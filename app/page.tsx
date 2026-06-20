@@ -1,15 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { type NavLink } from "@/lib/types";
 import { Navigation } from "@/components/Navigation";
-import { HeroSection } from "@/components/HeroSection";
 
-// ISR: 每 60 秒重新生成页面，确保数据及时更新
+// ISR: 每 60 秒重新生成页面
 export const revalidate = 60;
 
 export default async function Home() {
   const supabase = await createClient();
 
-  // Parallel fetch for faster initial load
   const [categoriesResult, linksResult] = await Promise.all([
     supabase.from("nav_categories").select("*").order("sort_order"),
     supabase
@@ -31,7 +29,12 @@ export default async function Home() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <HeroSection />
+      <h1 className="text-2xl font-bold text-center text-foreground/90 sm:text-3xl mb-2">
+        公益API导航站
+      </h1>
+      <p className="text-center text-sm text-muted-foreground/70 mb-8 max-w-md mx-auto">
+        精心收录 AI 大模型 API，涵盖官方原厂与公益中转服务
+      </p>
       <Navigation categories={categories} links={links} />
     </div>
   );

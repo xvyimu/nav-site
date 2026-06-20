@@ -64,7 +64,7 @@ if (!SOURCE_URL || !SOURCE_KEY || !TARGET_URL || !TARGET_KEY) {
 const source = createClient(SOURCE_URL, SOURCE_KEY);
 const target = createClient(TARGET_URL, TARGET_KEY);
 
-async function syncTable(table, conflictCol = "url") {
+async function syncTable(table, idCol = "id") {
   console.log(`\n📋 同步表: ${table}`);
 
   // 1. 读取源库
@@ -82,7 +82,7 @@ async function syncTable(table, conflictCol = "url") {
   // 2. 读取目标库
   const { data: targetData, error: tgtErr } = await target
     .from(table)
-    .select("id, url, title, updated_at");
+    .select(`id, ${idCol}, title, updated_at`);
 
   if (tgtErr) {
     console.error(`  ❌ 读取目标库失败: ${tgtErr.message}`);
@@ -91,25 +91,69 @@ async function syncTable(table, conflictCol = "url") {
   console.log(`  📥 目标库: ${targetData.length} 条`);
 
   // 3. 构建目标记录集合（用于去重）
-  const targetUrlSet = new Set();
+  const targetDedupSet = new Set();
   const targetIdSet = new Set();
   for (const item of targetData || []) {
-    if (item.url) targetUrlSet.add(item.url);
+    if (item[idCol]) targetDedupSet.add(item[idCol]);
     targetIdSet.add(item.id);
   }
 
-  // 4. 找出需要新增的记录
+  // 4. 找出需要新增和需要删除的记录
   const toInsert = [];
+  const sourceIdSet = new Set();
   for (const item of sourceData) {
-    if (shouldDedupe && (targetUrlSet.has(item.url) || targetIdSet.has(item.id))) {
+    sourceIdSet.add(item.id);
+    if (shouldDedupe && (targetDedupSet.has(item[idCol]) || targetIdSet.has(item.id))) {
       continue;
     }
     toInsert.push(item);
   }
 
+  // 5. 找出目标库中不再存在于源库的旧记录（需要清理的孤儿记录）
+  const toDelete = [];
+  for (const item of targetData || []) {
+    if (!sourceIdSet.has(item.id)) {
+      toDelete.push(item.id);
+    }
+  }
+
+  // 6. 先删除孤儿记录
+  if (toDelete.length > 0) {
+    console.log(`  🗑️ 待清理: ${toDelete.length} 条`);
+
+    if (!isDryRun) {
+      // 分批删除，避免 SQL 过长
+      let deleted = 0;
+      for (let i = 0; i < toDelete.length; i += 10) {
+        const batch = toDelete.slice(i, i + 10);
+        const { error: delErr } = await target
+          .from(table)
+          .delete()
+          .in("id", batch);
+        if (delErr) {
+          console.error(`  ❌ 第 ${i / 10 + 1} 批删除失败: ${delErr.message}`);
+        } else {
+          deleted += batch.length;
+        }
+      }
+      console.log(`  ✅ 实际清理: ${deleted} 条`);
+    } else {
+      console.log(`  👁️ (DRY RUN - 未实际删除)`);
+      for (const id of toDelete.slice(0, 5)) {
+        const item = targetData.find(d => d.id === id);
+        console.log(`    - ${item?.title || id}`);
+      }
+      if (toDelete.length > 5) {
+        console.log(`    ... 还有 ${toDelete.length - 5} 条`);
+      }
+    }
+  } else {
+    console.log(`  ✅ 无孤儿记录`);
+  }
+
   if (toInsert.length === 0) {
     console.log(`  ✅ 已是最新，无新增`);
-    return 0;
+    return toDelete.length > 0 ? toDelete.length : 0;
   }
   console.log(`  ➕ 待同步: ${toInsert.length} 条`);
 

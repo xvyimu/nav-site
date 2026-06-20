@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { verifyAdmin } from "@/lib/admin";
+import { withAdmin } from "@/lib/admin-middleware";
 
-export async function GET() {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "未授权" }, { status: 401 });
-  }
-
+export const GET = withAdmin(async () => {
   const supabase = await createAdminClient();
 
   const { data: links, error } = await supabase
@@ -19,13 +15,9 @@ export async function GET() {
   }
 
   return NextResponse.json({ links });
-}
+});
 
-export async function POST(request: Request) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "未授权" }, { status: 401 });
-  }
-
+export const POST = withAdmin(async (request: Request) => {
   const supabase = await createAdminClient();
   const body = await request.json();
 
@@ -48,4 +40,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ link: data });
-}
+});

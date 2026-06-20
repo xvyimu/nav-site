@@ -42,6 +42,8 @@ export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number })
               ? "border-l-[3px] border-l-primary"
               : type === "relay"
               ? "border-l-[3px] border-l-amber-400"
+              : type === "model"
+              ? "border-l-[3px] border-l-purple-400"
               : ""
           }`}
         >
@@ -67,6 +69,11 @@ export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number })
                 {type === "relay" && (
                   <span className="shrink-0 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800">
                     中转
+                  </span>
+                )}
+                {type === "model" && (
+                  <span className="shrink-0 inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-600 border border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800">
+                    排行
                   </span>
                 )}
               </div>

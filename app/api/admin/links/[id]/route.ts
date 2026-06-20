@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { verifyAdmin } from "@/lib/admin";
+import { withAdmin } from "@/lib/admin-middleware";
 
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "未授权" }, { status: 401 });
-  }
-
+export const PUT = withAdmin(async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const supabase = await createAdminClient();
   const body = await request.json();
@@ -31,13 +27,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   return NextResponse.json({ link: data });
-}
+});
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "未授权" }, { status: 401 });
-  }
-
+export const DELETE = withAdmin(async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const supabase = await createAdminClient();
 
@@ -48,4 +40,4 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   return NextResponse.json({ success: true });
-}
+});
