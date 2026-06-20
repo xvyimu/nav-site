@@ -2,20 +2,24 @@ import Link from "next/link";
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-50 border-b border-white/5 bg-background/70 backdrop-blur-2xl supports-[backdrop-filter]:bg-background/50">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="group flex items-center gap-2 font-semibold text-lg tracking-tight">
-          <span className="inline-block transition-transform duration-300 group-hover:scale-110">🌐</span>
-          <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent bg-[length:200%_100%] animate-[shimmer_4s_ease-in-out_infinite]">
-            公益API导航
-          </span>
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+        <Link href="/" className="flex items-center gap-2 font-medium tracking-tight">
+          <span className="text-base">⬡</span>
+          <span>公益API导航</span>
         </Link>
-        <nav className="flex items-center gap-3">
+        <nav className="flex items-center gap-1">
           <Link
             href="/submit"
-            className="inline-flex items-center justify-center rounded-xl bg-primary/20 border border-primary/20 px-4 py-1.5 text-sm font-medium text-primary transition-all duration-200 hover:bg-primary/30 hover:border-primary/30 hover:shadow-[0_0_20px_oklch(0.72_0.15_220/25%)] active:scale-[0.97]"
+            className="inline-flex h-8 items-center justify-center rounded-md px-3 text-sm font-medium text-muted-foreground/70 transition-colors hover:bg-white/[0.06] hover:text-foreground"
           >
-            提交站点
+            提交
+          </Link>
+          <Link
+            href="/admin"
+            className="inline-flex h-8 items-center justify-center rounded-md bg-foreground/[0.07] px-3 text-sm font-medium text-foreground transition-colors hover:bg-foreground/[0.12]"
+          >
+            管理
           </Link>
         </nav>
       </div>

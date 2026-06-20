@@ -2,19 +2,20 @@
 
 import { type NavLink } from "@/lib/types";
 import { motion } from "motion/react";
-import { Badge } from "@/components/ui/badge";
 import { fadeInUp } from "@/lib/animations";
 
 export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number }) {
+  let domain = "";
+  try {
+    domain = new URL(link.url).hostname.replace(/^www\./, "");
+  } catch {}
+
   return (
     <motion.div
       variants={fadeInUp}
       initial="hidden"
-      whileInView="show"
-      viewport={{ once: true, margin: "-40px" }}
-      transition={{ delay: index * 0.03 }}
-      whileHover={{ y: -3, transition: { duration: 0.2 } }}
-      whileTap={{ scale: 0.98 }}
+      animate="show"
+      transition={{ delay: index * 0.025 }}
     >
       <a
         href={link.url}
@@ -22,45 +23,32 @@ export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number })
         rel="noopener noreferrer"
         className="group block"
       >
-        <div className="glass-card rounded-xl p-4">
+        <div className="card-hover rounded-lg border border-white/10 bg-white/[0.02] p-3.5 transition-colors">
           <div className="flex items-start gap-3">
-            {/* 图标 */}
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 via-accent/10 to-primary/5 text-xl shadow-inner ring-1 ring-white/5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-foreground/[0.05] text-base">
               {link.icon || "🔗"}
             </div>
-
-            {/* 内容 */}
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="truncate font-semibold text-foreground group-hover:text-primary transition-colors duration-200">
+              <div className="flex items-center gap-2">
+                <span className="truncate text-[13.5px] font-medium text-foreground/90 group-hover:text-foreground">
                   {link.title}
-                  {link.featured && (
-                    <Badge
-                      variant="outline"
-                      className="ml-1.5 border-amber-500/30 bg-amber-500/10 text-[10px] px-1.5 py-0 text-amber-400 font-normal align-middle"
-                    >
-                      推荐
-                    </Badge>
-                  )}
-                </h3>
+                </span>
+                {link.featured && (
+                  <span className="shrink-0 inline-flex items-center rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-normal text-primary">
+                    推荐
+                  </span>
+                )}
               </div>
               {link.description && (
-                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground/80 leading-relaxed">
+                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/60">
                   {link.description}
                 </p>
               )}
-              <div className="mt-2 flex items-center gap-2">
-                <span className="rounded-md bg-primary/8 px-2 py-0.5 text-[10px] text-primary/60 ring-1 ring-primary/10">
-                  {link.category_name || "未分类"}
-                </span>
+              <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground/40">
+                <span className="font-mono">{domain}</span>
+                <span>·</span>
+                <span>{link.category_name || "未分类"}</span>
               </div>
-            </div>
-
-            {/* 箭头指示 */}
-            <div className="shrink-0 self-center text-muted-foreground/30 transition-all duration-200 group-hover:text-primary/60 group-hover:translate-x-0.5">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12L10 8L5 4" />
-              </svg>
             </div>
           </div>
         </div>
