@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyAdmin } from "@/lib/admin";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -8,7 +8,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
   const body = await request.json();
 
   const { data, error } = await supabase
@@ -39,7 +39,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const { error } = await supabase.from("nav_links").delete().eq("id", id);
 

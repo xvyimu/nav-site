@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyAdmin } from "@/lib/admin";
 
 export async function GET() {
@@ -7,7 +7,7 @@ export async function GET() {
     return NextResponse.json({ error: "未授权" }, { status: 401 });
   }
 
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const { data: categories, error } = await supabase
     .from("nav_categories")
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "未授权" }, { status: 401 });
   }
 
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
   const body = await request.json();
 
   const { data, error } = await supabase
