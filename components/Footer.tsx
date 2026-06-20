@@ -14,6 +14,16 @@ export function Footer() {
             <Link href="/admin" className="hover:text-foreground/60 transition-colors">
               管理
             </Link>
+            <span>·</span>
+            <a
+              href="https://halo.oneln.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="同款网站搭建"
+              className="text-primary/40 hover:text-primary/70 transition-colors"
+            >
+              oneLN
+            </a>
           </div>
         </div>
       </div>

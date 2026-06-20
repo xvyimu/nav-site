@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "setup": "node scripts/setup-env.mjs",
     "lint": "eslint",
     "add": "node scripts/add.mjs",
     "sync": "node scripts/sync-db.mjs",
