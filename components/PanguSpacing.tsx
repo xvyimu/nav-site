@@ -17,8 +17,11 @@ export function PanguSpacing() {
         if (!cancelled) {
           pangu.spacingPage();
         }
-      } catch {
-        // 静默失败，pangu 非关键依赖
+      } catch (e) {
+        // pangu 非关键依赖，失败时仅打印 debug 信息
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[pangu]", e);
+        }
       }
     }
 

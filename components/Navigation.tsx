@@ -5,9 +5,18 @@ import { type Category, type NavLink } from "@/lib/types";
 import { motion } from "motion/react";
 import { SearchBar } from "./SearchBar";
 import { LinkCard } from "./LinkCard";
+import { ModelRanking, type ModelRanking as ModelRankingType } from "./ModelRanking";
 import { staggerContainer, fadeInUp, slideDown } from "@/lib/animations";
 
-export function Navigation({ categories, links }: { categories: Category[]; links: NavLink[] }) {
+export function Navigation({
+  categories,
+  links,
+  modelRankings = [],
+}: {
+  categories: Category[];
+  links: NavLink[];
+  modelRankings?: ModelRankingType[];
+}) {
   const [activeCategory, setActiveCategory] = useState("all");
   const [search, setSearch] = useState("");
 
@@ -31,7 +40,6 @@ export function Navigation({ categories, links }: { categories: Category[]; link
 
   const officialLinks = filtered.filter((l) => l.category_slug === "big-tech");
   const relayLinks = filtered.filter((l) => l.category_slug === "free-relay");
-  const modelLinks = filtered.filter((l) => l.category_slug === "model-ranking");
 
   // Tab label mapping (friendly names)
   const sectionLabels: Record<string, string> = {
@@ -45,11 +53,29 @@ export function Navigation({ categories, links }: { categories: Category[]; link
     ...categories.map((c) => ({ key: c.slug, label: sectionLabels[c.slug] || c.name })),
   ];
 
+  // 全部视图下，推荐区已展示所有 featured 条目，分类区不再重复
+  const showNonFeatured = (items: NavLink[]) =>
+    activeCategory === "all" ? items.filter((l) => !l.featured && !l.paid) : items;
+
   const linkSections = [
-    { key: "big-tech", links: officialLinks, label: "官方 API", accent: "text-primary" },
-    { key: "free-relay", links: relayLinks, label: "中转服务站", accent: "text-amber-600/70" },
-    { key: "model-ranking", links: modelLinks, label: "模型排行榜", accent: "text-purple-600/70" },
+    { key: "big-tech", links: showNonFeatured(officialLinks), label: "官方 API", accent: "text-primary" },
+    { key: "free-relay", links: showNonFeatured(relayLinks), label: "中转服务站", accent: "text-amber-600/70" },
   ];
+
+  // 模型排行榜：搜索时按模型名/描述过滤
+  const filteredRankings = useMemo(() => {
+    if (!search.trim()) return modelRankings;
+    const q = search.toLowerCase();
+    return modelRankings.filter(
+      (r) => r.model_name.toLowerCase().includes(q) || r.description?.toLowerCase().includes(q) || r.source.toLowerCase().includes(q)
+    );
+  }, [modelRankings, search]);
+
+  const showRankings =
+    (activeCategory === "all" || activeCategory === "model-ranking") && filteredRankings.length > 0;
+  const showLinks = activeCategory !== "model-ranking";
+
+  const hasResults = (showLinks && filtered.length > 0) || showRankings;
 
   return (
     <motion.div className="space-y-8" variants={staggerContainer} initial="hidden" animate="show">
@@ -75,11 +101,8 @@ export function Navigation({ categories, links }: { categories: Category[]; link
         ))}
       </motion.div>
 
-      <motion.p className="text-xs text-muted-foreground/50" variants={fadeInUp}>
-        {filtered.length === 0 ? "没有找到匹配的工具" : `共 ${filtered.length} 个`}
-      </motion.p>
-
-      {featured.length > 0 && activeCategory === "all" && (
+      {/* 推荐区 */}
+      {showLinks && featured.length > 0 && activeCategory === "all" && (
         <motion.section variants={fadeInUp}>
           <h2 className="mb-4 text-xs font-medium uppercase tracking-widest text-muted-foreground/50 flex items-center gap-2">
             <span className="inline-block w-4 h-px bg-primary/40" />推荐
@@ -90,7 +113,8 @@ export function Navigation({ categories, links }: { categories: Category[]; link
         </motion.section>
       )}
 
-      {linkSections.map((section) =>
+      {/* 链接分类区 */}
+      {showLinks && linkSections.map((section) =>
         section.links.length > 0 && (activeCategory === "all" || activeCategory === section.key) ? (
           <motion.section key={section.key} variants={fadeInUp}>
             {activeCategory === "all" && (
@@ -105,10 +129,22 @@ export function Navigation({ categories, links }: { categories: Category[]; link
         ) : null
       )}
 
-      {filtered.length === 0 && (
+      {/* 模型排行榜区 */}
+      {showRankings && (
+        <motion.section variants={fadeInUp}>
+          {activeCategory === "all" && (
+            <h2 className="mb-4 text-xs font-medium uppercase tracking-widest text-purple-600/70 flex items-center gap-2">
+              <span className="inline-block w-4 h-px bg-purple-400" />模型排行榜
+            </h2>
+          )}
+          <ModelRanking data={filteredRankings} />
+        </motion.section>
+      )}
+
+      {!hasResults && (
         <motion.div className="flex flex-col items-center gap-3 py-20 text-muted-foreground/40" variants={fadeInUp}>
           <span className="text-3xl">🔍</span>
-          <p className="text-sm">没有找到匹配的工具</p>
+          <p className="text-sm">没有找到匹配的内容</p>
           <button onClick={() => { setSearch(""); setActiveCategory("all"); }}
             className="text-xs text-muted-foreground/50 hover:text-muted-foreground/80 underline-offset-2 underline transition-colors">
             清除筛选

@@ -200,9 +200,12 @@ async function main() {
   // 再同步链接
   const linkCount = await syncTable("nav_links", "url");
 
-  console.log(`\n📊 汇总: 分类 ${catCount} 条, 链接 ${linkCount} 条`);
+  // 同步模型排行榜（按 id 去重）
+  const rankCount = await syncTable("model_rankings", "id");
 
-  if (!isDryRun && (catCount > 0 || linkCount > 0)) {
+  console.log(`\n📊 汇总: 分类 ${catCount} 条, 链接 ${linkCount} 条, 排行榜 ${rankCount} 条`);
+
+  if (!isDryRun && (catCount > 0 || linkCount > 0 || rankCount > 0)) {
     console.log(`\n✅ 同步完成! 新数据已写入生产库。`);
   } else if (isDryRun) {
     console.log(`\n👁️ DRY RUN 完成。移除 --dry-run 即可实际写入。`);
