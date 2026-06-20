@@ -4,28 +4,52 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ===== Linear/Vercel 风格 — 极简深色 ===== */
+/* ===== 白底 + 黑 + 浅蓝主题 ===== */
 :root {
-  --background: oklch(0.11 0.005 260);
-  --foreground: oklch(0.93 0.005 260);
-  --card: oklch(0.14 0.005 260);
-  --card-foreground: oklch(0.93 0.005 260);
-  --popover: oklch(0.14 0.005 260);
-  --popover-foreground: oklch(0.93 0.005 260);
-  --primary: oklch(0.62 0.15 250);
-  --primary-foreground: oklch(0.14 0.005 260);
-  --secondary: oklch(0.18 0.005 260);
-  --secondary-foreground: oklch(0.88 0.005 260);
-  --muted: oklch(0.16 0.005 260);
-  --muted-foreground: oklch(0.5 0.01 255);
-  --accent: oklch(0.58 0.18 280);
-  --accent-foreground: oklch(0.93 0.005 260);
-  --destructive: oklch(0.58 0.2 22);
-  --border: oklch(0.93 0.005 260 / 8%);
-  --input: oklch(0.93 0.005 260 / 10%);
-  --ring: oklch(0.62 0.15 250);
-  --radius: 0.375rem;
+  --radius: 0.75rem;
 
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.13 0.01 250);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.13 0.01 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.13 0.01 250);
+
+  /* 浅蓝主色 */
+  --primary: oklch(0.62 0.18 250);
+  --primary-foreground: oklch(0.99 0 0);
+
+  --secondary: oklch(0.97 0.01 250);
+  --secondary-foreground: oklch(0.35 0.01 250);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.45 0.01 250);
+
+  --accent: oklch(0.95 0.03 250);
+  --accent-foreground: oklch(0.13 0.01 250);
+
+  --destructive: oklch(0.58 0.22 22);
+  --border: oklch(0.92 0.01 250);
+  --input: oklch(0.92 0.01 250);
+  --ring: oklch(0.62 0.18 250);
+
+  --chart-1: oklch(0.62 0.18 250);
+  --chart-2: oklch(0.55 0.2 280);
+  --chart-3: oklch(0.68 0.14 160);
+  --chart-4: oklch(0.72 0.14 70);
+  --chart-5: oklch(0.58 0.2 350);
+
+  --sidebar: oklch(0.99 0 0);
+  --sidebar-foreground: oklch(0.13 0.01 250);
+  --sidebar-primary: oklch(0.62 0.18 250);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.95 0.03 250);
+  --sidebar-accent-foreground: oklch(0.13 0.01 250);
+  --sidebar-border: oklch(0.92 0.01 250);
+  --sidebar-ring: oklch(0.62 0.18 250);
+}
+
+@theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -44,15 +68,38 @@
   --color-destructive: var(--destructive);
   --color-ring: var(--ring);
   --color-input: var(--input);
+  --radius: var(--radius);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
   --radius-sm: calc(var(--radius) * 0.5);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) * 1.5);
+  --radius-xl: calc(var(--radius) * 2);
 }
 
 body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: calc(var(--radius) - 2px);
 }
 
 @layer base {
@@ -63,39 +110,58 @@ body {
     background-color: var(--background);
     color: var(--foreground);
   }
+  html {
+    @apply font-sans;
+  }
 }
 
-/* 极简网格背景 */
-.grid-bg {
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  z-index: -10;
+/* 卡片样式 */
+.card-hover {
+  transition: all 0.2s cubic-bezier(0.32, 0, 0.08, 1);
 }
-.grid-bg::before {
-  content: "";
-  position: absolute;
-  inset: -50%;
-  width: 200%;
-  height: 200%;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
-  background-size: 48px 48px;
+.card-hover:hover {
+  border-color: oklch(0.62 0.18 250 / 30%);
+  box-shadow: 0 4px 16px oklch(0.62 0.18 250 / 8%);
+  transform: translateY(-1px);
 }
-.grid-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 0%, oklch(0.62 0.15 250 / 5%), transparent 60%);
+
+/* 官方板块 - 蓝色左边框 */
+.border-official {
+  border-left: 3px solid oklch(0.62 0.18 250);
+}
+
+/* 中转板块 - 琥珀色左边框 */
+.border-relay {
+  border-left: 3px solid oklch(0.68 0.2 50);
+}
+
+/* 加载骨架 */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-bg {
+  background: linear-gradient(
+    90deg,
+    oklch(0.97 0 0) 0%,
+    oklch(0.93 0.01 250) 50%,
+    oklch(0.97 0 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
 }
 
 /* 滚动条 */
-::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: oklch(0.93 0.005 260 / 8%); border-radius: 2px; }
+::-webkit-scrollbar-thumb {
+  background: oklch(0.92 0.01 250);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: oklch(0.8 0.01 250); }
 
 ::selection {
-  background: oklch(0.62 0.15 250 / 25%);
+  background: oklch(0.62 0.18 250 / 20%);
   color: var(--foreground);
 }

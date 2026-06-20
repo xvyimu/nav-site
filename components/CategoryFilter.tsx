@@ -17,10 +17,10 @@ export function CategoryFilter({
       <motion.button
         layout
         onClick={() => onChange("all")}
-        className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
           active === "all"
-            ? "bg-foreground/[0.08] text-foreground/80"
-            : "text-muted-foreground/50 hover:text-foreground/70"
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted text-muted-foreground/70 hover:bg-muted/80 hover:text-foreground"
         }`}
         whileTap={{ scale: 0.97 }}
       >
@@ -31,10 +31,10 @@ export function CategoryFilter({
           key={cat.slug}
           layout
           onClick={() => onChange(cat.slug)}
-          className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
             active === cat.slug
-              ? "bg-foreground/[0.08] text-foreground/80"
-              : "text-muted-foreground/50 hover:text-foreground/70"
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-muted-foreground/70 hover:bg-muted/80 hover:text-foreground"
           }`}
           whileTap={{ scale: 0.97 }}
         >

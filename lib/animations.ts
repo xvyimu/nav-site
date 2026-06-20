@@ -6,12 +6,12 @@ export const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.03, delayChildren: 0.02 },
+    transition: { staggerChildren: 0.04, delayChildren: 0.02 },
   },
 };
 
 export const fadeInUp: Variants = {
-  hidden: { opacity: 0, y: 8 },
+  hidden: { opacity: 0, y: 10 },
   show: {
     opacity: 1,
     y: 0,

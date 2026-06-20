@@ -4,7 +4,6 @@ import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Analytics } from "@/components/Analytics";
-import { GridBackground } from "@/components/GridBackground";
 import { PanguSpacing } from "@/components/PanguSpacing";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -18,8 +17,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://yuanjia1314.ccwu.cc";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://yuanjia1314.ccwu.cc";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -37,21 +35,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="zh-CN"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <GridBackground />
         <PanguSpacing />
         <Header />
-        <main className="flex-1 relative">{children}</main>
+        <main className="flex-1">{children}</main>
         <Footer />
         <Analytics />
         <Toaster position="top-center" />
