@@ -79,10 +79,10 @@ async function syncTable(table, idCol = "id") {
   }
   console.log(`  📤 源库: ${sourceData.length} 条`);
 
-  // 2. 读取目标库
+  // 2. 读取目标库（用 * 来兼容 PROD/DEV 可能不同的 schema）
   const { data: targetData, error: tgtErr } = await target
     .from(table)
-    .select(`id, ${idCol}, title, updated_at`);
+    .select("*");
 
   if (tgtErr) {
     console.error(`  ❌ 读取目标库失败: ${tgtErr.message}`);
@@ -98,7 +98,7 @@ async function syncTable(table, idCol = "id") {
     targetIdSet.add(item.id);
   }
 
-  // 4. 找出需要新增和需要删除的记录
+  // 4. 构建源 ID 集合，并找出需要新增的记录
   const toInsert = [];
   const sourceIdSet = new Set();
   for (const item of sourceData) {
@@ -114,6 +114,9 @@ async function syncTable(table, idCol = "id") {
   for (const item of targetData || []) {
     if (!sourceIdSet.has(item.id)) {
       toDelete.push(item.id);
+      // 从去重集中移除，防止孤儿删除后同条目的新版本被跳过
+      if (item[idCol]) targetDedupSet.delete(item[idCol]);
+      targetIdSet.delete(item.id);
     }
   }
 
