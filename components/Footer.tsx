@@ -1,24 +1,38 @@
+import Link from "next/link";
+
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-card">
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        <div className="flex flex-col items-center gap-4 text-sm text-muted-foreground">
-          <p>© 2026 公益API导航站 · 收录公益AI中转站，助你实现Token自由</p>
-          <div className="flex gap-4">
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-foreground transition-colors"
-            >
-              GitHub
-            </a>
-            <span>·</span>
-            <a href="/submit" className="hover:text-foreground transition-colors">
+    <footer className="border-t border-border/40 bg-muted/30">
+      <div className="mx-auto max-w-6xl px-4 py-6">
+        <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+          <p>
+            © 2026{" "}
+            <Link href="https://yuanjia1314.ccwu.cc" className="hover:text-foreground transition-colors">
+              公益API导航站
+            </Link>
+            {" · "}收录公益AI中转站，助你实现Token自由
+          </p>
+          <div className="flex items-center gap-3 text-xs">
+            <Link href="https://halo.oneln.org/" target="_blank" className="hover:text-foreground transition-colors">
+              ✦ oneLN
+            </Link>
+            <span className="text-border">|</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="text-amber-400">★</span> 本站满天星
+              <span className="text-amber-400">★</span>
+            </span>
+            <span className="text-border">|</span>
+            <Link href="/submit" className="hover:text-foreground transition-colors">
               提交站点
-            </a>
+            </Link>
           </div>
         </div>
+      </div>
+      {/* 页脚小标 - 来自用户素材 */}
+      <div className="mx-auto max-w-6xl px-4 pb-2 text-center text-[10px] text-muted-foreground/50">
+        <a href="https://halo.oneln.org/" target="_blank" title="同款网站搭建" className="hover:text-muted-foreground transition-colors">
+          oneLN
+        </a>
       </div>
     </footer>
   );

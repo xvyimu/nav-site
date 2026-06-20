@@ -4,6 +4,9 @@ import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Analytics } from "@/components/Analytics";
+import { StarBackground } from "@/components/StarBackground";
+import { PanguSpacing } from "@/components/PanguSpacing";
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,11 +47,14 @@ export default function RootLayout({
       lang="zh-CN"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-background text-foreground">
+        <StarBackground />
+        <PanguSpacing />
         <Header />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 relative">{children}</main>
         <Footer />
         <Analytics />
+        <Toaster position="top-center" />
       </body>
     </html>
   );
