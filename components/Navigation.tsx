@@ -33,7 +33,7 @@ export function Navigation({ categories, links }: { categories: Category[]; link
   const relayLinks = filtered.filter((l) => l.category_slug === "free-relay");
   const modelLinks = filtered.filter((l) => l.category_slug === "model-ranking");
 
-  // Section tab names for display
+  // Tab label mapping (friendly names)
   const sectionLabels: Record<string, string> = {
     "big-tech": "官方 API",
     "free-relay": "中转服务站",
@@ -41,8 +41,8 @@ export function Navigation({ categories, links }: { categories: Category[]; link
   };
 
   const tabs = [
-    { key: "all", label: "全部", icon: "" },
-    ...categories.map((c) => ({ key: c.slug, label: sectionLabels[c.slug] || c.name, icon: c.icon || "" })),
+    { key: "all", label: "全部" },
+    ...categories.map((c) => ({ key: c.slug, label: sectionLabels[c.slug] || c.name })),
   ];
 
   const linkSections = [
@@ -57,7 +57,7 @@ export function Navigation({ categories, links }: { categories: Category[]; link
         <SearchBar value={search} onChange={setSearch} />
       </motion.div>
 
-      {/* Single row of tabs - clean and minimal */}
+      {/* Single row of clean text tabs */}
       <motion.div variants={fadeInUp} className="flex items-center gap-1 border-b border-border pb-1 overflow-x-auto">
         {tabs.map((tab) => (
           <button
@@ -67,7 +67,7 @@ export function Navigation({ categories, links }: { categories: Category[]; link
               activeCategory === tab.key ? "text-foreground" : "text-muted-foreground/50 hover:text-foreground/70"
             }`}
           >
-            {tab.icon && <span className="mr-1">{tab.icon}</span>}{tab.label}
+            {tab.label}
             {activeCategory === tab.key && (
               <motion.div layoutId="section-indicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" transition={{ type: "spring", stiffness: 380, damping: 30 }} />
             )}
