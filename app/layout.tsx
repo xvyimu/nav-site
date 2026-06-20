@@ -15,7 +15,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL || "https://yuanjia1314.ccwu.cc";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
     default: "AI 导航站 — 精选 AI 工具与开发者资源",
     template: "%s | AI 导航站",
