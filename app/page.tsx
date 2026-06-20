@@ -26,6 +26,7 @@ export default async function Home() {
     ...l,
     category_name: l.nav_categories?.name ?? null,
     category_slug: l.nav_categories?.slug ?? null,
+    updated_at: l.updated_at ?? l.created_at,
   }));
 
   return (

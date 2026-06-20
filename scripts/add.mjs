@@ -53,8 +53,7 @@ if (args.length < 2) {
 分类 slug:
   free-relay  — 公益中转站 🆓
   big-tech    — 大厂API   🏢
-  oss-model   — 开源模型  📖
-  gpu         — 算力GPU   ⚡
+  model-ranking — 模型排行榜 🏆
 
 示例:
   node scripts/add.mjs "某站" "https://xxx.com" "描述" free-relay
@@ -90,7 +89,7 @@ async function main() {
     .single();
 
   if (catErr || !cat) {
-    console.error(`❌ 分类 "${categorySlug}" 不存在，请用 free-relay / big-tech / oss-model / gpu`);
+    console.error(`❌ 分类 "${categorySlug}" 不存在，请用 free-relay / big-tech / model-ranking`);
     process.exit(1);
   }
 

@@ -1,14 +1,8 @@
 "use client";
 
-import { type NavLink } from "@/lib/types";
+import { type NavLink, getLinkType, relativeTime } from "@/lib/types";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
-
-function getLinkType(slug: string | null): "official" | "relay" | "neutral" {
-  if (slug === "big-tech" || slug === "oss-model") return "official";
-  if (slug === "free-relay") return "relay";
-  return "neutral";
-}
 
 export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number }) {
   let domain = "";
@@ -17,6 +11,16 @@ export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number })
   } catch {}
 
   const type = getLinkType(link.category_slug ?? null);
+  const ts = relativeTime(link.updated_at || link.created_at);
+
+  function handleClick() {
+    // Fire-and-forget click tracking
+    fetch("/api/click", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: link.url }),
+    }).catch(() => {});
+  }
 
   return (
     <motion.div
@@ -29,6 +33,7 @@ export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number })
         href={link.url}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={handleClick}
         className="group block"
       >
         <div
@@ -55,12 +60,12 @@ export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number })
                   </span>
                 )}
                 {type === "official" && (
-                  <span className="shrink-0 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600 border border-blue-200">
+                  <span className="shrink-0 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
                     官方
                   </span>
                 )}
                 {type === "relay" && (
-                  <span className="shrink-0 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600 border border-amber-200">
+                  <span className="shrink-0 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800">
                     中转
                   </span>
                 )}
@@ -72,6 +77,8 @@ export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number })
               )}
               <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground/40">
                 <span className="font-mono">{domain}</span>
+                {ts && <><span>·</span><span>{ts}</span></>}
+                {link.click_count > 0 && <><span>·</span><span>{link.click_count} 次点击</span></>}
               </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function Header() {
   return (
@@ -9,18 +10,13 @@ export function Header() {
           <span className="text-sm">公益API导航站</span>
         </Link>
         <nav className="flex items-center gap-1">
-          <Link
-            href="/submit"
-            className="inline-flex h-8 items-center rounded-md px-3 text-xs text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
-          >
+          <Link href="/submit" className="inline-flex h-8 items-center rounded-md px-3 text-xs text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors">
             提交
           </Link>
-          <Link
-            href="/admin"
-            className="inline-flex h-8 items-center rounded-md px-3 text-xs text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
-          >
+          <Link href="/admin" className="inline-flex h-8 items-center rounded-md px-3 text-xs text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors">
             管理
           </Link>
+          <ThemeToggle />
         </nav>
       </div>
     </header>
