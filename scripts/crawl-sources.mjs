@@ -8,7 +8,7 @@
  *   node scripts/crawl-sources.mjs
  *
  * 定时执行（Vercel Cron）:
- *   改为 API 路由后部署，vercel.json 配置 `"cron": "0 */6 * * *"`
+ *   改为 API 路由后部署，vercel.json 配置 `"cron": "0 *\\/6 * * *"`
  */
 
 import { createClient } from "@supabase/supabase-js";

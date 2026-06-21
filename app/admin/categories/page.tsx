@@ -19,7 +19,8 @@ export default function AdminCategoriesPage() {
     setLoading(false);
   }
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); // eslint-disable-line react-hooks/set-state-in-effect
+  }, []);
 
   function resetForm() {
     setForm({ name: "", slug: "", description: "", icon: "📁", sort_order: 0 });

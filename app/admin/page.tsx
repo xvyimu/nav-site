@@ -37,7 +37,8 @@ export default function AdminPage() {
     setLoading(false);
   }
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); // eslint-disable-line react-hooks/set-state-in-effect
+  }, []);
 
   function resetForm() {
     setForm({ title: "", url: "", description: "", icon: "🔗", category_id: categories[0]?.id || "", approved: true, featured: false });

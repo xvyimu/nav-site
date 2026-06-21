@@ -1,0 +1,88 @@
+name: 链接健康度检查
+on:
+  workflow_dispatch:       # 手动触发
+  schedule:
+    - cron: "0 6 * * 1"   # 每周一 06:00 UTC
+
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+
+      - name: 运行链接检测
+        id: check
+        continue-on-error: true
+        run: node scripts/check-links.mjs --strict 2>&1 | tee check-output.txt
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          LINK_CHECK_TIMEOUT: "10000"
+          LINK_CHECK_CONCURRENCY: "5"
+
+      - name: 解析检测结果
+        id: parse
+        run: |
+          BROKEN=$(grep -c "❌" check-output.txt || true)
+          TOTAL=$(grep "📊 共" check-output.txt | grep -oP '\d+' | tail -1 || echo "0")
+          echo "broken=$BROKEN" >> $GITHUB_OUTPUT
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+
+      - name: 有问题时创建 Issue
+        if: steps.check.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('check-output.txt', 'utf-8');
+
+            // 提取异常链接和重定向
+            const lines = output.split('\n');
+            const brokenLines = [];
+            const redirectLines = [];
+            let inBroken = false, inRedirect = false;
+
+            for (const line of lines) {
+              if (line.includes('❌ 异常链接')) { inBroken = true; inRedirect = false; continue; }
+              if (line.includes('⚠️  重定向链接')) { inRedirect = true; inBroken = false; continue; }
+              if (inBroken && line.trim()) brokenLines.push(line.trim());
+              if (inRedirect && line.trim()) redirectLines.push(line.trim());
+            }
+
+            let body = `## 🔍 链接健康度检测报告\n\n`;
+            body += `检测时间: ${new Date().toISOString()}\n\n`;
+
+            if (brokenLines.length) {
+              body += `### ❌ 异常链接 (${brokenLines.length})\n\n`;
+              body += `| 标题 | URL | 状态 |\n|------|-----|:----:|\n`;
+              for (const line of brokenLines) {
+                body += `| ${line.replace(/^\s*[•]\s*/, '')} | |\n`;
+              }
+              body += '\n';
+            }
+
+            if (redirectLines.length) {
+              body += `### ⚠️ 重定向链接 (${redirectLines.length})\n\n`;
+              body += '建议统一更新为直接可访问的 URL。\n\n';
+            }
+
+            body += `---\n*由 [链接健康度检查](/.github/workflows/link-check.yml) 自动生成*`;
+
+            const broken = parseInt('${{ steps.parse.outputs.broken }}') || 0;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔗 链接健康度报告 — 发现 ${broken} 个异常链接`,
+              body: body,
+              labels: ['link-health', 'automated'],
+            });

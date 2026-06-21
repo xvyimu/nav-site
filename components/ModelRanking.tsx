@@ -32,14 +32,6 @@ const sourceColors: Record<string, string> = {
   "能力冠军": "text-rose-600 dark:text-rose-400",
 };
 
-const sourceBorderColors: Record<string, string> = {
-  "综合旗舰": "border-l-blue-400",
-  "开源模型": "border-l-emerald-400",
-  "Chatbot Arena": "border-l-violet-400",
-  "SuperCLUE": "border-l-amber-400",
-  "能力冠军": "border-l-rose-400",
-};
-
 export function ModelRanking({ data }: { data: ModelRanking[] }) {
   const [activeSource, setActiveSource] = useState("all");
 

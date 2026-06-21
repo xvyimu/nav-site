@@ -76,8 +76,9 @@ export async function GET(request: Request) {
       message: `同步完成`,
       detail: results,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("同步失败:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const message = err instanceof Error ? err.message : "未知错误";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
