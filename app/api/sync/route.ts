@@ -10,10 +10,14 @@ const TARGET_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const TARGET_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function GET(request: Request) {
-  // 简单鉴权：校验 ?secret=
+  // 鉴权：校验 ?secret=（fail-fast：CRON_SECRET 未配置时拒绝访问）
   const { searchParams } = new URL(request.url);
   const secret = searchParams.get("secret");
-  if (secret !== process.env.CRON_SECRET && process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET) {
+    console.error("CRON_SECRET 未配置，sync 端点已禁用");
+    return NextResponse.json({ error: "服务器配置错误" }, { status: 500 });
+  }
+  if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "未授权" }, { status: 401 });
   }
 

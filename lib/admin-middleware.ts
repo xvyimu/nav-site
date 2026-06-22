@@ -1,12 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { verifyAdmin } from "@/lib/admin";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Handler = (...args: any[]) => Promise<NextResponse>;
+type AdminHandler<T extends unknown[] = unknown[]> = (
+  ...args: T
+) => Promise<NextResponse>;
 
-export function withAdmin(handler: Handler): Handler {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return async (...args: any[]) => {
+export function withAdmin<T extends unknown[]>(handler: AdminHandler<T>): AdminHandler<T> {
+  return async (...args: T) => {
     if (!(await verifyAdmin())) {
       return NextResponse.json({ error: "未授权" }, { status: 401 });
     }

@@ -163,11 +163,21 @@ function RankingRow({ item, index }: { item: ModelRanking; index: number }) {
   );
 
   if (item.url) {
+    const safeUrl = (() => {
+      try {
+        const parsed = new URL(item.url);
+        return parsed.protocol === "http:" || parsed.protocol === "https:";
+      } catch { return false; }
+    })();
     return (
       <motion.div variants={fadeInUp} transition={{ delay: index * 0.03 }}>
-        <a href={item.url} target="_blank" rel="noopener noreferrer" className="block">
-          {content}
-        </a>
+        {safeUrl ? (
+          <a href={item.url} target="_blank" rel="noopener noreferrer" className="block">
+            {content}
+          </a>
+        ) : (
+          <div className="block">{content}</div>
+        )}
       </motion.div>
     );
   }

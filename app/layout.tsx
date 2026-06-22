@@ -63,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 name: siteName,
                 url: siteUrl,
                 description: siteDescription,
-              }),
+              }).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026"),
             }}
           />
         </ThemeProvider>

@@ -1,12 +1,14 @@
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { type NavLink } from "@/lib/types";
 import { Navigation } from "@/components/Navigation";
+import { NavSkeleton } from "@/components/NavSkeleton";
 import { getModelRankings } from "@/lib/model-rankings";
 
 // ISR: 每 60 秒重新生成页面
 export const revalidate = 60;
 
-export default async function Home() {
+async function NavContent() {
   const supabase = await createClient();
 
   const [categoriesResult, linksResult, rankings] = await Promise.all([
@@ -21,6 +23,10 @@ export default async function Home() {
     getModelRankings(),
   ]);
 
+  if (categoriesResult.error || linksResult.error) {
+    throw new Error(`DB query failed: ${categoriesResult.error?.message ?? linksResult.error?.message}`);
+  }
+
   const categories = categoriesResult.data ?? [];
   const links: NavLink[] = (linksResult.data ?? []).map((l) => ({
     ...l,
@@ -30,12 +36,20 @@ export default async function Home() {
   }));
 
   return (
+    <Navigation
+      categories={categories}
+      links={links}
+      modelRankings={rankings}
+    />
+  );
+}
+
+export default function Home() {
+  return (
     <div className="w-full">
-      <Navigation
-        categories={categories}
-        links={links}
-        modelRankings={rankings}
-      />
+      <Suspense fallback={<NavSkeleton />}>
+        <NavContent />
+      </Suspense>
     </div>
   );
 }

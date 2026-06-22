@@ -17,6 +17,9 @@ jobs:
       - uses: pnpm/action-setup@v4
       - run: pnpm install --frozen-lockfile
 
+      - name: 单元测试
+        run: pnpm test
+
       - name: ESLint
         run: pnpm lint
 
@@ -34,7 +37,7 @@ jobs:
         if: github.ref == 'refs/heads/master' && github.event_name == 'push'
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: a7e3787f-3c6d-4179-919d-1dc1efa83c52
+          NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
         run: |
           npm install -g netlify-cli
           netlify deploy --prod

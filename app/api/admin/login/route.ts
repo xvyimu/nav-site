@@ -1,7 +1,38 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { setSessionCookie, clearSession } from "@/lib/admin";
 
+const MAX_ATTEMPTS = 5;
+const DELAY_MS = 800;
+
+// 使用 Supabase 做分布式失败计数（Serverless 下 in-memory 不共享）
+async function checkLoginAttempts(ip: string): Promise<{ allowed: boolean }> {
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
+
+  const windowStart = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+
+  const { count } = await supabase
+    .from("login_attempts")
+    .select("*", { count: "exact", head: true })
+    .eq("ip", ip)
+    .gte("created_at", windowStart);
+
+  return { allowed: (count ?? 0) < MAX_ATTEMPTS };
+}
+
+async function recordLoginAttempt(ip: string, success: boolean) {
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
+  await supabase.from("login_attempts").insert({ ip, success });
+}
+
 export async function POST(request: Request) {
+  const ip =
+    request.headers.get("x-nf-client-connection-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown";
+
   const { password } = await request.json();
   const adminPassword = process.env.ADMIN_PASSWORD;
 
@@ -9,8 +40,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "未配置管理员密码" }, { status: 500 });
   }
 
-  if (password === adminPassword) {
-    await setSessionCookie(password);
+  // 速率限制检查（分布式）
+  const { allowed } = await checkLoginAttempts(ip);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "登录尝试过于频繁，请 15 分钟后再试" },
+      { status: 429 }
+    );
+  }
+
+  // 恒定时间比较
+  const passwordBuf = Buffer.from(password ?? "");
+  const expectedBuf = Buffer.from(adminPassword);
+
+  let isMatch: boolean;
+  if (passwordBuf.length !== expectedBuf.length) {
+    // 长度不同时，用定时安全的"假比较"防止时序泄露
+    const dummy = crypto.randomBytes(expectedBuf.length);
+    crypto.timingSafeEqual(dummy, dummy);
+    isMatch = false;
+  } else {
+    isMatch = crypto.timingSafeEqual(passwordBuf, expectedBuf);
+  }
+
+  // 无论成功失败都等 800ms（防暴力破解 + 时序攻击）
+  await new Promise((r) => setTimeout(r, DELAY_MS));
+  await recordLoginAttempt(ip, isMatch);
+
+  if (isMatch) {
+    await setSessionCookie(adminPassword);
     return NextResponse.json({ success: true });
   }
 

@@ -1,21 +1,30 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { withAdmin } from "@/lib/admin-middleware";
+import { withAdminWrite } from "@/lib/admin-middleware-write";
+import { z } from "zod";
 
-export const PUT = withAdmin(async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
+const updateCategorySchema = z.object({
+  name: z.string().min(1).max(50).optional(),
+  slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/).optional(),
+  description: z.string().max(200).nullish(),
+  icon: z.string().max(20).nullish(),
+  sort_order: z.number().int().optional(),
+});
+
+export const PUT = withAdminWrite(async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const supabase = await createAdminClient();
   const body = await request.json();
 
+  const parsed = updateCategorySchema.safeParse(body);
+  if (!parsed.success) {
+    const errors = parsed.error.flatten().fieldErrors;
+    return NextResponse.json({ error: "输入验证失败", details: errors }, { status: 400 });
+  }
+
   const { data, error } = await supabase
     .from("nav_categories")
-    .update({
-      name: body.name,
-      slug: body.slug,
-      description: body.description,
-      icon: body.icon,
-      sort_order: body.sort_order,
-    })
+    .update(parsed.data)
     .eq("id", id)
     .select()
     .single();
@@ -23,19 +32,15 @@ export const PUT = withAdmin(async (request: Request, { params }: { params: Prom
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
   return NextResponse.json({ category: data });
 });
 
-export const DELETE = withAdmin(async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
+export const DELETE = withAdminWrite(async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const supabase = await createAdminClient();
-
   const { error } = await supabase.from("nav_categories").delete().eq("id", id);
-
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
   return NextResponse.json({ success: true });
 });

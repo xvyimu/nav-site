@@ -5,20 +5,29 @@ import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 
 export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number }) {
+  function isSafeUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
+
   let domain = "";
   try {
     domain = new URL(link.url).hostname.replace(/^www\./, "");
   } catch {}
 
+  const safeUrl = isSafeUrl(link.url) ? link.url : "#";
   const type = getLinkType(link.category_slug ?? null);
   const ts = relativeTime(link.updated_at || link.created_at);
 
   function handleClick() {
-    fetch("/api/click", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: link.url }),
-    }).catch(() => {});
+    navigator.sendBeacon(
+      "/api/click",
+      new Blob([JSON.stringify({ url: link.url })], { type: "application/json" }),
+    );
   }
 
   // ── Pink hover vars ──
@@ -43,7 +52,7 @@ export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number })
       transition={{ delay: (index % 20) * 0.02 }}
     >
       <a
-        href={link.url}
+        href={safeUrl}
         target="_blank"
         rel="noopener noreferrer"
         onClick={handleClick}
