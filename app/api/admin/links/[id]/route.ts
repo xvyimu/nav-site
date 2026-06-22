@@ -5,7 +5,17 @@ import { z } from "zod";
 
 const updateLinkSchema = z.object({
   title: z.string().min(1).max(100).optional(),
-  url: z.string().url().max(2000).optional(),
+  url: z.string()
+    .url()
+    .refine((u) => {
+      try {
+        return new URL(u).protocol === "http:" || new URL(u).protocol === "https:";
+      } catch {
+        return false;
+      }
+    })
+    .max(2000)
+    .optional(),
   description: z.string().max(500).nullish(),
   icon: z.string().max(20).nullish(),
   category_id: z.string().uuid().nullable().nullish(),

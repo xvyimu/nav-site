@@ -4,7 +4,16 @@ import { z } from "zod";
 
 const submitSchema = z.object({
   title: z.string().min(1, "站点名称不能为空").max(100, "站点名称不能超过 100 字符"),
-  url: z.string().url("URL 格式不正确").max(2000, "URL 不能超过 2000 字符"),
+  url: z.string()
+    .url("URL 格式不正确")
+    .refine((u) => {
+      try {
+        return new URL(u).protocol === "http:" || new URL(u).protocol === "https:";
+      } catch {
+        return false;
+      }
+    }, "仅允许 http/https 协议")
+    .max(2000, "URL 不能超过 2000 字符"),
   description: z.string().max(500, "描述不能超过 500 字符").nullish().default(null),
   category_id: z.string().uuid("分类 ID 格式不正确").nullable().nullish().default(null),
 });
