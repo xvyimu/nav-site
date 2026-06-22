@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { setSessionCookie, clearSession } from "@/lib/admin";
+import { cookies } from "next/headers";
+import { encode } from "@auth/core/jwt";
 
 const MAX_ATTEMPTS = 5;
 const DELAY_MS = 800;
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
   if (!allowed) {
     return NextResponse.json(
       { error: "登录尝试过于频繁，请 15 分钟后再试" },
-      { status: 429 }
+      { status: 429 },
     );
   }
 
@@ -67,15 +68,45 @@ export async function POST(request: Request) {
   await new Promise((r) => setTimeout(r, DELAY_MS));
   await recordLoginAttempt(ip, isMatch);
 
-  if (isMatch) {
-    await setSessionCookie(adminPassword);
-    return NextResponse.json({ success: true });
+  if (!isMatch) {
+    return NextResponse.json({ error: "密码错误" }, { status: 401 });
   }
 
-  return NextResponse.json({ error: "密码错误" }, { status: 401 });
+  // 创建 Auth.js JWT 会话
+  const AUTH_SECRET = process.env.AUTH_SECRET;
+  if (!AUTH_SECRET) {
+    return NextResponse.json({ error: "未配置会话密钥" }, { status: 500 });
+  }
+
+  const isSecure = process.env.NODE_ENV === "production";
+  const cookieName = isSecure ? "__Secure-next-auth.session-token" : "next-auth.session-token";
+
+  const sessionToken = await encode({
+    secret: AUTH_SECRET,
+    token: {
+      sub: "admin",
+      role: "admin",
+    },
+    maxAge: 4 * 60 * 60, // 4 小时，与之前一致
+  });
+
+  const cookieStore = await cookies();
+  cookieStore.set({
+    name: cookieName,
+    value: sessionToken,
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 4 * 60 * 60,
+  });
+
+  return NextResponse.json({ success: true });
 }
 
 export async function DELETE() {
-  await clearSession();
+  const cookieStore = await cookies();
+  const isSecure = process.env.NODE_ENV === "production";
+  cookieStore.delete(isSecure ? "__Secure-next-auth.session-token" : "next-auth.session-token");
   return NextResponse.json({ success: true });
 }

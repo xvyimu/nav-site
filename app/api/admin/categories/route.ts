@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { withAdminWrite } from "@/lib/admin-middleware-write";
+import { requireAdmin, unauthorized } from "@/lib/admin-auth";
 import { z } from "zod";
 
 const createCategorySchema = z.object({
@@ -12,7 +12,10 @@ const createCategorySchema = z.object({
   sort_order: z.number().int("排序必须是整数").optional().default(0),
 });
 
-export const GET = withAdminWrite(async () => {
+export async function GET() {
+  const { authorized } = await requireAdmin();
+  if (!authorized) return unauthorized();
+
   const supabase = await createAdminClient();
   const { data: categories, error } = await supabase
     .from("nav_categories")
@@ -23,9 +26,12 @@ export const GET = withAdminWrite(async () => {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ categories });
-});
+}
 
-export const POST = withAdminWrite(async (request: Request) => {
+export async function POST(request: Request) {
+  const { authorized } = await requireAdmin();
+  if (!authorized) return unauthorized();
+
   const supabase = await createAdminClient();
   const body = await request.json();
 
@@ -53,4 +59,4 @@ export const POST = withAdminWrite(async (request: Request) => {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ category: data });
-});
+}

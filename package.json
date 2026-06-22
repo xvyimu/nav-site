@@ -16,6 +16,8 @@
     "add-help": "node scripts/add.mjs --help"
   },
   "dependencies": {
+    "@auth/core": "0.0.0-380f8d56",
+    "@auth/nextjs": "0.0.0-380f8d56",
     "@base-ui/react": "1.5.0",
     "@sentry/nextjs": "^10.59.0",
     "@supabase/ssr": "0.12.0",

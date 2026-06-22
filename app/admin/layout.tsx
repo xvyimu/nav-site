@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { verifyAdmin } from "@/lib/admin";
+import { auth } from "@/lib/auth";
 import LogoutButton from "@/components/admin/LogoutButton";
 
 export default async function AdminLayout({
@@ -8,9 +8,9 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const isAdmin = await verifyAdmin();
+  const session = await auth();
 
-  if (!isAdmin) {
+  if (!session?.user) {
     redirect("/login");
   }
 

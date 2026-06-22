@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { withAdminWrite } from "@/lib/admin-middleware-write";
+import { requireAdmin, unauthorized } from "@/lib/admin-auth";
 import { z } from "zod";
 
 const createLinkSchema = z.object({
@@ -13,7 +13,10 @@ const createLinkSchema = z.object({
   featured: z.boolean().optional().default(false),
 });
 
-export const GET = withAdminWrite(async () => {
+export async function GET() {
+  const { authorized } = await requireAdmin();
+  if (!authorized) return unauthorized();
+
   const supabase = await createAdminClient();
   const { data: links, error } = await supabase
     .from("nav_links")
@@ -24,9 +27,12 @@ export const GET = withAdminWrite(async () => {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ links });
-});
+}
 
-export const POST = withAdminWrite(async (request: Request) => {
+export async function POST(request: Request) {
+  const { authorized } = await requireAdmin();
+  if (!authorized) return unauthorized();
+
   const supabase = await createAdminClient();
   const body = await request.json();
 
@@ -56,4 +62,4 @@ export const POST = withAdminWrite(async (request: Request) => {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ link: data });
-});
+}

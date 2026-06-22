@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { withAdminWrite } from "@/lib/admin-middleware-write";
+import { requireAdmin, unauthorized } from "@/lib/admin-auth";
 import { z } from "zod";
 
 const updateLinkSchema = z.object({
@@ -13,7 +13,10 @@ const updateLinkSchema = z.object({
   featured: z.boolean().optional(),
 });
 
-export const PUT = withAdminWrite(async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { authorized } = await requireAdmin();
+  if (!authorized) return unauthorized();
+
   const { id } = await params;
   const supabase = await createAdminClient();
   const body = await request.json();
@@ -35,9 +38,12 @@ export const PUT = withAdminWrite(async (request: Request, { params }: { params:
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ link: data });
-});
+}
 
-export const DELETE = withAdminWrite(async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { authorized } = await requireAdmin();
+  if (!authorized) return unauthorized();
+
   const { id } = await params;
   const supabase = await createAdminClient();
   const { error } = await supabase.from("nav_links").delete().eq("id", id);
@@ -45,4 +51,4 @@ export const DELETE = withAdminWrite(async (request: Request, { params }: { para
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ success: true });
-});
+}
