@@ -18,9 +18,16 @@ const submitSchema = z.object({
   category_id: z.string().uuid("分类 ID 格式不正确").nullable().nullish().default(null),
 });
 
+async function cleanupExpiredRecords(supabase: any, table: string): Promise<void> {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from(table).delete().lt("created_at", cutoff);
+}
+
 async function checkRateLimit(ip: string): Promise<boolean> {
   const supabase = await createClient();
   const windowStart = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  // 惰性清理：每次检查时顺手删除超过 24h 的过期记录
+  await cleanupExpiredRecords(supabase, "submit_attempts");
   const { count } = await supabase
     .from("submit_attempts")
     .select("*", { count: "exact", head: true })

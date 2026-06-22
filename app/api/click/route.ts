@@ -4,9 +4,16 @@ import { createClient } from "@/lib/supabase/server";
 // Supabase 分布式限流（替代 in-memory，Serverless 下共享状态）
 const CLICK_RATE_LIMIT_MAX = 50; // 每 15 分钟最多 50 次
 
+async function cleanupExpiredRecords(supabase: any, table: string): Promise<void> {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from(table).delete().lt("created_at", cutoff);
+}
+
 async function checkRateLimit(ip: string): Promise<boolean> {
   const supabase = await createClient();
   const windowStart = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  // 惰性清理：每次检查时顺手删除超过 24h 的过期记录
+  await cleanupExpiredRecords(supabase, "click_rate_limits");
   const { count } = await supabase
     .from("click_rate_limits")
     .select("*", { count: "exact", head: true })
