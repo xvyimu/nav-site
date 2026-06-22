@@ -1,9 +1,9 @@
-name: CI 检查
+name: CI 检查 + Netlify 部署
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
   push:
-    branches: [main]
+    branches: [master]
 
 jobs:
   lint-and-build:
@@ -29,3 +29,12 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+
+      - name: 部署到 Netlify
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: a7e3787f-3c6d-4179-919d-1dc1efa83c52
+        run: |
+          npm install -g netlify-cli
+          netlify deploy --prod
