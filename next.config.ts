@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const securityHeaders = [
@@ -32,7 +33,7 @@ const securityHeaders = [
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
-      "connect-src 'self' https://*.supabase.co",
+      "connect-src 'self' https://*.supabase.co https://*.ingest.us.sentry.io",
       "object-src 'none'",
       "upgrade-insecure-requests",
     ].join("; "),
@@ -50,4 +51,12 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: "yuanjia-m0",
+  project: "javascript-nextjs",
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  sourcemaps: { disable: false },
+  // Turbopack 不支持以下选项，可忽略
+  // disableLogger / automaticVercelMonitors 已废弃
+});

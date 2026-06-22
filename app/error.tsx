@@ -1,5 +1,6 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
 export default function ErrorPage({
@@ -10,6 +11,7 @@ export default function ErrorPage({
   reset: () => void;
 }) {
   useEffect(() => {
+    Sentry.captureException(error);
     console.error("导航站全局错误:", error);
   }, [error]);
 
