@@ -145,6 +145,7 @@ jobs:
 
       - name: 部署到 Netlify
         id: deploy
+        continue-on-error: true
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
