@@ -41,6 +41,10 @@ export const metadata: Metadata = {
     title: `${siteName} — 开发者一站式资源导航`,
     description: siteDescription,
   },
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1b2e" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
