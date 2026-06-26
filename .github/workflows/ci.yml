@@ -111,6 +111,11 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SOURCE_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SOURCE_SUPABASE_ANON_KEY }}
 
+      - name: 健康检查
+        run: |
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:3264/ || echo "FAILED"
+          curl -s http://localhost:3264/ | head -40 || echo "EMPTY_RESPONSE"
+
       - name: 运行 E2E 测试
         run: pnpm run e2e -- --project=chromium
         env:
