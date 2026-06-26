@@ -1,354 +1,258 @@
-# 公益API导航站 — 设计方案与需求文档
+# 综合导航站 — 设计方案与需求文档
 
-> 设计定位：简洁专业的 API 导航平台 · 白底黑字浅蓝主题 · 双板块分类 · Awwwards 级品质
+> 设计定位：面向开发者的综合资源导航平台 · 一站式覆盖 AI/云服务/开发工具/开源项目/设计/学习
+>
+> 文档版本 v6.0 · 2026-06-24 · 514 站点 · 9 分类 · next-auth v5 · 服务端搜索 · GitHub OAuth
 
 ---
 
 ## 一、设计理念
 
 ### 关键词
-`专业` `清晰` `高效` `克制` `信赖`
+`综合` `实用` `高效` `可信` `克制`
 
-本设计融合五个参考的核心价值：
-- **Linear** — 极简克制，信息密度高，几乎无装饰
-- **Awwwards** — 卡片式内容展示，品质感，评分体系
-- **Canva** — 分类优先的浏览路径，高信息密度网格
-- **Pixso** — 设计规范体系，网格布局安全宽度
-- **oneLN** — 细致的装饰语言（柔和星星、页脚标、pangu.js）
+- **从"API 导航"到"开发者资源门户"** — 覆盖开发者日常需要的全部资源类型
+- **分类驱动** — 清晰的多级分类体系，让用户快速定位所需资源
+- **可信策展** — 人工精选 + 社区推荐，不做算法劫持、不塞广告
+- **信息效率** — 高密度低干扰的卡片布局，减少浏览噪音
 
-**核心原则：形式服务于功能。** 导航站的核心价值是让用户快速找到想要的 API 并跳转，所有设计围绕这个目标展开。
+**核心原则：让开发者在最快路径下找到想要的资源。**
 
 ---
 
-## 二、设计规范（Design System）
+## 二、分类体系
 
-### 2.1 颜色体系
+### 顶层分类（9 个类别，514 站点）
 
-```
-底色        #FFFFFF  (oklch 1 0 0)
-文字主色    #0F172A  (oklch 0.13 0.01 250)
-文字辅色    #64748B  (oklch 0.45 0.01 250)
+| 分类 | slug |
+|------|------|
+| AI & 大模型 | `ai-api` |
+| 云服务 & VPS | `cloud-vps` |
+| 开发工具 | `dev-tools` |
+| 设计资源 | `design` |
+| 在线工具 | `online-tools` |
+| 开源项目 | `open-source` |
+| 软件应用 | `software` |
+| 学习 & 社区 | `learning` |
+| 企业 & 运营工具 | `business` |
 
-浅蓝主色    #3B82F6  (oklch 0.62 0.18 250)
-浅蓝背景    #F0F5FF  (oklch 0.95 0.03 250)
-蓝 色 边    #3B82F6  (官方板块标识)
-
-琥珀强调    #F59E0B  (中转板块标识)
-琥珀背景    #FFFBEB  (中转卡片 tint)
-
-灰色边框    #E2E8F0  (oklch 0.92 0.01 250)
-灰色背景    #F8FAFC  (oklch 0.97 0 0)
-卡片白色    #FFFFFF
-
-红色警示    #EF4444  (错误/删除)
-绿色成功    #22C55E  (成功/在线)
-```
-
-### 2.2 字体规范
-
-| 用途 | 字体 | 字号 | 字重 | 颜色 |
-|------|------|------|------|------|
-| 站点名称 | Geist Sans | 14px | 500 | `--foreground` 80% |
-| 卡片标题 | Geist Sans | 14px | 500 | `--foreground` 85% |
-| 卡片描述 | Geist Sans | 12px | 400 | `--muted` 60% |
-| 卡片域名 | Geist Mono | 11px | 400 | `--muted` 40% |
-| 分类标签 | Geist Sans | 12px | 500 | 按状态 |
-| 正文 | Geist Sans | 14px | 400 | `--foreground` |
-| 小字提示 | Geist Sans | 12px | 400 | `--muted` 50% |
-
-### 2.3 间距规范
-
-| 层级 | 间距 | 用途 |
-|------|------|------|
-| Page padding | 16px (1rem) | 左右安全边距 |
-| Section gap | 32px (2rem) | 板块间距 |
-| Card grid gap | 12px (0.75rem) | 卡片网格间隙 |
-| Card padding | 16px (1rem) | 卡片内边距 |
-| Chip gap | 6px (0.375rem) | 标签间距 |
-| Content gap | 8px (0.5rem) | 卡片内部元数据间距 |
-
-### 2.4 圆角规范
-
-| 层级 | 圆角 | 组件 |
-|------|------|------|
-| 卡片 | 8px (0.5rem) | LinkCard |
-| 按钮/标签 | 6px (0.375rem) | CategoryFilter |
-| 搜索框 | 8px (0.5rem) | SearchBar |
-| 徽章 | 999px (full) | 官方/中转/推荐徽章 |
+> 分类映射配置：`lib/nav-config.ts` · 分类图标：`lib/category-icons.ts`
 
 ---
 
 ## 三、布局结构
 
 ```
-┌─────────────────────────────────────────────┐
-│  Header                                     │
-│  ⬡ 公益API导航站                [提交] [管理] │
-├─────────────────────────────────────────────┤
-│                                              │
-│  公益API导航站                                │
-│  精心收录 AI 大模型 API，涵盖官方与公益中转    │
-│                                              │
-│  [搜索框]                                    │
-│                                              │
-│  全部 | 官方 API | 中转服务站  ──── 板块Tab   │
-│  ┌────┐ ┌────┐ ┌────┐ ┌────┐  ← 分类过滤    │
-│  │全部│ │公益│ │大厂│ │开源│                    │
-│                                              │
-│  推荐 ──────────── 官方优先混排               │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐        │
-│  │[蓝边]   │ │[黄边]   │ │[蓝边]   │        │
-│  │ OpenAI  │ │ 某中转   │ │ Claude  │        │
-│  └─────────┘ └─────────┘ └─────────┘        │
-│                                              │
-│  官方 API ──────────── 蓝色标识               │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐        │
-│  │ OpenAI  │ │ Google  │ │ Claude  │        │
-│  │ [官方]  │ │ [官方]  │ │ [官方]  │        │
-│  └─────────┘ └─────────┘ └─────────┘        │
-│                                              │
-│  中转服务站 ────────── 琥珀色标识             │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐        │
-│  │ newapi  │ │ sub2api │ │ 某中转   │        │
-│  │ [中转]  │ │ [中转]  │ │ [中转]  │        │
-│  └─────────┘ └─────────┘ └─────────┘        │
-│                                              │
-├─────────────────────────────────────────────┤
-│  Footer                                      │
-│  © 2026 公益API导航站                        │
-│  提交站点 · 管理 · oneLN                     │
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  Header                                             │
+│  🧭 综合导航站     [收藏] [API] [提交] [登录] [🌙]    │
+├──────────┬──────────────────────────────────────────┤
+│ Sidebar  │  主内容区域                               │
+│ (w-64)   │                                           │
+│           │  🔍 [搜索站点、分类或描述...]  [⌘K]      │
+│  ▦ 全部   │                                           │
+│  ⚡ 公益  │  ✦ 精选推荐  | 🕐 最新收录 | 📈 热门      │
+│  🤖 AI    │  ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐    │
+│  ☁️ 云    │  │    │ │    │ │    │ │    │ │    │    │
+│  🛠 开发   │  └────┘ └────┘ └────┘ └────┘ └────┘    │
+│  🎨 设计   │                                           │
+│  🔧 工具   │  云服务 & VPS                            │
+│  📚 开源   │  ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐    │
+│  💻 软件   │  │    │ │    │ │    │ │    │ │    │    │
+│  📖 学习   │  └────┘ └────┘ └────┘ └────┘ └────┘    │
+│  🏢 企业   │                                           │
+│           │  模型排行榜（仅 AI 分类时显示）             │
+├──────────┴──────────────────────────────────────────┤
+│  Footer                                              │
+│  © 2026 综合导航站 · 提交站点 · 管理 · 同款网站搭建  │
+└─────────────────────────────────────────────────────┘
 ```
 
----
+> 注：上图中 emoji 仅用于示意，实际使用 Lucide React 图标组件。
 
-## 四、组件设计方案
+### 布局要点
 
-### 4.1 LinkCard（核心组件）
-
-```
-┌──────────────────────────────────┐
-│ ┌────┐  title          [推荐]    │  ← 蓝色左边框3px
-│ │icon│  description              │     (官方=蓝 / 中转=琥珀 / 其他=无)
-│ └────┘  domain.com               │
-│         [官方]                    │  ← badge
-└──────────────────────────────────┘
-```
-
-**交互行为：**
-- Default: 白色背景 + 1px 灰色边框 + 左侧颜色边
-- Hover: 边框变蓝 30% opacity + 阴影 + `translateY(-1px)`
-- 整个卡片可点击（跳转至目标 URL）
-- 过渡动画: 0.2s cubic-bezier
-
-### 4.2 CategoryFilter
-
-```
-┌─────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│ 全部 │ │ 🆓 公益   │ │ 🏢 大厂   │ │ 📖 开源   │
-└─────┘ └──────────┘ └──────────┘ └──────────┘
-```
-
-- 活跃状态：蓝色填充 + 白色文字
-- 非活跃：灰色背景 + 灰色文字
-- Hover: 背景变深
-- 布局：flex-wrap，支持换行
-- 动画：motion whileTap scale(0.97)
-
-### 4.3 SectionTabs
-
-```
-全部 | 官方 API | 中转服务站
-────────────────
-```
-
-- 下划线滑动指示器（motion layoutId）
-- 点击切换，弹簧动画
-
-### 4.4 SearchBar
-
-```
-🔍 [                         ] ✕
-```
-
-- 居中搜索图标
-- 聚焦时蓝色边框 + 蓝色外环（ring-3px）
-- 有输入时显示清除按钮
-- placeholder: "搜索 API 名称..."
-
-### 4.5 Badge 体系
-
-| 类型 | 位置 | 样式 |
+| 区域 | 规范 | 说明 |
 |------|------|------|
-| 推荐 | 标题右侧 | 蓝色背景 10% + 蓝色文字 + 圆角 full |
-| 官方 | 卡片底部/标题侧 | 蓝色背景 + 白色文字 + 蓝色边框 |
-| 中转 | 卡片底部/标题侧 | 琥珀背景 + 白色文字 + 琥珀边框 |
+| 侧边栏 | `w-64` 固定 | 桌面端常驻，移动端滑入式 overlay |
+| 主内容区 | `flex-1 min-w-0` | 自适应剩余宽度 |
+| 卡片网格 | 2-5 列自适应 | `sm:2 lg:3 xl:4 2xl:5` |
+| 搜索框 | `rounded-[24px]` | 圆角搜索，蓝色聚焦光环 |
+| 移动端 | 底部导航栏 | 全部分类横向滚动 + 汉堡菜单 |
 
 ---
 
-## 五、装饰效果（柔和协调）
+## 四、设计规范（Design System）
 
-### 5.1 柔和满天星
+### 4.1 颜色体系（OKLCH + 蓝色主色）
 
-- 24 个极淡蓝色径向渐变点，分布在整个页面
-- 透明度 0.15-0.30
-- 纯 CSS 实现，零 JS 开销
-- 顶部的极淡蓝色渐变（`from-sky-50/30`）
-- 不干扰内容可读性
+```
+底色        #FFFFFF  (oklch 1 0 0)
+文字主色    #0F172A  (oklch 0.13 0.01 250)
+文字辅色    #64748B  (oklch 0.45 0.01 250)
 
-### 5.2 oneLN 页脚标
+蓝色主色    #3B82F6  (oklch 0.62 0.18 250)
+蓝色背景    oklch(0.95 0.03 250 / 0.25)
+蓝色边框    oklch(0.62 0.18 250 / 40%)
+蓝色聚焦    oklch(0.62 0.18 250 / 60%) + ring 20%
 
-- Footer 中的小字链接
-- `text-primary/40` 色，hover 变为 `text-primary/70`
-- 标题：`同款网站搭建`
+灰色边框    #E2E8F0  (oklch 0.92 0.01 250)
+灰色背景    #F8FAFC  (oklch 0.97 0 0)
 
-### 5.3 pangu.js
+暗色底色    oklch(0.12 0.008 260)
+暗色主色    oklch(0.62 0.18 250)
+```
 
-- 自动为中英文之间插入空格
-- 已通过 PanguSpacing 组件实现 ✅
+### 4.2 字体规范
+
+| 用途 | 字体 | 字号 | 字重 |
+|------|------|------|------|
+| 站点名称 | Geist Sans | 14px | 500 |
+| 卡片标题 | Geist Sans | 14px | 500 |
+| 卡片描述 | Geist Sans | 12px | 400 |
+| 卡片域名 | Geist Mono | 11px | 400 |
+| 分类标签（侧边栏） | Geist Sans | 13px | 500 |
+
+### 4.3 间距与圆角
+
+| 层级 | 值 | 组件 |
+|------|------|------|
+| 卡片网格间隙 | `gap-2.5` (10px) | CategorySection |
+| 卡片内边距 | 12px | LinkCard |
+| 页面垂直间距 | `py-6` (24px) | Navigation |
+| 卡片圆角 | `rounded-xl` (12px) | LinkCard |
+| 搜索框圆角 | `rounded-[24px]` | SearchBar |
+| 侧边栏链接圆角 | `rounded-lg` (8px) | Sidebar |
+| 徽章圆角 | `rounded-full` | Badges |
+
+---
+
+## 五、核心组件
+
+### 5.1 LinkCard（链接卡片）
+
+- Favicon 通过 `/api/favicon` 代理加载，Content-Type 白名单安全过滤
+- 使用 `next/image` 的 `<NextImage>` 组件（`unoptimized` 模式适配代理 URL）
+- Hover: 蓝色边框 + 上浮 2px + 柔和蓝色阴影
+- 过渡动画: 0.2s cubic-bezier(0.32, 0, 0.08, 1)
+
+### 5.2 Sidebar（侧边栏）
+
+- 桌面端常驻显示，移动端 overlay 滑入
+- 每个分类显示站点数量
+- 当前激活分类蓝色高亮
+- 图标通过 `lib/category-icons.ts` 统一管理（Lucide React）
+
+### 5.3 SearchBar（搜索框）
+
+- 圆角 24px，蓝色聚焦光环
+- `⌘K` / `Ctrl+K` 全局聚焦快捷键
+- 200ms 防抖后调用 `/api/search` 服务端 API
+- 搜索中显示 `Loader2` 旋转图标
+
+### 5.4 ModelRanking（模型排行榜）
+
+- 通过 `next/dynamic` 动态导入（`ssr: false`），减少初始 JS bundle
+- 仅在用户滚动到排行榜区域时加载
+- 加载中显示脉冲骨架占位
 
 ---
 
 ## 六、技术架构
 
-### 6.1 性能优化
+### 6.1 核心架构
 
-| 方案 | 说明 |
+| 层 | 选型 |
+|---|------|
+| 框架 | Next.js 16 (App Router, ISR) |
+| 样式 | Tailwind CSS v4 + shadcn/ui |
+| 动画 | motion (framer-motion) |
+| 数据库 | Supabase PostgreSQL (单库模式) |
+| 认证 | next-auth v5 (Credentials + GitHub OAuth) |
+| 搜索 | Fuse.js 服务端搜索 (`/api/search` API) |
+| 部署 | Netlify |
+
+### 6.2 数据流
+
+```
+管理员 CRUD ──→ Supabase (nav_links / nav_categories)
+用户提交 ────→ Supabase (approved=false, 待审核)
+                    │
+              ISR 60s 增量再生
+                    │
+              用户浏览器
+                    │
+         搜索 → /api/search → Fuse.js 服务端
+         收藏 → localStorage + /api/favorites (登录后同步)
+         点击 → /api/click → click_count + 1
+```
+
+### 6.3 认证流程
+
+```
+管理员登录 → Credentials provider → role: "admin"
+用户登录  → GitHub OAuth → role: "user"
+                    │
+         proxy.ts middleware
+                    │
+         admin 路由 → 仅 role === "admin" 可访问
+         其他路由 → 所有已登录用户可访问
+```
+
+### 6.4 SEO 架构
+
+| 组件 | 实现 |
 |------|------|
-| ISR 60s | 每 60 秒增量重新生成页面，数据及时更新 |
-| Promise.all | 分类和链接并行取数 |
-| motion 入场 | stagger 0.04s，避免全部同时渲染 |
-| shadcn tree-shaking | 仅引入使用的组件 |
-| Geist font | Next.js 内置优化，local fallback |
-
-### 6.2 安全性
-
-| 方案 | 说明 |
-|------|------|
-| `.env*` .gitignore | 环境变量不提交 |
-| `.env.local.example` | 模板文件，值为占位符 |
-| `npm run setup` | 引导式配置初始化 |
-| Vercel env vars | 生产环境变量通过 Dashboard 注入 |
-| GitHub Secrets | CI/CD 使用加密 Secrets |
-| HMAC cookie auth | 管理员鉴权 |
-
-### 6.3 双库架构
-
-```
-开发环境 (npm run dev) → 开发库 (nzaoc...)
-部署环境 (Vercel)     → 生产库 (vyqq...)
-GitHub Actions (sync) → 开发库 → 生产库定时同步
-```
+| 站点地图 | `app/sitemap.ts` — 静态页 + 工具详情页 + 分类页 |
+| 爬虫规则 | `app/robots.ts` — 允许公开页，禁止 /admin /api/admin /login |
+| OG 图片 | `app/opengraph-image.tsx` — `next/og` Edge Runtime 动态生成 1200x630 |
+| JSON-LD | `WebSite` schema (layout.tsx) + `SoftwareApplication` (tool/[slug]) |
+| 元数据 | `generateMetadata` 动态生成 title/description/OG/Twitter Card |
 
 ---
 
-## 七、需求优先级
+## 七、导航配置（lib/nav-config.ts）
 
-### P0（已实现）
-- [x] 白底 + 黑 + 浅蓝主色调
-- [x] 双板块布局（官方 API / 中转服务站）
-- [x] 板块 Tab 切换 + 下划线指示器
-- [x] 分类筛选 + 搜索
-- [x] 推荐区（官方优先混排）
-- [x] 左侧颜色边（蓝/琥珀）
-- [x] 官方/中转徽章
-- [x] shadcn Card 组件
-- [x] ISR 增量再生
-- [x] 柔和满天星背景
-- [x] oneLN 页脚标
-- [x] pangu.js 中英文间距
-- [x] 管理员面板（增删改）
-- [x] 双库数据同步
-- [x] 一键添加脚本
-- [x] aff 链接清理
-- [x] 环境变量模板 + 初始化脚本
+分类 slug → 显示名称映射在 `lib/nav-config.ts` 中集中管理。新增分类只需在此添加映射，无需修改组件逻辑。
 
-### P1（已实现）
-- [x] 评分/稳定性标签（调用成功率、响应速度标签）
-- [x] 卡片 hover 预览（悬浮时显示更多信息）
-- [x] 数据最后更新时间戳
-- [x] 链接点击计数（热度排名）
-- [x] 基础暗色模式（根据系统偏好自动切换）
-- [x] 缓存策略升级（`actions/cache@v4` 加速 CI）
-
-### P2（中优先级）
-- [ ] 今日推荐卡片（大尺寸，类似 Awwwards SOTD）
-- [ ] 热门 API 排行榜（按点击量排）
-- [ ] 标签系统（多个标签交叉过滤）
-- [ ] 提交站点后的审核通知
-- [ ] 站内站点详情页（非直接跳转外部）
-- [ ] RSS/定期更新通知
-
-### P3（低优先级）
-- [ ] 多语言支持
-- [ ] API 状态检测（自动检测站点是否在线）
-- [ ] 用户评论/反馈系统
-- [ ] 收藏夹功能
-- [ ] 数据导出（OPML/JSON）
+分类图标映射在 `lib/category-icons.ts` 中，使用 Lucide React 图标组件。
 
 ---
 
-## 八、文件结构（当前）
+## 八、已实现功能清单
 
-```
-nav-site/
-├── app/
-│   ├── layout.tsx          # 根布局
-│   ├── page.tsx            # 首页（ISR 60s)
-│   ├── globals.css         # 完整设计系统
-│   ├── login/
-│   │   └── page.tsx        # 管理员登录
-│   ├── admin/
-│   │   ├── layout.tsx      # 管理面板布局
-│   │   ├── page.tsx        # 链接管理
-│   │   └── categories/
-│   │       └── page.tsx    # 分类管理
-│   ├── submit/
-│   │   └── page.tsx        # 提交站点
-│   └── api/
-│       ├── admin/*         # 管理 API
-│       ├── submit/route.ts # 提交 API
-│       └── sync/route.ts   # 同步 API
-├── components/
-│   ├── Header.tsx          # 顶部导航
-│   ├── Footer.tsx          # 底部（含 oneLN）
-│   ├── HeroSection.tsx     # 主视觉区
-│   ├── Navigation.tsx      # 导航（含板块 Tab）
-│   ├── LinkCard.tsx        # 链接卡片（核心）
-│   ├── CategoryFilter.tsx  # 分类筛选
-│   ├── SearchBar.tsx       # 搜索
-│   ├── SubtleStars.tsx     # 柔和星星背景
-│   ├── PanguSpacing.tsx    # 中英文间距
-│   ├── SubmitForm.tsx      # 提交表单
-│   ├── Analytics.tsx       # GA4
-│   └── ui/                 # shadcn 组件
-│       ├── card.tsx
-│       ├── badge.tsx
-│       ├── button.tsx
-│       └── ...
-├── lib/
-│   ├── supabase/           # 双库路由客户端
-│   ├── admin.ts            # 管理员鉴权
-│   ├── types.ts            # 类型定义
-│   ├── animations.ts       # motion 变体
-│   └── utils.ts            # cn()
-├── scripts/
-│   ├── add.mjs             # 一键添加链接
-│   ├── sync-db.mjs         # 双库同步
-│   ├── setup-env.mjs       # 环境初始化
-│   └── fix-prod-admin.sql  # 生产库修复
-└── .github/workflows/
-    └── sync-db.yml         # 自动同步
-```
+### Phase 1-12（基础建设）
+- 11 个分类体系，287 个精选站点
+- LinkCard 卡片组件 + Favicon 代理
+- 侧边栏分类导航 + 搜索框
+- 管理后台 CRUD（链接 + 分类）
+- 用户提交 + 审核
+- 点击计数 + 热门排行
+- 程序化 SEO 工具详情页
+- Sentry 监控 + 结构化日志
+- CI/CD 流水线（lint + tsc + test + build + e2e + deploy）
+- 73 单元测试 + 18 E2E 测试
+
+### Phase 13（搜索 + API 文档 + 图片优化）
+- 服务端 Fuse.js 搜索 API（`/api/search`）
+- API 文档页面（`/api-docs`）
+- LinkCard 使用 `next/image` 优化
+- Favicon 代理 Content-Type 白名单
+
+### Phase 14（用户账号系统）
+- GitHub OAuth 登录
+- 用户收藏同步（`user_favorites` 表 + RLS）
+- localStorage + 服务端双写同步
+- Header 登录/退出按钮
+
+### Phase 15（UX 完善 + 性能优化）
+- 自定义 404 页面
+- 路由级 loading 骨架屏
+- 动态 OG 图片生成（`next/og`）
+- ModelRanking 动态导入
+- 无障碍 skip-to-content 链接
 
 ---
 
-## 九、下一步执行建议
-
-按优先级顺序：
-
-1. **P1（已全部完成）：** 稳定性标签 + 点击计数 + 最后更新时间 + 暗色模式 + 卡片 hover 预览 + CI 缓存
-2. **P2：** 今日推荐大卡片 + 热门排行 + 标签系统
-3. **P3：** API 状态检测 + 更多装饰效果
-
-> 文档版本 v2.0 · 2026-06-20 · P1 全部完成，模型排行榜按新榜单更新
+> 文档版本 v5.0 · 2026-06-24
+> 进度详情请参阅 `docs/PROGRESS.md`

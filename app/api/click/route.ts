@@ -1,83 +1,58 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { logger } from "@/lib/logger";
+import { getClientIp } from "@/lib/utils";
+import { urlSchema } from "@/lib/schemas";
+import { checkClickRateLimit, recordClick, incrementClickCount } from "@/lib/rate-limit";
+import { findApprovedLinkByUrl } from "@/lib/repositories";
 
-// Supabase 分布式限流（替代 in-memory，Serverless 下共享状态）
-const CLICK_RATE_LIMIT_MAX = 50; // 每 15 分钟最多 50 次
+const clickSchema = z.object({
+  url: urlSchema,
+});
 
-async function cleanupExpiredRecords(supabase: any, table: string): Promise<void> {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  await supabase.from(table).delete().lt("created_at", cutoff);
-}
-
-async function checkRateLimit(ip: string): Promise<boolean> {
-  const supabase = await createClient();
-  const windowStart = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  // 惰性清理：每次检查时顺手删除超过 24h 的过期记录
-  await cleanupExpiredRecords(supabase, "click_rate_limits");
-  const { count } = await supabase
-    .from("click_rate_limits")
-    .select("*", { count: "exact", head: true })
-    .eq("ip", ip)
-    .gte("created_at", windowStart);
-  return (count ?? 0) < CLICK_RATE_LIMIT_MAX;
-}
-
-async function recordClick(ip: string) {
-  const supabase = await createClient();
-  await supabase.from("click_rate_limits").insert({ ip });
-}
-
-function isSafeUrl(url: string): boolean {
+export async function POST(request: Request) {
   try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+    const ip = getClientIp(request);
 
-export async function POST(request: NextRequest) {
-  try {
-    const ip = request.headers.get("x-nf-client-connection-ip")
-      || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-      || "unknown";
-
-    // Rate limit check (distributed via Supabase)
-    const allowed = await checkRateLimit(ip);
-    if (!allowed) {
-      return NextResponse.json({ error: "too many requests" }, { status: 429 });
+    const body = await request.json();
+    const parsed = clickSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "URL 格式不正确" },
+        { status: 400 }
+      );
     }
 
-    const { url } = await request.json();
-    if (!url || typeof url !== "string") {
-      return NextResponse.json({ error: "missing url" }, { status: 400 });
-    }
+    const { url } = parsed.data;
 
-    // Validate URL protocol
-    if (!isSafeUrl(url)) {
-      return NextResponse.json({ error: "invalid url" }, { status: 400 });
-    }
-
-    const supabase = await createClient();
-
-    // Verify the URL exists in the database
-    const { data: link } = await supabase
-      .from("nav_links")
-      .select("id")
-      .eq("url", url)
-      .eq("approved", true)
-      .maybeSingle();
-
+    // 验证链接存在且已批准
+    const link = await findApprovedLinkByUrl(url);
     if (!link) {
-      return NextResponse.json({ error: "link not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "链接不存在或未批准" },
+        { status: 404 }
+      );
     }
 
-    // Increment click_count via RPC
-    await supabase.rpc("increment_click", { link_url: url });
-    await recordClick(ip);
+    // IP+URL 去重：同一 IP 对同一链接 15 分钟内只计一次点击
+    const { allowed } = await checkClickRateLimit(ip, url);
+    if (!allowed) {
+      // 已记录过，静默返回成功（不阻断用户跳转）
+      return NextResponse.json({ success: true, deduplicated: true });
+    }
 
-    return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ ok: false });
+    // 点击数 +1（通过 RPC 原子递增）
+    await incrementClickCount(url);
+
+    // 记录本次点击（用于后续去重判断）
+    await recordClick(ip, url);
+
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    logger.error("Click route error", { source: "click-api" }, e instanceof Error ? e : undefined);
+    return NextResponse.json(
+      { error: "服务器错误" },
+      { status: 500 }
+    );
   }
 }

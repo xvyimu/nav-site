@@ -2,12 +2,6 @@ import { describe, it, expect } from "vitest";
 import { getLinkType, relativeTime } from "@/lib/types";
 
 describe("getLinkType", () => {
-  it("returns 'official' for big-tech", () => {
-    expect(getLinkType("big-tech")).toBe("official");
-  });
-  it("returns 'relay' for free-relay", () => {
-    expect(getLinkType("free-relay")).toBe("relay");
-  });
   it("returns 'model' for model-ranking", () => {
     expect(getLinkType("model-ranking")).toBe("model");
   });
@@ -16,6 +10,12 @@ describe("getLinkType", () => {
   });
   it("returns 'neutral' for null", () => {
     expect(getLinkType(null)).toBe("neutral");
+  });
+  it("returns 'neutral' for ai-api", () => {
+    expect(getLinkType("ai-api")).toBe("neutral");
+  });
+  it("returns 'neutral' for free-relay", () => {
+    expect(getLinkType("free-relay")).toBe("neutral");
   });
 });
 
@@ -43,7 +43,14 @@ describe("relativeTime", () => {
     expect(relativeTime(d)).toBe("10天前");
   });
   it("returns 'X个月前' for >= 30 days", () => {
-    const d = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-    expect(relativeTime(d)).toBe("2个月前");
+    // 使用日历月份计算：当前日期减去 2 个月
+    const d = new Date();
+    d.setMonth(d.getMonth() - 2);
+    expect(relativeTime(d.toISOString())).toBe("2个月前");
+  });
+  it("returns 'X年前' for >= 12 months", () => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 1);
+    expect(relativeTime(d.toISOString())).toBe("1年前");
   });
 });

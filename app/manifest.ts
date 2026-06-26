@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "公益API导航站",
-    short_name: "API导航",
-    description: "精心收录 AI 大模型 API，涵盖官方原厂与公益中转服务",
+    name: "综合导航站",
+    short_name: "综合导航",
+    description: "精选收录 AI、云服务、开发工具、设计资源、开源项目等优质站点",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

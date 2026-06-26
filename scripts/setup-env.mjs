@@ -25,7 +25,7 @@ function ask(q) {
 
 async function main() {
   console.log("========================================");
-  console.log("  公益API导航站 - 环境配置初始化");
+  console.log("  综合导航站 - 环境配置初始化");
   console.log("========================================\n");
 
   if (!existsSync(template)) {

@@ -1,17 +1,32 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { type Category, type NavLink } from "@/lib/types";
 import { motion } from "motion/react";
+import { Search, PackageOpen, Waves, Trophy } from "lucide-react";
 import { SearchBar } from "./SearchBar";
-import { ModelRanking, type ModelRanking as ModelRankingType } from "./ModelRanking";
+import type { ModelRanking as ModelRankingType } from "@/lib/types";
 import { staggerContainer, fadeInUp, slideDown } from "@/lib/animations";
-import { MobileNav } from "./MobileNav";
 import { Sidebar } from "./Sidebar";
 import { useShell } from "./Shell";
 import { useLinksFilter } from "./useLinksFilter";
 import { DualTrackSection } from "./DualTrackSection";
 import { CategorySection } from "./CategorySection";
+
+// 动态导入 MobileNav — 仅移动端可见，桌面端不加载
+const MobileNav = dynamic(() => import("./MobileNav").then((m) => m.MobileNav), {
+  ssr: false,
+  loading: () => null,
+});
+
+// 动态导入 ModelRanking — 仅在需要时加载
+const ModelRanking = dynamic(() => import("./ModelRanking").then((m) => m.ModelRanking), {
+  loading: () => (
+    <div className="h-32 rounded-lg bg-muted/30 animate-pulse" />
+  ),
+  ssr: false,
+});
 
 export function Navigation({
   categories,
@@ -23,32 +38,58 @@ export function Navigation({
   modelRankings?: ModelRankingType[];
 }) {
   const { sidebarOpen, closeSidebar } = useShell();
-  const ctx = useLinksFilter({ categories, links, modelRankings });
+  const {
+    // State
+    activeCategory, setActiveCategory,
+    rawSearch, setRawSearch,
+    setSearch,
+    focusedIndex, setFocusedIndex,
+    q,
+    searchLoading,
+    // Tag filter
+    activeTags, toggleTag, clearTags, availableTags,
+    // Refs (only used in event handlers and JSX ref props)
+    inputRef, resultsRef, announceRef,
+    // Tab data
+    tabKeys, tabTree, currentLabel,
+    // Derived data
+    featured, latest, popular, linkSections,
+    showRankings, showLinks, filteredRankings,
+    hasResults,
+    // Handlers
+    handleSearchKeyDown, handleResultKeyDown,
+  } = useLinksFilter({ categories, links, modelRankings });
   const [mounted, setMounted] = useState(false);
+  // SSR/CSR 挂载标记：避免水合不匹配
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   // Smooth scroll to top on category switch
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [ctx.activeCategory]);
+  }, [activeCategory]);
 
-  const sectionOffset = ctx.featured.length + ctx.latest.length;
+  const sectionOffset = featured.length + latest.length + popular.length;
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)]">
       {/* ─── Sidebar ─── */}
       <Sidebar
-        tabs={ctx.tabCounts}
-        activeKey={ctx.activeCategory}
-        onSelect={ctx.setActiveCategory}
+        tabs={tabTree}
+        activeKey={activeCategory}
+        onSelect={setActiveCategory}
         open={sidebarOpen}
         onClose={closeSidebar}
+        tags={availableTags}
+        activeTags={activeTags}
+        onToggleTag={toggleTag}
+        onClearTags={clearTags}
       />
 
       {/* ─── Main content area ─── */}
       <div className="flex-1 min-w-0">
         <motion.div
-          className="px-4 py-6 md:px-6 max-w-6xl mx-auto space-y-6"
+          className="px-4 py-6 md:px-6 space-y-6"
           variants={staggerContainer}
           initial="hidden"
           animate="show"
@@ -56,18 +97,19 @@ export function Navigation({
           {/* ─── Search ─── */}
           <motion.div variants={slideDown}>
             <SearchBar
-              value={ctx.rawSearch}
-              onChange={ctx.setRawSearch}
-              onKeyDown={ctx.handleSearchKeyDown}
-              inputRef={ctx.inputRef}
+              value={rawSearch}
+              onChange={setRawSearch}
+              onKeyDown={handleSearchKeyDown}
+              inputRef={inputRef}
+              loading={searchLoading}
             />
           </motion.div>
 
           {/* ─── Screen reader announce ─── */}
-          <div ref={ctx.announceRef} role="status" aria-live="polite" aria-atomic="true" className="sr-only" />
+          <div ref={announceRef} role="status" aria-live="polite" aria-atomic="true" className="sr-only" />
 
           {/* ─── Breadcrumb ─── */}
-          {ctx.activeCategory !== "all" && (
+          {activeCategory !== "all" && (
             <motion.nav
               variants={slideDown}
               className="flex items-center gap-1.5 text-xs text-muted-foreground/70"
@@ -77,64 +119,71 @@ export function Navigation({
               <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
-              <span className="text-foreground/60 font-medium">{ctx.currentLabel}</span>
+              <span className="text-foreground/60 font-medium">{currentLabel}</span>
             </motion.nav>
           )}
 
           {/* ─── Results container ─── */}
-          <div ref={ctx.resultsRef} className="space-y-6">
+          <div ref={resultsRef} className="space-y-6">
             {/* Featured + Latest */}
             <DualTrackSection
-              featured={ctx.featured}
-              latest={ctx.latest}
+              featured={featured}
+              latest={latest}
+              popular={popular}
               featuredOffset={0}
-              focusedIndex={ctx.focusedIndex}
-              onFocusChange={ctx.setFocusedIndex}
-              onKeyDown={ctx.handleResultKeyDown}
+              focusedIndex={focusedIndex}
+              onFocusChange={setFocusedIndex}
+              onKeyDown={handleResultKeyDown}
+              searchQuery={q}
             />
 
             {/* Link sections */}
-            {ctx.showLinks && ctx.linkSections.map((section) => (
+            {showLinks && linkSections.map((section) => (
               <CategorySection
                 key={section.key}
                 section={section}
                 sectionOffset={sectionOffset}
-                activeCategory={ctx.activeCategory}
-                focusedIndex={ctx.focusedIndex}
-                onFocusChange={ctx.setFocusedIndex}
-                onKeyDown={ctx.handleResultKeyDown}
+                activeCategory={activeCategory}
+                focusedIndex={focusedIndex}
+                onFocusChange={setFocusedIndex}
+                onKeyDown={handleResultKeyDown}
+                searchQuery={q}
               />
             ))}
 
             {/* Model rankings */}
-            {ctx.showRankings && (
+            {showRankings && (
               <motion.section variants={fadeInUp}>
-                {ctx.activeCategory === "all" && (
-                  <h2 className="mb-3 text-xs font-medium uppercase tracking-widest text-purple-600 dark:text-purple-400 flex items-center gap-2">
-                    <span className="inline-block w-4 h-px bg-purple-400" />
+                {activeCategory === "all" && (
+                  <h2 className="mb-3 text-xs font-medium uppercase tracking-widest text-primary flex items-center gap-2">
+                    <Trophy className="h-3.5 w-3.5" />
                     模型排行榜
                   </h2>
                 )}
-                <ModelRanking data={ctx.filteredRankings} />
+                <ModelRanking data={filteredRankings} />
               </motion.section>
             )}
           </div>
 
           {/* Empty state */}
-          {mounted && !ctx.hasResults && (
+          {mounted && !hasResults && (
             <motion.div className="flex flex-col items-center gap-3 py-20 text-muted-foreground/40" variants={fadeInUp}>
-              <span className="text-3xl" role="img" aria-hidden="true">
-                {ctx.q ? "🔍" : ctx.activeCategory !== "all" ? "📭" : "🌊"}
-              </span>
+              {q ? (
+                <Search className="h-8 w-8" aria-hidden="true" />
+              ) : activeCategory !== "all" ? (
+                <PackageOpen className="h-8 w-8" aria-hidden="true" />
+              ) : (
+                <Waves className="h-8 w-8" aria-hidden="true" />
+              )}
               <p className="text-sm text-muted-foreground">
-                {ctx.q
-                  ? `没有找到与"${ctx.q}"匹配的内容`
-                  : ctx.activeCategory !== "all"
+                {q
+                  ? `没有找到与"${q}"匹配的内容`
+                  : activeCategory !== "all"
                     ? "这个分类还没有收录任何站点"
                     : "暂时没有已收录的站点"}
               </p>
-              {(ctx.q || ctx.activeCategory !== "all") && (
-                <button onClick={() => { ctx.setRawSearch(""); ctx.setSearch(""); ctx.setActiveCategory("all"); ctx.inputRef.current?.focus(); }}
+              {(q || activeCategory !== "all") && (
+                <button type="button" aria-label="清除筛选" onClick={() => { setRawSearch(""); setSearch(""); setActiveCategory("all"); inputRef.current?.focus(); }}
                   className="text-xs text-muted-foreground/70 hover:text-muted-foreground underline-offset-2 underline transition-colors">
                   清除筛选
                 </button>
@@ -144,7 +193,7 @@ export function Navigation({
         </motion.div>
 
         {/* Mobile bottom nav */}
-        <MobileNav tabs={ctx.tabKeys} activeCategory={ctx.activeCategory} onSelect={ctx.setActiveCategory} />
+        <MobileNav tabs={tabKeys} activeCategory={activeCategory} onSelect={setActiveCategory} />
         <div className="h-16 md:hidden" />
       </div>
     </div>

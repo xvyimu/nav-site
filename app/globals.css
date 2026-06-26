@@ -9,6 +9,11 @@
   container-type: inline-size;
 }
 
+/* ===== Admin form inputs ===== */
+.field-input {
+  @apply w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-white outline-none focus:border-sky-400 text-sm;
+}
+
 /* ===== 视觉层 ===== */
 :root {
   --radius: 0.75rem;
@@ -156,107 +161,40 @@ body {
   --sidebar-ring: oklch(0.62 0.18 250);
 }
 
-/* ===== 渐变背景 ===== */
-.gradient-bg {
-  background: linear-gradient(135deg,
-    rgb(248 250 252),   /* slate-50 */
-    rgb(253 242 248 / 0.3),  /* pink-50/30 */
-    rgb(248 250 252)    /* slate-50 */
-  );
-}
-
-.dark .gradient-bg {
-  background: linear-gradient(135deg,
-    rgb(2 6 23),    /* slate-950 */
-    rgb(15 23 42),  /* slate-900 */
-    rgb(2 6 23)     /* slate-950 */
-  );
-}
-
-/* ===== 粉色悬停体系（qcy33 风格） ===== */
-.card-pink {
-  --card-pink-border: oklch(0.9 0.04 340 / 0.4);
-  --card-pink-shadow: 0 0 0 1px oklch(0.9 0.04 340 / 0.3);
-  --card-pink-glow: 0 12px 24px -8px oklch(0.75 0.12 350 / 0.15);
-  --card-pink-title: oklch(0.55 0.15 350);
+/* ===== 卡片悬停体系（Restrained：单一 border 反馈） =====
+ * 移除 translate + shadow 叠加装饰，只保留 border-color 变化。
+ * 微妙的 -1px translate 仅作为按压触感反馈，不作为装饰。 */
+.card-hover {
   --card-icon-scale: 1;
-  --card-icon-glow: none;
   transition:
-    transform 0.2s cubic-bezier(0.32, 0, 0.08, 1),
-    box-shadow 0.2s cubic-bezier(0.32, 0, 0.08, 1),
-    border-color 0.2s cubic-bezier(0.32, 0, 0.08, 1);
+    transform 0.18s cubic-bezier(0.32, 0, 0.08, 1),
+    border-color 0.18s cubic-bezier(0.32, 0, 0.08, 1);
 }
 
-.card-pink:hover {
-  transform: translateY(-3px) scale(1.02);
-  border-color: oklch(0.7 0.15 345);  /* pink-400 */
-  box-shadow: var(--card-pink-glow);
-  --card-icon-scale: 1.15;
-  --card-icon-glow: drop-shadow(0 0 4px oklch(0.7 0.15 345 / 0.4));
+.card-hover:hover {
+  transform: translateY(-1px);
+  border-color: oklch(0.62 0.18 250 / 45%);
+  --card-icon-scale: 1.08;
 }
 
-.card-pink:hover .card-pink-title {
-  color: var(--card-pink-title);
+.card-hover:hover .card-hover-title {
+  color: oklch(0.45 0.16 250);
 }
 
-.dark .card-pink {
-  --card-pink-border: oklch(0.6 0.1 345 / 0.5);
-  --card-pink-shadow: 0 0 0 1px oklch(0.6 0.1 345 / 0.3);
-  --card-pink-glow: 0 12px 24px -8px oklch(0.6 0.12 345 / 0.2);
-  --card-pink-title: oklch(0.75 0.12 350);
+.dark .card-hover:hover {
+  border-color: oklch(0.62 0.18 250 / 55%);
 }
 
-.dark .card-pink:hover {
-  border-color: oklch(0.65 0.15 345);
-  box-shadow: var(--card-pink-glow);
-}
-
-/* ===== 玻璃态卡片（保留旧版兼容） ===== */
-.card-glass {
-  background: var(--card);
-  box-shadow:
-    0 1px 2px oklch(0 0 0 / 0.03),
-    0 1px 4px oklch(0 0 0 / 0.03);
-  transition:
-    box-shadow 0.2s cubic-bezier(0.32, 0, 0.08, 1),
-    border-color 0.2s cubic-bezier(0.32, 0, 0.08, 1),
-    transform 0.2s cubic-bezier(0.32, 0, 0.08, 1);
-}
-
-.card-glass:hover {
-  box-shadow:
-    0 2px 4px oklch(0 0 0 / 0.04),
-    0 8px 16px oklch(0 0 0 / 0.06),
-    0 16px 24px oklch(0 0 0 / 0.04);
-  border-color: oklch(0.62 0.18 250 / 25%);
-  transform: translateY(-2px);
-}
-
-.dark .card-glass {
-  box-shadow:
-    0 1px 2px oklch(0 0 0 / 0.2),
-    0 1px 4px oklch(0 0 0 / 0.15);
-}
-
-.dark .card-glass:hover {
-  box-shadow:
-    0 2px 8px oklch(0 0 0 / 0.3),
-    0 8px 24px oklch(0 0 0 / 0.2),
-    0 0 0 1px oklch(0.62 0.18 250 / 8%);
-  border-color: oklch(0.62 0.18 250 / 35%);
-}
-
-/* ===== 官方板块 - 蓝色左边框 ===== */
-.border-official {
-  border-left: 3px solid oklch(0.62 0.18 250);
-}
-
-/* ===== 中转板块 - 琥珀色左边框 ===== */
-.border-relay {
-  border-left: 3px solid oklch(0.68 0.2 50);
+.dark .card-hover:hover .card-hover-title {
+  color: oklch(0.75 0.13 250);
 }
 
 /* ===== 滚动条 ===== */
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: oklch(0.92 0.01 250) transparent; }
+.dark * { scrollbar-color: oklch(0.93 0.005 260 / 10%) transparent; }
+
+/* WebKit (Chrome/Safari/Edge) */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -327,14 +265,10 @@ body {
 
 /* ===== 无障碍：高对比度 ===== */
 @media (prefers-contrast: more) {
-  .card-glass {
+  .card-hover {
     border-width: 2px;
   }
-  .card-glass:hover {
-    border-color: var(--ring);
-    box-shadow: 0 0 0 1px var(--ring);
-  }
-  .dark .card-glass:hover {
+  .card-hover:hover {
     border-color: var(--ring);
   }
 }
@@ -346,12 +280,12 @@ body {
 }
 
 .sidebar-link:hover {
-  background: oklch(0.95 0.02 340 / 0.15);
+  background: oklch(0.95 0.03 250 / 0.15);
   color: oklch(0.3 0.01 260);
 }
 
 .sidebar-link.active {
-  background: oklch(0.95 0.02 340 / 0.25);
+  background: oklch(0.95 0.03 250 / 0.25);
   color: oklch(0.25 0.01 260);
   font-weight: 500;
 }
@@ -361,24 +295,24 @@ body {
 }
 
 .dark .sidebar-link:hover {
-  background: oklch(0.25 0.02 340 / 0.2);
+  background: oklch(0.25 0.03 250 / 0.2);
   color: oklch(0.9 0.01 260);
 }
 
 .dark .sidebar-link.active {
-  background: oklch(0.25 0.02 340 / 0.35);
+  background: oklch(0.25 0.03 250 / 0.35);
   color: oklch(0.95 0.01 260);
 }
 
 .sidebar-badge {
   @apply inline-flex items-center justify-center rounded-full text-[11px] font-medium min-w-[20px] h-5 px-1.5;
-  background: oklch(0.92 0.02 340 / 0.4);
-  color: oklch(0.55 0.15 350);
+  background: oklch(0.95 0.03 250 / 0.4);
+  color: oklch(0.62 0.18 250);
 }
 
 .dark .sidebar-badge {
-  background: oklch(0.25 0.02 340 / 0.3);
-  color: oklch(0.75 0.12 350);
+  background: oklch(0.25 0.03 250 / 0.3);
+  color: oklch(0.7 0.15 250);
 }
 
 /* ===== Container queries 响应式卡片 ===== */

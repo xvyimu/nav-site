@@ -1,8 +1,9 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
+# dependencies
 /node_modules
-/.pnp
+/deps
 .pnp.*
 .yarn/*
 !.yarn/patches
@@ -12,6 +13,10 @@
 
 # testing
 /coverage
+/playwright-report
+/test-results
+/blob-report
+/playwright/.cache
 
 # next.js
 /.next/
@@ -32,6 +37,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!.env.local.example
 
 # netlify (local state + build artifacts)
 .netlify
@@ -41,6 +48,18 @@ yarn-error.log*
 
 # pipeline agent artifacts
 .pipeline
+
+# tool memory
+.workbuddy/
+
+# pnpm artifact directories
+nm_temp/
+node_modules_broken/
+node_modules_old*/
+node_modules_phantom*/
+
+# mcp config (project-specific, should be configured per developer)
+.mcp.json
 
 # typescript
 *.tsbuildinfo

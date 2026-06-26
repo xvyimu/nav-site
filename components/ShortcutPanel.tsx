@@ -2,18 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { SECTION_LABELS } from "@/lib/nav-config";
 
-const shortcuts = [
+const baseShortcuts = [
   { keys: ["⌘", "K"], label: "搜索站点" },
   { keys: ["⌘", "1"], label: "全部" },
-  { keys: ["⌘", "2"], label: "官方 API" },
-  { keys: ["⌘", "3"], label: "中转服务站" },
-  { keys: ["⌘", "4"], label: "模型排行榜" },
   { keys: ["↑", "↓"], label: "导航结果列表" },
   { keys: ["↵"], label: "打开选中站点" },
   { keys: ["Esc"], label: "清除搜索 / 关闭面板" },
   { keys: ["?"], label: "显示快捷键" },
 ];
+
+// 从 SECTION_LABELS 动态生成分类快捷键
+const categoryShortcuts = Object.entries(SECTION_LABELS)
+  .slice(0, 8)
+  .map(([, label], i) => ({
+    keys: ["⌘", String(i + 2)],
+    label,
+  }));
 
 export function ShortcutPanel() {
   const [open, setOpen] = useState(false);
@@ -72,7 +78,7 @@ export function ShortcutPanel() {
               </button>
             </div>
             <div className="space-y-2">
-              {shortcuts.map((s) => (
+              {[...baseShortcuts.slice(0, 2), ...categoryShortcuts, ...baseShortcuts.slice(2)].map((s) => (
                 <div
                   key={s.label}
                   className="flex items-center justify-between text-sm"

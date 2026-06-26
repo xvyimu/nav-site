@@ -1,38 +1,63 @@
 "use client";
 
+import { useState, useEffect, memo } from "react";
+import NextImage from "next/image";
 import { type NavLink, getLinkType, relativeTime } from "@/lib/types";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
+import { Globe, Heart } from "lucide-react";
+import { useFavoritesContext } from "@/components/FavoritesProvider";
+import { isSafeUrl, extractDomain } from "@/lib/utils";
+import { highlightSearchTerm } from "@/lib/highlight";
 
-export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number }) {
-  function isSafeUrl(url: string): boolean {
-    try {
-      const parsed = new URL(url);
-      return parsed.protocol === "http:" || parsed.protocol === "https:";
-    } catch {
-      return false;
-    }
-  }
-
-  let domain = "";
-  try {
-    domain = new URL(link.url).hostname.replace(/^www\./, "");
-  } catch {}
-
+function LinkCardComponent({ link, index = 0, searchQuery = "" }: { link: NavLink; index?: number; searchQuery?: string }) {
+  const domain = extractDomain(link.url);
   const safeUrl = isSafeUrl(link.url) ? link.url : "#";
   const type = getLinkType(link.category_slug ?? null);
   const ts = relativeTime(link.updated_at || link.created_at);
 
-  function handleClick() {
+  const { isFavorite, toggleFavorite } = useFavoritesContext();
+  const fav = isFavorite(link.id);
+
+  function handleClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFavorite(link.id);
+  }
+
+  function handleLinkClick() {
     navigator.sendBeacon(
       "/api/click",
       new Blob([JSON.stringify({ url: link.url })], { type: "application/json" }),
     );
   }
 
-  // ── Pink hover vars ──
-  // The .card-pink class handles transform, border-color, box-shadow via CSS.
-  // We add the base card styles here and toggle the class on the card wrapper.
+  // ── Favicon pre-loading via local API proxy ──
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!domain) return;
+
+    let cancelled = false;
+    const proxyUrl = `/api/favicon?domain=${encodeURIComponent(domain)}`;
+
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) setFaviconUrl(proxyUrl);
+    };
+    img.onerror = () => {
+      // 代理失败，尝试直接加载 favicon.im
+      const directUrl = `https://favicon.im/${domain}`;
+      const img2 = new Image();
+      img2.onload = () => {
+        if (!cancelled) setFaviconUrl(directUrl);
+      };
+      img2.src = directUrl;
+    };
+    img.src = proxyUrl;
+
+    return () => { cancelled = true; };
+  }, [domain]);
 
   // Badge color per type
   const badgeStyle =
@@ -55,23 +80,36 @@ export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number })
         href={safeUrl}
         target="_blank"
         rel="noopener noreferrer"
-        onClick={handleClick}
+        onClick={handleLinkClick}
         className="group block"
         aria-label={`${link.title}${link.description ? ` — ${link.description}` : ""}`}
       >
-        <div className="relative h-[66px] rounded-xl border border-border/70 bg-card px-3 py-2.5 card-pink overflow-hidden">
-          <div className="flex items-center gap-3 h-full">
-            {/* Icon */}
-            <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-lg bg-muted text-base transition-all duration-200"
-              style={{ transform: "scale(var(--card-icon-scale))", filter: "var(--card-icon-glow)" }}>
-              {link.icon || "🔗"}
+        <div className="relative min-h-[68px] rounded-xl border border-border/70 bg-card px-3.5 py-3 card-hover overflow-hidden">
+          <div className="flex items-center gap-3 min-h-[44px]">
+            {/* Favicon / Icon */}
+            <div
+              className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-lg bg-muted overflow-hidden transition-all duration-200"
+              style={{ transform: "scale(var(--card-icon-scale))" }}
+            >
+              {faviconUrl ? (
+                <NextImage
+                  src={faviconUrl}
+                  alt=""
+                  width={24}
+                  height={24}
+                  className="rounded"
+                  unoptimized
+                />
+              ) : (
+                <Globe className="h-5 w-5 text-muted-foreground/50" />
+              )}
             </div>
 
             {/* Content */}
-            <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5">
+            <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
               <div className="flex items-center gap-2">
-                <span className="card-pink-title truncate text-[13px] font-medium text-foreground/85 transition-colors duration-200">
-                  {link.title}
+                <span className="card-hover-title truncate text-[13.5px] font-medium text-foreground transition-colors duration-200">
+                  {highlightSearchTerm(link.title, searchQuery)}
                 </span>
                 {/* Inline badges */}
                 {link.featured && (
@@ -85,14 +123,30 @@ export function LinkCard({ link, index = 0 }: { link: NavLink; index?: number })
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50 truncate">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground truncate">
                 <span className="font-mono truncate">{domain}</span>
-                {ts && <><span>·</span><span className="shrink-0">{ts}</span></>}
+                {ts && <><span aria-hidden="true">·</span><span className="shrink-0">{ts}</span></>}
               </div>
             </div>
+
+            {/* Favorite toggle */}
+            <button
+              onClick={handleClick}
+              className="shrink-0 p-1.5 rounded-md text-muted-foreground/30 hover:text-primary hover:bg-primary/5 transition-colors"
+              aria-label={fav ? "取消收藏" : "添加收藏"}
+              aria-pressed={fav}
+            >
+              <Heart
+                className={`h-3.5 w-3.5 transition-all ${
+                  fav ? "fill-primary text-primary" : ""
+                }`}
+              />
+            </button>
           </div>
         </div>
       </a>
     </motion.div>
   );
 }
+
+export const LinkCard = memo(LinkCardComponent);

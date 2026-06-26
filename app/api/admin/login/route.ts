@@ -1,112 +1,95 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
-import { cookies } from "next/headers";
-import { encode } from "@auth/core/jwt";
+import { encode } from "next-auth/jwt";
+import { z } from "zod";
+import { getClientIp } from "@/lib/utils";
+import { checkRateLimit, recordAttempt } from "@/lib/rate-limit";
+import { verifyAdminPassword } from "@/lib/auth";
 
 const MAX_ATTEMPTS = 5;
 const DELAY_MS = 800;
+const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // 30 天
 
-// 使用 Supabase 做分布式失败计数（Serverless 下 in-memory 不共享）
-async function checkLoginAttempts(ip: string): Promise<{ allowed: boolean }> {
-  const { createClient } = await import("@/lib/supabase/server");
-  const supabase = await createClient();
+const loginSchema = z.object({
+  password: z.string().min(1, "缺少密码").max(256, "密码过长"),
+});
 
-  const windowStart = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-
-  const { count } = await supabase
-    .from("login_attempts")
-    .select("*", { count: "exact", head: true })
-    .eq("ip", ip)
-    .gte("created_at", windowStart);
-
-  return { allowed: (count ?? 0) < MAX_ATTEMPTS };
-}
-
-async function recordLoginAttempt(ip: string, success: boolean) {
-  const { createClient } = await import("@/lib/supabase/server");
-  const supabase = await createClient();
-  await supabase.from("login_attempts").insert({ ip, success });
+async function createSessionCookie(): Promise<string> {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) throw new Error("AUTH_SECRET not configured");
+  return encode({
+    token: { sub: "admin", name: "管理员", role: "admin" },
+    secret,
+    salt: "next-auth.session-token",
+    maxAge: SESSION_MAX_AGE,
+  });
 }
 
 export async function POST(request: Request) {
-  const ip =
-    request.headers.get("x-nf-client-connection-ip") ||
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "unknown";
+  const ip = getClientIp(request);
 
-  const { password } = await request.json();
-  const adminPassword = process.env.ADMIN_PASSWORD;
-
-  if (!adminPassword) {
-    return NextResponse.json({ error: "未配置管理员密码" }, { status: 500 });
-  }
-
-  // 速率限制检查（分布式）
-  const { allowed } = await checkLoginAttempts(ip);
+  // 分布式速率限制（fail-close：数据库故障时使用内存备用限制）
+  const { allowed } = await checkRateLimit(
+    "login_attempts",
+    ip,
+    15 * 60 * 1000,
+    MAX_ATTEMPTS,
+    true
+  );
   if (!allowed) {
     return NextResponse.json(
-      { error: "登录尝试过于频繁，请 15 分钟后再试" },
-      { status: 429 },
+      { error: "尝试过于频繁，请 15 分钟后再试" },
+      { status: 429 }
     );
   }
 
-  // 恒定时间比较
-  const passwordBuf = Buffer.from(password ?? "");
-  const expectedBuf = Buffer.from(adminPassword);
-
-  let isMatch: boolean;
-  if (passwordBuf.length !== expectedBuf.length) {
-    // 长度不同时，用定时安全的"假比较"防止时序泄露
-    const dummy = crypto.randomBytes(expectedBuf.length);
-    crypto.timingSafeEqual(dummy, dummy);
-    isMatch = false;
-  } else {
-    isMatch = crypto.timingSafeEqual(passwordBuf, expectedBuf);
+  const body = await request.json();
+  const parsed = loginSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "输入验证失败", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
   }
 
-  // 无论成功失败都等 800ms（防暴力破解 + 时序攻击）
-  await new Promise((r) => setTimeout(r, DELAY_MS));
-  await recordLoginAttempt(ip, isMatch);
+  const { password } = parsed.data;
 
-  if (!isMatch) {
+  // 恒定时间延迟：无论结果如何都等待，防止时序攻击
+  await new Promise((r) => setTimeout(r, DELAY_MS));
+
+  // 密码验证（使用共享函数，消除重复逻辑）
+  const success = await verifyAdminPassword(password);
+
+  // 记录登录结果
+  await recordAttempt("login_attempts", ip, success);
+
+  if (!success) {
     return NextResponse.json({ error: "密码错误" }, { status: 401 });
   }
 
-  // 创建 Auth.js JWT 会话
-  const AUTH_SECRET = process.env.AUTH_SECRET;
-  if (!AUTH_SECRET) {
-    return NextResponse.json({ error: "未配置会话密钥" }, { status: 500 });
-  }
+  // 创建加密会话 JWT 并设置 cookie
+  const sessionToken = await createSessionCookie();
 
-  const isSecure = process.env.NODE_ENV === "production";
-  const cookieName = isSecure ? "__Secure-next-auth.session-token" : "next-auth.session-token";
-
-  const sessionToken = await encode({
-    secret: AUTH_SECRET,
-    token: {
-      sub: "admin",
-      role: "admin",
-    },
-    maxAge: 4 * 60 * 60, // 4 小时，与之前一致
-  });
-
-  const cookieStore = await cookies();
-  cookieStore.set({
-    name: cookieName,
-    value: sessionToken,
+  const isProduction = process.env.NODE_ENV === "production";
+  const response = NextResponse.json({ success: true });
+  response.cookies.set("next-auth.session-token", sessionToken, {
     httpOnly: true,
-    secure: isSecure,
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite: "strict",
     path: "/",
-    maxAge: 4 * 60 * 60,
+    maxAge: SESSION_MAX_AGE,
   });
 
-  return NextResponse.json({ success: true });
+  return response;
 }
 
 export async function DELETE() {
-  const cookieStore = await cookies();
-  const isSecure = process.env.NODE_ENV === "production";
-  cookieStore.delete(isSecure ? "__Secure-next-auth.session-token" : "next-auth.session-token");
-  return NextResponse.json({ success: true });
+  const response = NextResponse.json({ success: true });
+  response.cookies.set("next-auth.session-token", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: 0,
+  });
+  return response;
 }

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getCategories } from "@/lib/repositories";
 import { SubmitForm } from "@/components/SubmitForm";
 import { type Category } from "@/lib/types";
 
@@ -8,13 +8,7 @@ export const metadata = {
 };
 
 export default async function SubmitPage() {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("nav_categories")
-    .select("*")
-    .order("sort_order");
-
-  const categories: Category[] = data ?? [];
+  const categories: Category[] = await getCategories().catch(() => []);
 
   return (
     <div className="mx-auto max-w-xl px-4 py-8">

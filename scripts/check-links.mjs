@@ -130,23 +130,19 @@ async function main() {
   console.log(`📊 共 ${links.length} 个链接需要检查\n`);
 
   // 2. 并发检测（限流）
-  const queue = [...links];
-  const running = [];
+  let idx = 0;
 
-  while (queue.length || running.length) {
-    while (running.length < CONCURRENCY && queue.length) {
-      const link = queue.shift();
-      const idx = OK_COUNT.total - queue.length;
-      const p = checkLink(link, idx, OK_COUNT.total).finally(() => {
-        const i = running.indexOf(p);
-        if (i > -1) running.splice(i, 1);
-      });
-      running.push(p);
-    }
-    if (running.length) {
-      await Promise.race(running);
+  async function worker() {
+    while (idx < links.length) {
+      const currentIdx = idx;
+      const link = links[idx];
+      idx++;
+      await checkLink(link, currentIdx + 1, OK_COUNT.total);
     }
   }
+
+  const workers = Array.from({ length: Math.min(CONCURRENCY, links.length) }, () => worker());
+  await Promise.all(workers);
 
   // 3. 汇总
   const elapsed = ((Date.now() - START) / 1000).toFixed(1);

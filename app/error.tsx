@@ -2,6 +2,8 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
+import Link from "next/link";
+import { Waves, RefreshCw, Home } from "lucide-react";
 
 export default function ErrorPage({
   error,
@@ -18,7 +20,7 @@ export default function ErrorPage({
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4">
       <div className="flex flex-col items-center gap-5 text-center max-w-sm">
-        <span className="text-4xl" role="img" aria-hidden="true">🌊</span>
+        <Waves className="h-10 w-10 text-muted-foreground/30" aria-hidden="true" />
         <h1 className="text-lg font-semibold text-foreground/80">
           页面遇到了问题
         </h1>
@@ -30,19 +32,18 @@ export default function ErrorPage({
         <div className="flex items-center gap-3">
           <button
             onClick={() => reset()}
-            className="inline-flex items-center gap-1.5 rounded-full border border-input bg-background/80 px-4 py-2 text-sm text-foreground/70 transition-all hover:border-pink-300/60 hover:text-pink-500/80 hover:bg-pink-50/20 dark:hover:bg-pink-950/20"
+            className="inline-flex items-center gap-1.5 rounded-full border border-input bg-background/80 px-4 py-2 text-sm text-foreground/70 transition-all hover:border-primary/60 hover:text-primary hover:bg-primary/5"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <RefreshCw className="h-3.5 w-3.5" />
             重试
           </button>
-          <a
+          <Link
             href="/"
-            className="inline-flex items-center gap-1.5 rounded-full border border-input bg-background/80 px-4 py-2 text-sm text-foreground/70 transition-all hover:border-pink-300/60 hover:text-pink-500/80 hover:bg-pink-50/20 dark:hover:bg-pink-950/20"
+            className="inline-flex items-center gap-1.5 rounded-full border border-input bg-background/80 px-4 py-2 text-sm text-foreground/70 transition-all hover:border-primary/60 hover:text-primary hover:bg-primary/5"
           >
+            <Home className="h-3.5 w-3.5" />
             返回首页
-          </a>
+          </Link>
         </div>
         {error.digest && (
           <p className="text-[10px] text-muted-foreground/30 font-mono">

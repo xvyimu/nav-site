@@ -10,6 +10,10 @@ export async function requireAdmin(): Promise<{ authorized: boolean }> {
   if (!session?.user) {
     return { authorized: false };
   }
+  const role = session.user.role;
+  if (role !== "admin") {
+    return { authorized: false };
+  }
   return { authorized: true };
 }
 

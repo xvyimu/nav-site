@@ -1,74 +1,31 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { requireAdmin, unauthorized } from "@/lib/admin-auth";
-import { z } from "zod";
+import { withAdminGet, withAdminWrite } from "@/lib/with-admin";
+import { createLinkSchema } from "@/lib/schemas";
+import { getAllLinksForAdmin, createLink } from "@/lib/repositories";
 
-const createLinkSchema = z.object({
-  title: z.string().min(1, "名称不能为空").max(100, "名称不能超过 100 字符"),
-  url: z.string()
-    .url("URL 格式不正确")
-    .refine((u) => {
-      try {
-        return new URL(u).protocol === "http:" || new URL(u).protocol === "https:";
-      } catch {
-        return false;
-      }
-    }, "仅允许 http/https 协议")
-    .max(2000, "URL 不能超过 2000 字符"),
-  description: z.string().max(500, "描述不能超过 500 字符").nullish(),
-  icon: z.string().max(20, "图标不能超过 20 字符").nullish(),
-  category_id: z.string().uuid("分类 ID 格式不正确").nullable().nullish(),
-  approved: z.boolean().optional().default(true),
-  featured: z.boolean().optional().default(false),
+export const GET = withAdminGet(async () => {
+  try {
+    const links = await getAllLinksForAdmin();
+    return NextResponse.json({ links });
+  } catch {
+    return NextResponse.json({ error: "获取链接列表失败" }, { status: 500 });
+  }
 });
 
-export async function GET() {
-  const { authorized } = await requireAdmin();
-  if (!authorized) return unauthorized();
-
-  const supabase = await createAdminClient();
-  const { data: links, error } = await supabase
-    .from("nav_links")
-    .select("*, nav_categories(name, slug)")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+export const POST = withAdminWrite(createLinkSchema, async ({ parsed }) => {
+  try {
+    const link = await createLink({
+      title: parsed.title,
+      url: parsed.url,
+      description: parsed.description || null,
+      icon: parsed.icon || "🔗",
+      category_id: parsed.category_id || null,
+      approved: parsed.approved,
+      featured: parsed.featured,
+      tag_ids: parsed.tag_ids,
+    });
+    return NextResponse.json({ link });
+  } catch {
+    return NextResponse.json({ error: "创建链接失败" }, { status: 500 });
   }
-  return NextResponse.json({ links });
-}
-
-export async function POST(request: Request) {
-  const { authorized } = await requireAdmin();
-  if (!authorized) return unauthorized();
-
-  const supabase = await createAdminClient();
-  const body = await request.json();
-
-  const parsed = createLinkSchema.safeParse(body);
-  if (!parsed.success) {
-    const errors = parsed.error.flatten().fieldErrors;
-    return NextResponse.json({ error: "输入验证失败", details: errors }, { status: 400 });
-  }
-
-  const { title, url, description, icon, category_id, approved, featured } = parsed.data;
-
-  const { data, error } = await supabase
-    .from("nav_links")
-    .insert({
-      title,
-      url,
-      description: description || null,
-      icon: icon || "🔗",
-      category_id: category_id || null,
-      approved,
-      featured,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-  return NextResponse.json({ link: data });
-}
+});

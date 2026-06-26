@@ -1,16 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextResponse } from "next/server";
 import { z } from "zod";
+import { isSafeUrl } from "@/lib/utils";
 
 import { requireAdmin, unauthorized } from "@/lib/admin-auth";
 
 // ─── Mock @/lib/auth ───
 
 vi.mock("@/lib/auth", () => ({
-  auth: vi.fn(),
+  auth: vi.fn(() => Promise.resolve(null)),
 }));
 
 import { auth } from "@/lib/auth";
+
+const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
 
 describe("admin-auth", () => {
   beforeEach(() => {
@@ -18,15 +20,27 @@ describe("admin-auth", () => {
   });
 
   it("returns unauthorized when no session exists", async () => {
-    (auth as any).mockResolvedValue(null);
+    mockAuth.mockResolvedValue(null);
     const result = await requireAdmin();
     expect(result.authorized).toBe(false);
   });
 
-  it("returns authorized when session.user exists", async () => {
-    (auth as any).mockResolvedValue({ user: { id: "admin" } });
+  it("returns authorized when session.user has admin role", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "admin", role: "admin" } } as never);
     const result = await requireAdmin();
     expect(result.authorized).toBe(true);
+  });
+
+  it("returns unauthorized when session.user lacks admin role", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user1", role: "user" } } as never);
+    const result = await requireAdmin();
+    expect(result.authorized).toBe(false);
+  });
+
+  it("returns unauthorized when session.user has no role field", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "unknown" } } as never);
+    const result = await requireAdmin();
+    expect(result.authorized).toBe(false);
   });
 
   it("returns 401 JSON response via unauthorized()", () => {
@@ -126,16 +140,7 @@ describe("submitSchema validation", () => {
   });
 });
 
-// ─── isSafeUrl (from LinkCard) ───
-
-function isSafeUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+// ─── isSafeUrl (from lib/utils) ───
 
 describe("isSafeUrl", () => {
   it("accepts https URLs", () => {

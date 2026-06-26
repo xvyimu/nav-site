@@ -1,34 +1,13 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin, unauthorized } from "@/lib/admin-auth";
-import { z } from "zod";
-
-const updateLinkSchema = z.object({
-  title: z.string().min(1).max(100).optional(),
-  url: z.string()
-    .url()
-    .refine((u) => {
-      try {
-        return new URL(u).protocol === "http:" || new URL(u).protocol === "https:";
-      } catch {
-        return false;
-      }
-    })
-    .max(2000)
-    .optional(),
-  description: z.string().max(500).nullish(),
-  icon: z.string().max(20).nullish(),
-  category_id: z.string().uuid().nullable().nullish(),
-  approved: z.boolean().optional(),
-  featured: z.boolean().optional(),
-});
+import { updateLinkSchema } from "@/lib/schemas";
+import { updateLink, deleteLink } from "@/lib/repositories";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { authorized } = await requireAdmin();
   if (!authorized) return unauthorized();
 
   const { id } = await params;
-  const supabase = await createAdminClient();
   const body = await request.json();
 
   const parsed = updateLinkSchema.safeParse(body);
@@ -37,17 +16,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "输入验证失败", details: errors }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from("nav_links")
-    .update(parsed.data)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    const link = await updateLink(id, parsed.data as Record<string, unknown>);
+    return NextResponse.json({ link });
+  } catch {
+    return NextResponse.json({ error: "更新链接失败" }, { status: 500 });
   }
-  return NextResponse.json({ link: data });
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -55,10 +29,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!authorized) return unauthorized();
 
   const { id } = await params;
-  const supabase = await createAdminClient();
-  const { error } = await supabase.from("nav_links").delete().eq("id", id);
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    await deleteLink(id);
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "删除链接失败" }, { status: 500 });
   }
-  return NextResponse.json({ success: true });
 }

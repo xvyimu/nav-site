@@ -9,8 +9,10 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
+  const role = session?.user?.role;
 
-  if (!session?.user) {
+  // 纵深防御：middleware 已拦截，此处二次确认 role
+  if (!session?.user || role !== "admin") {
     redirect("/login");
   }
 

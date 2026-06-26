@@ -4,7 +4,7 @@ import { type KeyboardEvent } from "react";
 import { type NavLink } from "@/lib/types";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
-import { LinkCard } from "./LinkCard";
+import { ResultGrid } from "./ResultGrid";
 
 interface CategorySectionConfig {
   key: string;
@@ -20,6 +20,7 @@ interface CategorySectionProps {
   focusedIndex: number;
   onFocusChange: (index: number) => void;
   onKeyDown: (e: KeyboardEvent<HTMLElement>, index: number) => void;
+  searchQuery?: string;
 }
 
 export function CategorySection({
@@ -29,6 +30,7 @@ export function CategorySection({
   focusedIndex,
   onFocusChange,
   onKeyDown,
+  searchQuery = "",
 }: CategorySectionProps) {
   if (section.links.length === 0) return null;
   if (activeCategory !== "all" && activeCategory !== section.key) return null;
@@ -37,31 +39,19 @@ export function CategorySection({
     <motion.section variants={fadeInUp}>
       {activeCategory === "all" && (
         <h2 className={`mb-3 text-xs font-medium uppercase tracking-widest ${section.accent} flex items-center gap-2`}>
-          <span className="inline-block w-4 h-px bg-current opacity-40" />
+          <span className="inline-block w-4 h-px bg-current opacity-50" />
           {section.label}
-          <span className="text-muted-foreground/40 font-normal">({section.links.length})</span>
+          <span className="text-muted-foreground/60 font-normal tabular-nums">({section.links.length})</span>
         </h2>
       )}
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" role="list" aria-label={section.label}>
-        {section.links.map((link, i) => {
-          const resultIndex = sectionOffset + i;
-          return (
-            <motion.div layout key={link.id}
-              id={`result-${resultIndex}`}
-              role="listitem"
-              data-result-index={resultIndex}
-              data-focused={focusedIndex === resultIndex ? "true" : undefined}
-              onMouseEnter={() => onFocusChange(resultIndex)}
-              onMouseLeave={() => onFocusChange(-1)}
-              onKeyDown={(e) => onKeyDown(e, resultIndex)}
-              tabIndex={focusedIndex === resultIndex ? 0 : -1}
-              className="outline-none rounded-xl transition-all duration-150"
-            >
-              <LinkCard link={link} index={resultIndex} />
-            </motion.div>
-          );
-        })}
-      </div>
+      <ResultGrid
+        links={section.links}
+        baseIndex={sectionOffset}
+        focusedIndex={focusedIndex}
+        onFocusChange={onFocusChange}
+        onKeyDown={onKeyDown}
+        searchQuery={searchQuery}
+      />
     </motion.section>
   );
 }

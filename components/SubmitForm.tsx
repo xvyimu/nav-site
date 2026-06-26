@@ -50,7 +50,7 @@ export function SubmitForm({ categories }: { categories: Category[] }) {
       >
         <span className="text-2xl">✅</span>
         <p className="text-sm text-foreground/70">{message}</p>
-        <button onClick={() => setStatus("idle")} className="text-xs text-muted-foreground/50 underline underline-offset-2 hover:text-muted-foreground/80 transition-colors">
+        <button type="button" aria-label="继续提交" onClick={() => setStatus("idle")} className="text-xs text-muted-foreground/50 underline underline-offset-2 hover:text-muted-foreground/80 transition-colors">
           继续提交
         </button>
       </motion.div>

@@ -1,153 +1,254 @@
-# 公益API导航站
+# 综合导航站 (nav-site)
 
-精选 AI 大模型 API 与开发者资源导航平台。收录官方原厂与公益中转服务，帮助开发者快速找到可用的 AI API 入口。
-
-**生产站点**：[https://yuanjia1314.ccwu.cc](https://yuanjia1314.ccwu.cc)
-
----
+精选收录 AI 大模型、云服务、开发工具、设计资源、开源项目等 500+ 优质站点的导航平台。
 
 ## 技术栈
 
-| 层 | 技术 |
-|---|------|
-| 框架 | [Next.js 16](https://nextjs.org/) (App Router, ISR) |
-| 语言 | TypeScript |
-| 样式 | Tailwind CSS v4 + [shadcn/ui](https://ui.shadcn.com/) |
-| 动画 | [Motion](https://motion.dev/) (Framer Motion) |
-| 数据库 | [Supabase](https://supabase.com/) (PostgreSQL) |
-| 部署 | [Vercel](https://vercel.com/) |
-| CDN | Cloudflare (代理 + 缓存 + SSL) |
-| 包管理 | pnpm |
+| 层级 | 技术 | 版本 |
+|------|------|------|
+| 框架 | Next.js (App Router + **webpack** 构建) | 16.2.9 |
+| UI | React + Tailwind CSS v4 + shadcn/ui | 19.2.4 |
+| 数据库 | Supabase (PostgreSQL + RLS) | 单库模式 |
+| 认证 | next-auth v5 (Credentials + GitHub OAuth) | 5.0.0-beta.31 |
+| 搜索 | Fuse.js 服务端模糊搜索 | — |
+| 动画 | Motion (Framer Motion) | — |
+| 监控 | Sentry (client/server/edge) | — |
+| 测试 | Vitest (单元) + Playwright (E2E) | — |
+| 部署 | Netlify | — |
+
+## 快速开始
+
+```bash
+# 安装依赖
+npm install
+
+# 配置环境变量
+cp .env.local.example .env.local
+# 编辑 .env.local 填入 Supabase URL/KEY、AUTH_SECRET、ADMIN_PASSWORD 等
+
+# 开发模式（端口 3264，webpack 模式）
+npm run dev
+
+# 生产构建（webpack 模式，必须保留 --webpack 标志）
+npm run build
+
+# 启动生产服务器
+npm start
+```
+
+> ⚠️ 不要使用 `pnpm` 或不加 `--webpack` 的 `next build/dev`：`node_modules` 中存在 30 个 NTFS reparse point 损坏目录，Turbopack 无法遍历。详见 `CLAUDE-HANDOFF.md`。
+
+## 环境变量
+
+| 变量 | 说明 | 必填 |
+|------|------|------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 项目 URL | 是 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | 是 |
+| `NEXT_PUBLIC_SITE_URL` | 站点 URL（用于 SEO） | 是 |
+| `AUTH_SECRET` | Auth.js 加密密钥 | 是 |
+| `ADMIN_PASSWORD` | 管理员密码 | 是 |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key（服务端绕过 RLS） | 是 |
+| `GITHUB_ID` | GitHub OAuth App ID（用户登录） | 否 |
+| `GITHUB_SECRET` | GitHub OAuth App Secret | 否 |
+| `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN | 否 |
+| `CRON_SECRET` | 定时任务密钥 | 否 |
+
+## 测试
+
+```bash
+# 单元测试
+npm test
+
+# 单元测试 + 覆盖率
+npm run test:coverage
+
+# E2E 测试（需先启动 dev server）
+npm run e2e
+
+# E2E 交互式 UI 模式
+npm run e2e:ui
+```
+
+## 代码质量
+
+```bash
+# ESLint
+npm run lint
+
+# TypeScript 类型检查
+npm run typecheck
+
+# Bundle 分析
+npm run analyze
+```
 
 ## 项目结构
 
 ```
 nav-site/
-├── app/                    # Next.js App Router 路由
-│   ├── api/                # API 路由（提交/付费/统计）
-│   ├── admin/              # 后台管理面板
-│   ├── submit/             # 站点提交页面
-│   ├── layout.tsx          # 根布局（SEO meta、JSON-LD、主题）
-│   ├── page.tsx            # 首页（导航列表 + 排行榜）
-│   ├── sitemap.ts          # 站点地图
-│   └── robots.ts           # 爬虫规则
-├── components/             # UI 组件
-│   ├── ui/                 # shadcn/ui 基础组件
-│   ├── LinkCard.tsx        # 链接卡片（含点击追踪）
-│   ├── Navigation.tsx      # 分类筛选 + 搜索
-│   ├── ModelRanking.tsx    # 模型排行榜
-│   ├── SubmitForm.tsx      # 站点提交表单
-│   └── Header.tsx / Footer.tsx
-├── lib/                    # 工具库
-│   ├── supabase/           # Supabase 客户端（server/client/admin）
-│   ├── types.ts            # 类型定义
-│   ├── utils.ts            # 工具函数
-│   ├── model-rankings.ts   # 排行榜数据获取
-│   └── animations.ts       # 动画配置
-├── scripts/                # 自动化脚本
-│   ├── check-links.mjs     # 链接健康度检测
-│   ├── sync-db.mjs         # 开发→生产双库同步
-│   └── add.mjs             # 批量添加链接
-└── .github/workflows/      # CI/CD
-    ├── link-check.yml      # 每周链接健康检查
-    └── sync-db.yml         # 每6小时数据库同步
+├── app/                        # Next.js App Router
+│   ├── api/                    # API 路由
+│   │   ├── admin/              # 管理员 CRUD API
+│   │   ├── auth/[...nextauth]/  # Auth.js 路由
+│   │   ├── click/              # 点击计数
+│   │   ├── favorites/          # 用户收藏同步
+│   │   ├── favicon/            # Favicon 代理
+│   │   ├── health/             # 健康检查
+│   │   ├── reviews/            # 工具评价
+│   │   ├── search/             # 服务端搜索 API
+│   │   ├── submit/             # 站点提交
+│   │   └── tools/              # Agent API
+│   ├── admin/                  # 管理后台
+│   ├── api-docs/               # API 文档页面
+│   ├── favorites/              # 收藏页面
+│   ├── login/                  # 登录页面
+│   ├── tool/[slug]/            # 程序化 SEO 工具详情页
+│   ├── submit/                 # 提交页面
+│   ├── about/                  # 关于页面
+│   ├── error.tsx               # 错误边界
+│   ├── global-error.tsx        # 全局错误边界
+│   ├── loading.tsx             # 路由级加载骨架
+│   ├── not-found.tsx           # 自定义 404
+│   ├── opengraph-image.tsx     # 动态 OG 图片
+│   ├── sitemap.ts              # 站点地图
+│   ├── robots.ts               # 爬虫规则
+│   └── manifest.ts             # PWA manifest
+├── components/                 # React 组件
+│   ├── admin/                  # 管理后台组件
+│   ├── ui/                     # UI 基础组件
+│   ├── Header.tsx              # 顶栏（含登录/退出）
+│   ├── Navigation.tsx          # 主导航
+│   ├── Sidebar.tsx             # 侧边栏分类
+│   ├── LinkCard.tsx            # 链接卡片
+│   ├── SearchBar.tsx           # 搜索框
+│   ├── ModelRanking.tsx        # 模型排行榜
+│   ├── FavoritesProvider.tsx   # 收藏上下文
+│   ├── Providers.tsx           # SessionProvider 包装
+│   ├── Shell.tsx               # 布局壳
+│   └── ...
+├── lib/                        # 工具库
+│   ├── supabase/               # Supabase 客户端
+│   ├── auth.ts                 # Auth.js 配置
+│   ├── repositories.ts         # 数据访问层
+│   ├── use-favorites.ts        # 收藏 Hook
+│   ├── useLinksFilter.ts       # 搜索/过滤 Hook
+│   ├── model-rankings.ts       # 模型排行榜数据
+│   ├── slugify.ts              # URL slug 生成
+│   ├── rate-limit.ts           # 速率限制
+│   ├── logger.ts               # 结构化日志
+│   └── ...
+├── scripts/                    # 运维脚本
+│   ├── bulk-add.mjs            # 批量导入站点（JSON/TXT）
+│   ├── bulk-sites.json         # 批量录入数据源（356 条）
+│   ├── check-links.mjs         # 链接健康检测
+│   ├── dedupe-figma-api.mjs    # Figma 去重脚本（admin API）
+│   ├── setup-env.mjs           # 环境配置初始化
+│   ├── seed-data.json          # 种子数据（示例）
+│   ├── migration-complete.sql  # slug + favorites + RLS 完整迁移
+│   ├── migration-slug.sql      # slug 列迁移
+│   ├── migration-user-favorites.sql  # 收藏表迁移
+│   ├── migration-reviews.sql   # 评价系统迁移
+│   ├── migration-pgvector.sql  # 语义搜索迁移（可选）
+│   └── rls-audit.sql           # RLS 审计
+├── tests/                      # 单元测试
+├── e2e/                        # E2E 测试
+├── docs/                       # 文档
+│   ├── PROGRESS.md             # 项目进度
+│   ├── adr-001-dual-db-merge.md
+│   └── adr-002-authjs-migration.md
+├── proxy.ts                    # Auth.js middleware
+├── next.config.ts              # Next.js 配置
+├── eslint.config.mjs           # ESLint 配置
+└── package.json
 ```
 
-## 数据流
+## API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/tools` | GET | Agent API，支持分类过滤、搜索、限制 |
+| `/api/search` | GET | 服务端 Fuse.js 模糊搜索 |
+| `/api/click` | POST | 点击计数（sendBeacon） |
+| `/api/favorites` | GET/POST/DELETE | 用户收藏同步（需登录） |
+| `/api/reviews` | GET/POST | 工具评价 |
+| `/api/submit` | POST | 站点提交 |
+| `/api/favicon` | GET | Favicon 代理（Content-Type 白名单） |
+| `/api/health` | GET | 健康检查 |
+| `/api/admin/*` | GET/POST/PUT/DELETE | 管理员 CRUD（需 admin 角色） |
+
+API 文档详见 `/api-docs` 页面。
+
+## CI/CD 流水线
 
 ```
-用户提交 ──→ /api/submit ──→ Supabase (开发库)
-                                   │
-                    sync-db.yml (每6小时)
-                                   │
-                            ┌──────┴──────┐
-                            │  生产库 (只读) │
-                            └─────────────┘
-                                  │
-    next.config.ts 安全头 ← ── Vercel ──→ Cloudflare CDN ──→ 用户
+push/PR → quality (lint + tsc + test+coverage)
+                ↓
+          build (next build)
+                ↓
+           e2e (Playwright)
+                ↓
+         deploy (Netlify)  [仅 master push]
 ```
 
-- **开发库** (`nzaocqwumlmbewoddysd`): 唯一的写入源，全部管理操作在此进行
-- **生产库** (`vyqqbypwrbdcafanzwmj`): 只读副本，由 GitHub Actions 定时同步
+## 架构决策
 
-## 本地开发
+### ADR-001: 双库合并（已执行）
+
+项目原采用双库架构（开发库写入 + 生产库只读 + 6 小时同步），已于 2026-06-23 合并为单库模式。详见 `docs/adr-001-dual-db-merge.md`。
+
+### ADR-002: Auth.js 迁移（已执行）
+
+从 `@auth/core` canary 迁移到 `next-auth` v5 beta，降低供应链风险。详见 `docs/adr-002-authjs-migration.md`。
+
+### 数据访问层
+
+所有数据库操作通过 `lib/repositories.ts` 统一抽象，避免 API 路由直接调用 Supabase 客户端。
+
+### 程序化 SEO
+
+每个收录的工具自动生成 `/tool/[slug]` 详情页，包含 JSON-LD `SoftwareApplication` 结构化数据，便于搜索引擎和 AI 引擎理解。
+
+### 服务端搜索
+
+搜索请求通过 `/api/search` API 在服务端执行 Fuse.js 模糊搜索，减少客户端 bundle 体积。200ms 防抖，支持分类过滤。
+
+### 用户收藏同步
+
+未登录用户收藏存储在 localStorage；登录后自动合并到服务端 `user_favorites` 表，跨设备同步。
+
+## 数据库迁移
+
+在 Supabase SQL Editor 中按顺序执行：
+
+```sql
+-- 1. RLS 策略审计
+-- 运行 scripts/rls-audit.sql
+
+-- 2. 用户评价系统
+-- 运行 scripts/migration-reviews.sql
+
+-- 3. slug 列迁移（SEO 友好 URL）
+-- 运行 scripts/migration-slug.sql
+
+-- 4. 用户收藏表
+-- 运行 scripts/migration-user-favorites.sql
+
+-- 5. pgvector 语义搜索（可选）
+-- 先在 Supabase Dashboard 启用 vector 扩展
+-- 然后运行 scripts/migration-pgvector.sql
+```
+
+## 内容管理
 
 ```bash
-# 前置要求：Node.js 22+, pnpm
+# 批量导入站点（JSON/TXT）
+npm run bulk:add scripts/bulk-sites.json
+npm run bulk:add scripts/bulk-sites.json --dry-run    # 预览模式
 
-# 1. 克隆项目
-git clone https://github.com/yuanjia1314/nav-site.git
-cd nav-site
-
-# 2. 安装依赖
-pnpm install
-
-# 3. 配置环境变量
-cp .env.example .env.local
-# 编辑 .env.local，填入 Supabase 凭据
-
-# 4. 启动开发服务器
-pnpm dev
-
-# 访问 http://localhost:3000
+# 检查链接健康状态
+npm run check:links
 ```
 
-### 环境变量
-
-| 变量 | 说明 | 必须 |
-|------|------|:----:|
-| `NEXT_PUBLIC_SUPABASE_URL` | 生产 Supabase URL | ✅ |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 生产 Supabase anon key | ✅ |
-| `NEXT_PUBLIC_SUPABASE_URL_DEV` | 开发 Supabase URL | 本地开发 |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY_DEV` | 开发 Supabase anon key | 本地开发 |
-| `NEXT_PUBLIC_SITE_URL` | 站点 URL（sitemap/meta） | 部署时 |
-
-### 常用命令
-
-```bash
-pnpm dev       # 启动开发服务器
-pnpm build     # 生产构建
-pnpm lint      # ESLint 检查
-pnpm sync      # 手动触发数据库同步
-pnpm add       # 批量添加链接（交互式）
-```
-
-## 安全
-
-- **安全响应头**: CSP、HSTS、X-Frame-Options、X-Content-Type-Options、Referrer-Policy、Permissions-Policy（via `next.config.ts`）
-- **外链**: 全部使用 `rel="noopener noreferrer"`（via `LinkCard.tsx`）
-- **CDN**: Cloudflare 代理 + SSL + HSTS Preload
-- **表单**: 提交走服务端 API，CSP `form-action 'self'` 限制
-
-## 功能
-
-- ✅ 分类展示导航链接（官方 API / 中转服务站 / 排行榜）
-- ✅ 分类筛选 + 实时搜索
-- ✅ 模型排行榜（含评分与来源）
-- ✅ 点击统计
-- ✅ 站点提交（需审核）
-- ✅ SEO 优化（OG / Twitter Card / JSON-LD / sitemap / robots）
-- ✅ 安全响应头（CSP / HSTS / XSS 防护）
-- ✅ 暗色模式
-- ✅ 响应式设计（移动端适配）
-- ✅ 链接健康度自动检测（每周）
-- 🔜 Stripe 付费优选提交
-- 🔜 后台管理面板
-
-## CI/CD
-
-| 工作流 | 触发 | 说明 |
-|--------|------|------|
-| `sync-db.yml` | 每6小时 / 手动 | 开发库 → 生产库数据同步 |
-| `link-check.yml` | 每周一 / 手动 | 检测所有外链可用性，异常自动创建 Issue |
-
-## 贡献指南
-
-1. 提交 Issue 报告问题或建议
-2. Fork 项目后创建特性分支
-3. 确保通过 `pnpm lint` 和 `pnpm build`
-4. 提交 PR 并描述变更内容
-
-## 许可证
+## License
 
 MIT

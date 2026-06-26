@@ -1,7 +1,9 @@
 import { createClient } from "./supabase/server";
-import type { ModelRanking } from "@/components/ModelRanking";
+import type { ModelRanking } from "@/lib/types";
+import { logger } from "@/lib/logger";
+import { cache } from "react";
 
-export async function getModelRankings(): Promise<ModelRanking[]> {
+async function getModelRankingsImpl(): Promise<ModelRanking[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -11,7 +13,7 @@ export async function getModelRankings(): Promise<ModelRanking[]> {
     .order("rank");
 
   if (error) {
-    console.error("Failed to fetch model rankings:", error.message);
+    logger.error("Failed to fetch model rankings", { table: "model_rankings" });
     return [];
   }
 
@@ -27,3 +29,5 @@ export async function getModelRankings(): Promise<ModelRanking[]> {
     category: r.category || "closed",
   }));
 }
+
+export const getModelRankings = cache(getModelRankingsImpl);

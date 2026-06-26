@@ -1,24 +1,50 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { Compass, X, ChevronRight, ChevronDown } from "lucide-react";
+import { getCategoryIcon } from "@/lib/category-icons";
+import { TagFilter } from "./TagFilter";
+import type { Tag } from "@/lib/types";
 
-interface SidebarTab {
+/** 侧边栏树节点（含子分类） */
+interface SidebarTabNode {
   key: string;
   label: string;
   count: number;
+  children: SidebarTabNode[];
 }
 
 interface SidebarProps {
-  tabs: SidebarTab[];
+  tabs: SidebarTabNode[];
   activeKey: string;
   onSelect: (key: string) => void;
   open: boolean;
   onClose: () => void;
+  /** 可选标签列表（按名称排序） */
+  tags?: Tag[];
+  /** 当前选中的标签 slug 列表 */
+  activeTags?: string[];
+  /** 切换标签选中状态 */
+  onToggleTag?: (slug: string) => void;
+  /** 清除所有标签筛选 */
+  onClearTags?: () => void;
 }
 
-export function Sidebar({ tabs, activeKey, onSelect, open, onClose }: SidebarProps) {
+export function Sidebar({
+  tabs,
+  activeKey,
+  onSelect,
+  open,
+  onClose,
+  tags = [],
+  activeTags = [],
+  onToggleTag,
+  onClearTags,
+}: SidebarProps) {
   const sidebarRef = useRef<HTMLDivElement>(null);
+  // 展开的分类 slug 集合（分类层级用）
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // Close on Escape
   useEffect(() => {
@@ -50,23 +76,99 @@ export function Sidebar({ tabs, activeKey, onSelect, open, onClose }: SidebarPro
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
+  // 选中子分类时自动展开父分类
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    setExpanded((prev) => {
+      for (const tab of tabs) {
+        if (tab.children.some((c) => c.key === activeKey) && !prev.has(tab.key)) {
+          const next = new Set(prev);
+          next.add(tab.key);
+          return next;
+        }
+      }
+      return prev;
+    });
+  }, [activeKey, tabs]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const toggleExpand = (key: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const handleSelect = (key: string) => {
+    onSelect(key);
+    if (window.innerWidth < 768) onClose();
+  };
+
+  const renderTab = (tab: SidebarTabNode, isChild = false): ReactNode => {
+    const Icon = getCategoryIcon(tab.key);
+    const isActive = activeKey === tab.key;
+    const hasChildren = tab.children.length > 0;
+    const isExpanded = expanded.has(tab.key);
+
+    return (
+      <div key={tab.key}>
+        <div className={`flex items-center ${isChild ? "ml-5" : ""}`}>
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={() => toggleExpand(tab.key)}
+              className="shrink-0 w-5 h-7 flex items-center justify-center text-muted-foreground/50 hover:text-foreground transition-colors"
+              aria-label={isExpanded ? "收起子分类" : "展开子分类"}
+              aria-expanded={isExpanded}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </button>
+          ) : (
+            <span className="shrink-0 w-5" aria-hidden="true" />
+          )}
+          <button
+            onClick={() => handleSelect(tab.key)}
+            className={`sidebar-link flex-1 ${isActive ? "active" : ""}`}
+            aria-current={isActive ? "page" : undefined}
+            style={isChild ? { paddingLeft: "0.25rem" } : undefined}
+          >
+            <span className="flex items-center gap-2.5">
+              <Icon
+                className={`h-4 w-4 shrink-0 transition-colors ${
+                  isActive ? "text-primary" : "text-muted-foreground/50"
+                }`}
+              />
+              {tab.label}
+            </span>
+            {tab.count > 0 && <span className="sidebar-badge">{tab.count}</span>}
+          </button>
+        </div>
+        {hasChildren && isExpanded && (
+          <div className="flex flex-col gap-1">
+            {tab.children.map((child) => renderTab(child, true))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const links: ReactNode = (
     <nav className="flex flex-col gap-1 px-3 py-2" aria-label="导航分类">
-      {tabs.map((tab) => (
-        <button
-          key={tab.key}
-          onClick={() => {
-            onSelect(tab.key);
-            // close on mobile after selecting
-            if (window.innerWidth < 768) onClose();
-          }}
-          className={`sidebar-link ${activeKey === tab.key ? "active" : ""}`}
-          aria-current={activeKey === tab.key ? "page" : undefined}
-        >
-          <span>{tab.label}</span>
-          {tab.count > 0 && <span className="sidebar-badge">{tab.count}</span>}
-        </button>
-      ))}
+      {tabs.map((tab) => renderTab(tab))}
+      {onToggleTag && onClearTags && (
+        <TagFilter
+          tags={tags}
+          activeTags={activeTags}
+          onToggleTag={onToggleTag}
+          onClear={onClearTags}
+        />
+      )}
     </nav>
   );
 
@@ -102,15 +204,15 @@ export function Sidebar({ tabs, activeKey, onSelect, open, onClose }: SidebarPro
           >
             <div className="flex h-14 items-center justify-between border-b border-border/50 px-4">
               <span className="flex items-center gap-2 text-sm font-medium text-foreground/80">
-                <span className="text-lg text-primary">⬡</span>
-                公益API导航站
+                <Compass className="h-5 w-5 text-primary" />
+                综合导航站
               </span>
               <button
                 onClick={onClose}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors text-sm"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors"
                 aria-label="关闭侧边栏"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
             {links}
