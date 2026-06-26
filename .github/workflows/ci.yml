@@ -99,8 +99,8 @@ jobs:
 
       - name: 启动生产服务器
         run: |
-          pnpm start &
-          sleep 5
+          pnpm start -p 3264 &
+          sleep 10
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SOURCE_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SOURCE_SUPABASE_ANON_KEY }}
@@ -108,7 +108,7 @@ jobs:
       - name: 运行 E2E 测试
         run: pnpm run e2e -- --project=chromium
         env:
-          E2E_BASE_URL: http://localhost:3000
+          E2E_BASE_URL: http://localhost:3264
 
       - name: 上传 E2E 测试报告
         if: always()
