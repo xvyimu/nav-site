@@ -10,15 +10,11 @@ import { useFavoritesContext } from "@/components/FavoritesProvider";
 export function FavoritesView() {
   const { favorites, clearFavorites, count } = useFavoritesContext();
   const [links, setLinks] = useState<NavLink[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(count > 0);
 
   // 按收藏 ID 批量获取链接数据
   useEffect(() => {
-    if (count === 0) {
-      setLinks([]);
-      setLoading(false);
-      return;
-    }
+    if (count === 0) return;
 
     setLoading(true);
     const ids = [...favorites].join(",");
