@@ -9,7 +9,7 @@ import { getCategories, getApprovedLinks } from "@/lib/repositories";
 // ISR: 每 60 秒重新生成页面
 export const revalidate = 60;
 
-async function NavContent() {
+export default async function Home() {
   const [categories, links, rankings] = await Promise.all([
     getCategories(),
     getApprovedLinks(),
@@ -17,20 +17,14 @@ async function NavContent() {
   ]);
 
   return (
-    <Navigation
-      categories={categories}
-      links={links as NavLink[]}
-      modelRankings={rankings}
-    />
-  );
-}
-
-export default function Home() {
-  return (
     <div className="w-full">
       <ErrorBoundary>
         <Suspense fallback={<NavSkeleton />}>
-          <NavContent />
+          <Navigation
+            categories={categories}
+            links={links as NavLink[]}
+            modelRankings={rankings}
+          />
         </Suspense>
       </ErrorBoundary>
     </div>
