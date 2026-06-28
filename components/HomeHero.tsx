@@ -47,11 +47,11 @@ export function HomeHero({
       <div className="relative z-10 mx-auto flex min-h-[76svh] max-w-[1480px] flex-col justify-between gap-10 py-8 md:min-h-[78svh] md:py-12">
         <div className="flex items-start justify-between gap-6">
           <div className="hidden max-w-[18rem] text-xs font-mono uppercase leading-relaxed text-white/70 md:block">
-            Curated atlas for builders working across AI, cloud, design, open source, and operations.
+            面向 AI、云端、设计、开源与运维构建者的精选图谱
           </div>
           <div className="ml-auto flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-mono uppercase text-white/80 backdrop-blur-md">
             <Sparkles className="h-3.5 w-3.5 text-emerald-200" aria-hidden="true" />
-            Hybrid search
+            混合检索
           </div>
         </div>
 
@@ -60,12 +60,12 @@ export function HomeHero({
             <div className="space-y-2 text-white">
               <p className="flex items-center gap-2 text-xs font-mono uppercase text-white/70">
                 <Compass className="h-3.5 w-3.5" aria-hidden="true" />
-                Nav Atlas
+                导航图谱
               </p>
               <h1 className="nav-display max-w-6xl text-6xl leading-[0.96] text-white sm:text-7xl md:text-8xl lg:text-9xl">
-                Find the
-                <span className="block pl-[12%] italic text-white/90">signal.</span>
-                <span className="block text-right text-white/95">In the tool wild.</span>
+                在工具荒野中
+                <span className="block pl-[12%] italic text-white/90">寻得信号。</span>
+                <span className="block text-right text-white/95">不再迷途。</span>
               </h1>
             </div>
 
@@ -78,27 +78,27 @@ export function HomeHero({
                 loading={searchLoading}
                 semantic={semanticSearch}
                 onSemanticChange={onSemanticSearchChange}
-                placeholder="Search tools, categories, tags..."
+                placeholder="搜索工具、分类、标签..."
                 variant="hero"
               />
               <a
                 href="#atlas"
                 className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 text-sm font-medium text-white backdrop-blur-md transition hover:border-emerald-200/50 hover:bg-white/15 focus-visible:outline-white"
               >
-                Explore atlas
+                探索图谱
                 <ArrowDown className="h-4 w-4" aria-hidden="true" />
               </a>
             </div>
           </div>
 
-          <aside className="nav-glass space-y-5 p-4 text-white md:p-5" aria-label="Atlas summary">
+          <aside className="nav-glass space-y-5 p-4 text-white md:p-5" aria-label="图谱概览">
             <div className="grid grid-cols-3 gap-3">
-              <Metric value={totalLinks} label="tools" />
-              <Metric value={categoryCount} label="groups" />
-              <Metric value={featuredCount} label="picked" />
+              <Metric value={totalLinks} label="工具" />
+              <Metric value={categoryCount} label="分组" />
+              <Metric value={featuredCount} label="精选" />
             </div>
             <p className="text-sm leading-6 text-white/72">
-              A quieter surface for finding useful services without scanning a noisy link wall.
+              无需扫视喧嚣链接墙，安静地寻得可用工具。
             </p>
             <div className="flex flex-wrap gap-2">
               {topTabs.slice(0, 5).map((tab) => (
@@ -128,11 +128,11 @@ export function HomeHero({
 
         <div className="grid gap-4 text-xs font-mono uppercase leading-relaxed text-white/60 md:grid-cols-[180px_minmax(0,1fr)_260px]">
           <div className="rounded-xl border border-white/10 bg-white/[0.06] p-3 backdrop-blur">
-            Curated daily
+            每日精选
           </div>
           <div className="hidden md:block" />
           <p>
-            Search first. Browse second. Keep what matters close enough to act on.
+            先搜索，再浏览。重要的东西，不要让它们离你太远。
           </p>
         </div>
       </div>

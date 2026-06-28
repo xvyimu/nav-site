@@ -39,7 +39,7 @@ export function Header() {
         <Link href="/" className="group flex items-center gap-2 text-center" aria-label="返回首页">
           <Compass className="h-5 w-5 text-emerald-100 transition group-hover:rotate-12" />
           <span className="hidden font-serif text-lg leading-none tracking-normal text-white sm:inline">
-            Nav Atlas
+            导航图谱
           </span>
         </Link>
 

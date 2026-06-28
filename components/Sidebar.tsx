@@ -187,7 +187,7 @@ export function Sidebar({
             <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
               <span className="flex items-center gap-2 text-sm font-medium text-white/85">
                 <Compass className="h-5 w-5 text-emerald-100" />
-                Nav Atlas
+                导航图谱
               </span>
               <button
                 onClick={onClose}
