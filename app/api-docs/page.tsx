@@ -118,7 +118,7 @@ curl "https://nav-site.netlify.app/api/tools?search=react&limit=10"`}</code></pr
               <h2 className="text-xl font-semibold">GET /api/search</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              服务端模糊搜索，基于 Fuse.js。搜索标题、描述和分类名称。
+              服务端搜索，默认基于 Fuse.js 模糊匹配；传入 semantic=true 时使用 pgvector 语义搜索，embedding 服务不可用时自动回退。
             </p>
 
             <h3 className="text-sm font-semibold text-foreground mb-2">参数</h3>
@@ -151,26 +151,34 @@ curl "https://nav-site.netlify.app/api/tools?search=react&limit=10"`}</code></pr
                     <td className="px-4 py-2 text-muted-foreground">否</td>
                     <td className="px-4 py-2">返回数量（默认 20，最大 100）</td>
                   </tr>
+                  <tr>
+                    <td className="px-4 py-2 font-mono text-primary">semantic</td>
+                    <td className="px-4 py-2 text-muted-foreground">boolean</td>
+                    <td className="px-4 py-2 text-muted-foreground">否</td>
+                    <td className="px-4 py-2">设为 true 时启用 pgvector 语义搜索</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
 
-            <pre className="rounded-lg bg-muted p-4 text-sm overflow-x-auto mb-4"><code>{`curl "https://nav-site.netlify.app/api/search?q=vercel&limit=5"`}</code></pre>
+            <pre className="rounded-lg bg-muted p-4 text-sm overflow-x-auto mb-4"><code>{`curl "https://nav-site.netlify.app/api/search?q=react&semantic=true&limit=5"`}</code></pre>
 
             <pre className="rounded-lg bg-muted p-4 text-sm overflow-x-auto mb-4"><code>{`{
   "results": [
     {
       "id": "uuid",
-      "title": "Vercel",
-      "url": "https://vercel.com",
-      "description": "前端部署与托管平台",
-      "category_slug": "cloud-vps",
+      "title": "React",
+      "url": "https://react.dev",
+      "description": "用于构建用户界面的 JavaScript 库",
+      "category_slug": "dev-tools",
       "featured": true,
-      "score": 0.01
+      "similarity": 0.82,
+      "source": "semantic"
     }
   ],
   "total": 1,
-  "query": "vercel"
+  "query": "react",
+  "mode": "semantic"
 }`}</code></pre>
           </section>
 

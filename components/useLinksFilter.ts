@@ -40,6 +40,7 @@ export function useLinksFilter({
   const [activeCategory, setActiveCategory] = useState("all");
   const [rawSearch, setRawSearch] = useState("");
   const [search, setSearch] = useState("");
+  const [semanticSearch, setSemanticSearch] = useState(true);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   // 多标签筛选（AND 语义：必须同时拥有所有选中的标签 slug）
   const [activeTags, setActiveTags] = useState<string[]>([]);
@@ -137,6 +138,7 @@ export function useLinksFilter({
       setSearch(q);
       try {
         const params = new URLSearchParams({ q });
+        if (semanticSearch) params.set("semantic", "true");
         if (activeCategory !== "all") params.set("category", activeCategory);
         const res = await fetch(`/api/search?${params}`, { signal: controller.signal });
         if (res.ok) {
@@ -171,7 +173,7 @@ export function useLinksFilter({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [rawSearch, activeCategory]);
+  }, [rawSearch, activeCategory, semanticSearch]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // ── ⌘1-4: switch categories ──
@@ -449,6 +451,8 @@ export function useLinksFilter({
     sortMode, setSortMode,
     q,
     searchLoading,
+    semanticSearch,
+    setSemanticSearch,
 
     // Tag filter
     activeTags,

@@ -24,7 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_nav_links_embedding
 
 -- 4. 创建语义搜索函数
 -- 输入：查询向量 + 结果数量
--- 输出：匹配的链接（按相似度排序）
+-- 输出：匹配的链接（按相似度排序），含分类名和分类 slug
 CREATE OR REPLACE FUNCTION search_links_semantic(
   query_embedding vector(512),
   match_count INTEGER DEFAULT 10
@@ -35,7 +35,8 @@ RETURNS TABLE (
   url TEXT,
   description TEXT,
   icon TEXT,
-  category_id UUID,
+  category_name TEXT,
+  category_slug TEXT,
   similarity FLOAT
 )
 LANGUAGE sql
@@ -47,9 +48,11 @@ AS $$
     nl.url,
     nl.description,
     nl.icon,
-    nl.category_id,
+    nc.name AS category_name,
+    nc.slug AS category_slug,
     1 - (nl.embedding <=> query_embedding) AS similarity
   FROM nav_links nl
+  LEFT JOIN nav_categories nc ON nc.id = nl.category_id
   WHERE nl.approved = true
     AND nl.embedding IS NOT NULL
   ORDER BY nl.embedding <=> query_embedding

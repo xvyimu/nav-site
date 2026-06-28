@@ -17,6 +17,8 @@
     "analyze": "ANALYZE=true next build --webpack",
     "bulk:add": "node scripts/bulk-add.mjs",
     "check:links": "node scripts/check-links.mjs --report",
+    "db:reviews:apply": "node scripts/apply-reviews-migration.mjs",
+    "db:reviews:verify": "node scripts/verify-reviews-migration.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

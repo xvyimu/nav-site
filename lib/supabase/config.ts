@@ -30,3 +30,14 @@ export function getSupabaseKey(): string {
   }
   return key;
 }
+
+/**
+ * 获取 Supabase service_role key（绕过 RLS，仅服务端使用）
+ */
+export function getServiceRoleKey(): string {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY_PROD ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) {
+    throw new Error("未配置 SUPABASE_SERVICE_ROLE_KEY");
+  }
+  return key;
+}

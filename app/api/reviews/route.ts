@@ -8,6 +8,7 @@ import {
   createReview,
   checkReviewRateLimit,
   recordReviewAttempt,
+  MissingDatabaseMigrationError,
 } from "@/lib/repositories";
 
 const reviewSchema = z.object({
@@ -108,6 +109,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, review });
   } catch (e) {
+    if (e instanceof MissingDatabaseMigrationError) {
+      logger.warn("Reviews POST unavailable until migration is applied", { source: "api-reviews" });
+      return NextResponse.json(
+        { error: "Reviews database migration has not been applied" },
+        { status: 503 }
+      );
+    }
+
     logger.error("Reviews POST error", { source: "api-reviews" }, e instanceof Error ? e : undefined);
     return NextResponse.json(
       { error: "提交评价失败" },

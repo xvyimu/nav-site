@@ -1,6 +1,6 @@
 # 综合导航站 — 项目进度文档
 
-> 最后更新：2026-06-28 · 版本 v12.0
+> 最后更新：2026-06-28 · 版本 v13.0
 > 项目路径：`d:\nav-site` · 开发端口：3264
 
 ---
@@ -13,8 +13,9 @@
 - 收录站点：513 个（Phase 12 批量导入 + 持续扩充）
 - 分类数量：11 个（含"全部"和"模型排行榜"两个特殊分类）
 - 模型排行榜：29 条（7 个维度榜单）
+- 向量维度：512 维（BAAI/bge-small-zh-v1.5 嵌入模型）
 
-> 文档版本 v12.0 · 2026-06-28 · Phase 20 完成：新一轮修复优化 + 数据库迁移确认
+> 文档版本 v13.0 · 2026-06-28 · Phase 21 完成：pgvector 语义搜索
 
 ## 二、技术栈
 
@@ -25,7 +26,8 @@
 | 图标 | Lucide React | 1.20.0 |
 | 数据库 | Supabase (PostgreSQL + RLS) | 单库模式 |
 | 认证 | Auth.js (NextAuth) Credentials | — |
-| 搜索 | Fuse.js 服务端模糊搜索 | — |
+| 搜索 | Fuse.js 服务端模糊搜索 + pgvector 语义搜索 | — |
+| 嵌入微服务 | BAAI/bge-small-zh-v1.5 (512 维) | FastAPI + uvicorn |
 | 动画 | Motion (Framer Motion) | 12.40.0 |
 | 监控 | Sentry (client/server/edge) | — |
 | 测试 | Vitest (单元) + Playwright (E2E) | — |
@@ -735,7 +737,7 @@ pnpm sync         # 数据库同步
 - [ ] Google Search Console 提交
 
 ### 长期
-- [ ] pgvector 语义搜索
+- [x] pgvector 语义搜索 ✅ (Phase v21)
 - [ ] 国际化 (i18n)
 - [ ] PWA 离线支持
 

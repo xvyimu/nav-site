@@ -15,6 +15,21 @@ import { cache } from "react";
 /** Supabase 客户端类型（与 createClient / createStaticClient 返回类型一致） */
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
+export class MissingDatabaseMigrationError extends Error {
+  constructor(feature: string, options?: { cause?: unknown }) {
+    super(`${feature} database objects are missing`, options);
+    this.name = "MissingDatabaseMigrationError";
+  }
+}
+
+function isMissingRelationError(error: { code?: string; message?: string }): boolean {
+  return (
+    error.code === "PGRST205" ||
+    error.code === "42P01" ||
+    /could not find the table|relation .* does not exist/i.test(error.message ?? "")
+  );
+}
+
 /**
  * Supabase 链接行（含 join 字段）的松散类型。
  * 生成类型可能不包含 nav_links_tags join，故用此辅助类型安全访问。
@@ -309,6 +324,9 @@ export async function createReview(
     .single();
 
   if (error) {
+    if (isMissingRelationError(error)) {
+      throw new MissingDatabaseMigrationError("reviews", { cause: error });
+    }
     logger.error("Failed to create review", { source: "repositories", linkId }, error);
     throw new Error("Failed to create review");
   }

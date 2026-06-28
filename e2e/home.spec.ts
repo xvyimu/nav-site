@@ -23,7 +23,7 @@ test.describe("首页", () => {
 
     const searchInput = page.locator('input[placeholder*="搜索"]').first();
     await expect(searchInput).toBeVisible({ timeout: 15000 });
-    await page.waitForFunction(() => "next" in window);
+    await page.locator('[data-nav-hydrated="true"]').waitFor({ timeout: 15000 });
 
     // Header 导航按钮存在
     await expect(page.locator("header")).toBeVisible();
@@ -55,14 +55,13 @@ test.describe("首页", () => {
     );
 
     await searchInput.fill("openai");
-    await searchResponse;
+    const response = await searchResponse;
+    const body = await response.json();
 
-    // 验证搜索结果区域出现
-    const emptyState = page.locator('text=/没有找到/');
-    const openAiResult = page.getByRole("link", { name: /OpenAI Platform/ });
-
-    // 至少有一种状态出现
-    await expect(openAiResult.or(emptyState)).toBeVisible({ timeout: 10000 });
+    expect(body).toHaveProperty("results");
+    expect(body).toHaveProperty("total");
+    expect(body.query).toBe("openai");
+    await expect(searchInput).toHaveValue("openai");
   });
 
   test("分类导航存在并可切换", async ({ page }) => {
@@ -75,8 +74,6 @@ test.describe("首页", () => {
     const categoryTab = page.locator('[role="tab"]:has-text("AI")').first();
     if (await categoryTab.isVisible()) {
       await categoryTab.click();
-      await page.waitForTimeout(1000);
-
       // 面包屑应该出现
       const breadcrumb = page.locator('text=/首页/');
       await expect(breadcrumb).toBeVisible({ timeout: 5000 });
@@ -108,7 +105,7 @@ test.describe("首页", () => {
     const favButton = page.locator('button:has-text("添加收藏")').first();
     if (await favButton.isVisible()) {
       await favButton.click();
-      await page.waitForTimeout(500);
+      await expect(page.locator('button[aria-label="取消收藏"]').first()).toBeVisible({ timeout: 5000 });
 
       // Header 收藏计数应该变化
       const favLink = page.locator('a:has-text("收藏")');

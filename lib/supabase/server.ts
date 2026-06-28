@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { getSupabaseUrl, getSupabaseKey } from "./config";
+import { getSupabaseUrl, getSupabaseKey, getServiceRoleKey } from "./config";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -31,6 +32,21 @@ export function createStaticClient() {
     cookies: {
       getAll() { return []; },
       setAll() {},
+    },
+  });
+}
+
+/**
+ * 服务端 service_role 客户端（绕过 RLS，仅限 API 路由中使用）
+ *
+ * 用于需要绕过 RLS 的操作，如 pgvector 语义搜索、管理员操作等。
+ * 仅在服务端使用，不会暴露给客户端。
+ */
+export function createServiceRoleClient() {
+  return createSupabaseClient(getSupabaseUrl(), getServiceRoleKey(), {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
   });
 }

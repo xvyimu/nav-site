@@ -10,7 +10,8 @@
 | UI | React + Tailwind CSS v4 + shadcn/ui | 19.2.4 |
 | 数据库 | Supabase (PostgreSQL + RLS) | 单库模式 |
 | 认证 | next-auth v5 (Credentials + GitHub OAuth) | 5.0.0-beta.31 |
-| 搜索 | Fuse.js 服务端模糊搜索 | — |
+| 搜索 | Fuse.js 服务端模糊搜索 + pgvector 语义搜索 | — |
+| 嵌入服务 | BAAI/bge-small-zh-v1.5 (512 维) | FastAPI + uvicorn |
 | 动画 | Motion (Framer Motion) | — |
 | 监控 | Sentry (client/server/edge) | — |
 | 测试 | Vitest (单元) + Playwright (E2E) | — |
@@ -48,6 +49,8 @@ pnpm start
 | `AUTH_SECRET` | Auth.js 加密密钥 | 是 |
 | `ADMIN_PASSWORD` | 管理员密码 | 是 |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key（服务端绕过 RLS） | 是 |
+| `SUPABASE_SERVICE_ROLE_KEY_PROD` | 生产库 service role key（优先于 `SUPABASE_SERVICE_ROLE_KEY`） | 否 |
+| `EMBED_SERVER_URL` | 本地 embedding 服务地址（默认 `http://127.0.0.1:8003`） | 否 |
 | `GITHUB_ID` | GitHub OAuth App ID（用户登录） | 否 |
 | `GITHUB_SECRET` | GitHub OAuth App Secret | 否 |
 | `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN | 否 |
@@ -167,7 +170,7 @@ nav-site/
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/api/tools` | GET | Agent API，支持分类过滤、搜索、限制 |
-| `/api/search` | GET | 服务端 Fuse.js 模糊搜索 |
+| `/api/search` | GET | 服务端 Fuse.js 模糊搜索 + pgvector 语义搜索 |
 | `/api/click` | POST | 点击计数（sendBeacon） |
 | `/api/favorites` | GET/POST/DELETE | 用户收藏同步（需登录） |
 | `/api/reviews` | GET/POST | 工具评价 |
@@ -210,7 +213,7 @@ push/PR → quality (lint + tsc + test+coverage)
 
 ### 服务端搜索
 
-搜索请求通过 `/api/search` API 在服务端执行 Fuse.js 模糊搜索，减少客户端 bundle 体积。200ms 防抖，支持分类过滤。
+搜索请求通过 `/api/search` API 在服务端执行。默认使用 Fuse.js 模糊搜索；传入 `semantic=true` 时调用本地 embedding 服务生成 512 维向量，再通过 Supabase pgvector RPC 检索，服务不可用时自动回退到 Fuse.js。200ms 防抖，支持分类过滤。
 
 ### 用户收藏同步
 
@@ -225,7 +228,9 @@ push/PR → quality (lint + tsc + test+coverage)
 -- 运行 scripts/rls-audit.sql
 
 -- 2. 用户评价系统
--- 运行 scripts/migration-reviews.sql
+-- 验证状态：pnpm db:reviews:verify
+-- 执行迁移：设置 DATABASE_URL 后运行 pnpm db:reviews:apply
+-- 或在 Supabase SQL Editor 中运行 scripts/migration-reviews.sql
 
 -- 3. slug 列迁移（SEO 友好 URL）
 -- 运行 scripts/migration-slug.sql
@@ -233,9 +238,10 @@ push/PR → quality (lint + tsc + test+coverage)
 -- 4. 用户收藏表
 -- 运行 scripts/migration-user-favorites.sql
 
--- 5. pgvector 语义搜索（可选）
+-- 5. pgvector 语义搜索（已执行）
 -- 先在 Supabase Dashboard 启用 vector 扩展
 -- 然后运行 scripts/migration-pgvector.sql
+-- 本地 embedding 服务：python scripts/embed-server.py
 ```
 
 ## 内容管理

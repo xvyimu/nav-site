@@ -46,6 +46,8 @@ export function Navigation({
     focusedIndex, setFocusedIndex,
     q,
     searchLoading,
+    semanticSearch,
+    setSemanticSearch,
     // Tag filter
     activeTags, toggleTag, clearTags, availableTags,
     // Refs (only used in event handlers and JSX ref props)
@@ -102,6 +104,8 @@ export function Navigation({
               onKeyDown={handleSearchKeyDown}
               inputRef={inputRef}
               loading={searchLoading}
+              semantic={semanticSearch}
+              onSemanticChange={setSemanticSearch}
             />
           </motion.div>
 

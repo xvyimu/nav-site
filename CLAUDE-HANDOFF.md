@@ -9,9 +9,9 @@
 
 - Next.js 16.2.9 (App Router + **webpack** 构建)
 - React 19.2.4 + Tailwind CSS v4 + shadcn/ui
-- Supabase PostgreSQL（单库模式 + RLS）
+- Supabase PostgreSQL（单库模式 + RLS + pgvector 语义搜索）
 - next-auth v5（Credentials 管理员 + GitHub OAuth 用户）
-- Fuse.js 服务端搜索 + React cache() 数据去重
+- Fuse.js 服务端搜索 + pgvector 语义搜索 + React cache() 数据去重
 - Motion 动画 + Lucide React 图标
 - Sentry 监控（共享配置 `sentry.shared.config.ts`）
 - Vitest 单元测试（74 个） + Playwright E2E 测试
@@ -23,6 +23,8 @@
 - ESLint 0 errors, TypeScript 0 errors, 生产构建成功（`next build --webpack`），E2E 34/34 全绿
 - 安全审计漏洞清零（postcss override 已配置）
 - **数据库迁移已确认**：slug 列索引/trigger + user_favorites 表/RLS 均已在生产库就绪
+- **pgvector 语义搜索已完成**：生产库 vector 扩展/RPC/索引就绪，513 个链接 embedding 已回填
+- 本地 embedding 微服务：`scripts/embed-server.py`，模型 `BAAI/bge-small-zh-v1.5`，默认 `http://127.0.0.1:8003`
 
 ## ⚠️ 环境注意事项（必读）
 
@@ -114,8 +116,9 @@
 ## 关键命令
 
 ```bash
-pnpm dev          # 启动开发服务器（端口 3264，webpack 模式）
-pnpm build        # 生产构建（webpack 模式）
+python scripts/embed-server.py  # 启动本地 embedding 服务（端口 8003）
+pnpm dev                       # 启动开发服务器（端口 3264，webpack 模式）
+pnpm build                     # 生产构建（webpack 模式）
 pnpm lint         # ESLint 检查
 pnpm typecheck    # TypeScript 类型检查
 pnpm test         # 单元测试
@@ -133,6 +136,8 @@ pnpm analyze      # Bundle 分析
 - `AUTH_SECRET` — Auth.js 加密密钥
 - `ADMIN_PASSWORD` — 管理员密码
 - `SUPABASE_SERVICE_ROLE_KEY` — 服务端绕过 RLS
+- `SUPABASE_SERVICE_ROLE_KEY_PROD` — 生产库 service role，优先级高于 `SUPABASE_SERVICE_ROLE_KEY`
+- `EMBED_SERVER_URL` — 本地 embedding 服务地址，默认 `http://127.0.0.1:8003`
 - `GITHUB_ID` / `GITHUB_SECRET` — GitHub OAuth（已配置）
 - `NEXT_PUBLIC_SITE_URL` — 站点 URL（SEO 用）
 
@@ -164,7 +169,7 @@ pnpm analyze      # Bundle 分析
 - 分类层级支持（父/子分类）
 - 标签系统（多标签交叉过滤）
 - 用户提交审核流程优化
-- pgvector 语义搜索（`scripts/migration-pgvector.sql` 已准备）
+- 语义搜索排序质量调优（embedding 文本、阈值、混排策略）
 
 ## 已知问题
 
