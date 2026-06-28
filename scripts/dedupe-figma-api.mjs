@@ -111,6 +111,10 @@ async function main() {
 }
 
 async function loginViaCredentials() {
+  if (!process.env.ADMIN_PASSWORD) {
+    throw new Error("缺少 ADMIN_PASSWORD 环境变量，无法登录 admin API");
+  }
+
   // 1. 获取 CSRF token
   const csrfResp = await fetch(`${apiBase}/api/auth/csrf`, {
     headers: { Cookie: "" },
@@ -127,7 +131,7 @@ async function loginViaCredentials() {
     },
     body: new URLSearchParams({
       csrfToken,
-      password: process.env.ADMIN_PASSWORD || "admin123",
+      password: process.env.ADMIN_PASSWORD,
       callbackUrl: `${apiBase}/admin`,
       json: "true",
     }),

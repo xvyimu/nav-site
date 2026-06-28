@@ -46,7 +46,7 @@ CREATE TRIGGER trg_tool_reviews_updated_at
 
 -- 2. 评价速率限制表
 CREATE TABLE IF NOT EXISTS review_rate_limits (
-  id UUID PRIMARY KEY DEFAULT gen_random.uuid(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ip TEXT NOT NULL,
   link_id UUID NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()

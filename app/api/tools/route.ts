@@ -4,7 +4,7 @@ import { slugify } from "@/lib/slugify";
 import { logger } from "@/lib/logger";
 import { withTimeout } from "@/lib/utils";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 const FETCH_TIMEOUT = 8000;
 

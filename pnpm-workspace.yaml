@@ -3,3 +3,5 @@ packages:
 allowBuilds:
   '@sentry/cli': true
   sharp: true
+overrides:
+  postcss: 8.5.15

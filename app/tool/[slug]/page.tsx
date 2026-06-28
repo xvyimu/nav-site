@@ -1,7 +1,7 @@
-import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import NotFound from "@/app/not-found";
 import { getApprovedLinkBySlug, getRelatedLinks, getCategories } from "@/lib/repositories";
 import { slugify } from "@/lib/slugify";
 import { relativeTime } from "@/lib/types";
@@ -102,7 +102,7 @@ export default async function ToolDetailPage({ params }: PageProps) {
   });
 
   if (!link) {
-    notFound();
+    return <NotFound />;
   }
   const data = link; // 类型收窄：notFound() 之后 TS 仍不认识 link 已非 null
 

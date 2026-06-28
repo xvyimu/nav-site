@@ -20,23 +20,23 @@
 
 ```bash
 # 安装依赖
-npm install
+pnpm install
 
 # 配置环境变量
 cp .env.local.example .env.local
 # 编辑 .env.local 填入 Supabase URL/KEY、AUTH_SECRET、ADMIN_PASSWORD 等
 
 # 开发模式（端口 3264，webpack 模式）
-npm run dev
+pnpm dev
 
 # 生产构建（webpack 模式，必须保留 --webpack 标志）
-npm run build
+pnpm build
 
 # 启动生产服务器
-npm start
+pnpm start
 ```
 
-> ⚠️ 不要使用 `pnpm` 或不加 `--webpack` 的 `next build/dev`：`node_modules` 中存在 30 个 NTFS reparse point 损坏目录，Turbopack 无法遍历。详见 `CLAUDE-HANDOFF.md`。
+> ⚠️ `next build/dev` 必须保留 `--webpack` 标志（已在 `package.json` scripts 中配置）：`node_modules` 中存在 NTFS reparse point 损坏目录，Turbopack 无法遍历。Vitest 也已配置 `resolve.preserveSymlinks: true`。
 
 ## 环境变量
 
@@ -57,29 +57,29 @@ npm start
 
 ```bash
 # 单元测试
-npm test
+pnpm test
 
 # 单元测试 + 覆盖率
-npm run test:coverage
+pnpm test:coverage
 
 # E2E 测试（需先启动 dev server）
-npm run e2e
+pnpm e2e
 
 # E2E 交互式 UI 模式
-npm run e2e:ui
+pnpm e2e:ui
 ```
 
 ## 代码质量
 
 ```bash
 # ESLint
-npm run lint
+pnpm lint
 
 # TypeScript 类型检查
-npm run typecheck
+pnpm typecheck
 
 # Bundle 分析
-npm run analyze
+pnpm analyze
 ```
 
 ## 项目结构
@@ -242,11 +242,11 @@ push/PR → quality (lint + tsc + test+coverage)
 
 ```bash
 # 批量导入站点（JSON/TXT）
-npm run bulk:add scripts/bulk-sites.json
-npm run bulk:add scripts/bulk-sites.json --dry-run    # 预览模式
+pnpm bulk:add scripts/bulk-sites.json
+pnpm bulk:add scripts/bulk-sites.json --dry-run    # 预览模式
 
 # 检查链接健康状态
-npm run check:links
+pnpm check:links
 ```
 
 ## License

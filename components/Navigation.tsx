@@ -72,7 +72,7 @@ export function Navigation({
   const sectionOffset = featured.length + latest.length + popular.length;
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)]">
+    <div className="flex min-h-[calc(100vh-3.5rem)]" data-nav-hydrated={mounted ? "true" : "false"}>
       {/* ─── Sidebar ─── */}
       <Sidebar
         tabs={tabTree}

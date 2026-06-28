@@ -1,6 +1,6 @@
 # 综合导航站 — 项目进度文档
 
-> 最后更新：2026-06-24 · 版本 v10.0
+> 最后更新：2026-06-28 · 版本 v12.0
 > 项目路径：`d:\nav-site` · 开发端口：3264
 
 ---
@@ -10,11 +10,11 @@
 **定位**：面向开发者的综合资源导航平台，一站式覆盖 AI/云服务/开发工具/开源项目/设计/学习等 9 大分类。
 
 **当前数据规模**：
-- 收录站点：287 个（Phase 12 批量导入 228 个）
+- 收录站点：513 个（Phase 12 批量导入 + 持续扩充）
 - 分类数量：11 个（含"全部"和"模型排行榜"两个特殊分类）
 - 模型排行榜：29 条（7 个维度榜单）
 
----
+> 文档版本 v12.0 · 2026-06-28 · Phase 20 完成：新一轮修复优化 + 数据库迁移确认
 
 ## 二、技术栈
 
@@ -37,9 +37,10 @@
 
 | 指标 | 状态 | 数值 |
 |------|------|------|
-| ESLint | 通过 | 0 errors, 0 warnings |
+| ESLint | 通过 | 0 errors, 1 warning (no-unused-vars) |
 | TypeScript | 通过 | 0 errors (strict mode) |
-| 单元测试 | 通过 | 73/73 (4 test files) |
+| 单元测试 | 通过 | 150/150 (4 test files) |
+| 安全测试覆盖率 | 通过 | admin-auth 100%, schemas 100%, utils 100%, with-admin 100%, rate-limit 79% |
 | E2E 测试 | 通过 | 34/34 (chromium + mobile-chrome) |
 | 生产构建 | 通过 | next build 成功 (28 routes) |
 
@@ -605,6 +606,100 @@ pnpm sync         # 数据库同步
 
 ---
 
+### Phase 18：安全测试覆盖（2026-06-27）
+
+#### 18.1 安全模块测试
+
+| 模块 | 覆盖率 | 测试内容 |
+|------|--------|----------|
+| `admin-auth.ts` | 100% | 鉴权通过/失败 |
+| `schemas.ts` | 100% | URL/标题/slug/分类/标签/链接ID Zod schema 校验 |
+| `utils.ts` | 100% | URL 安全校验、域名提取、客户端 IP 提取、JSON HTML 转义 |
+| `with-admin.ts` | 100% | 只读/写入路由包装器（鉴权 + Zod 校验） |
+| `rate-limit.ts` | 79% | 内存桶限流、DB 限流、点击限流、记录尝试 |
+
+**新增测试**：76 个，安全测试文件 `tests/security.test.ts` 共计 99 个测试用例。
+
+#### 18.2 其他修复
+
+- 升级 TypeScript 5.0.2 → 5.1.3（消除 build warning）
+- 修复 `themeColor` 构建警告（Next.js 16 Metadata → Viewport API 迁移）
+- 配置 Dependabot（每周 npm 更新，reviewer xvyimu）
+- 修复安全测试中原始 U+2028 字符导致 ESLint 解析错误
+- GitHub 项目全面扫描（master 分支保护、CI 历史失败分析）
+
+#### 18.3 质量验证
+
+| 指标 | 状态 | 数值 |
+|------|------|------|
+| ESLint | 通过 | 0 errors, 1 warning (no-unused-vars) |
+| TypeScript | 通过 | 0 errors |
+| 单元测试 | 通过 | 150/150 (4 test files) |
+| 生产构建 | 通过 | next build 成功 |
+
+### Phase 19：GitHub 标准文档补齐（2026-06-27）
+
+#### 19.1 新增标准 GitHub 文档
+
+| 文件 | 说明 |
+|------|------|
+| `LICENSE` | MIT 开源许可证 |
+| `CHANGELOG.md` | 版本发布日志（基于 git 历史整理） |
+| `CONTRIBUTING.md` | 贡献指南（命名规范、代码风格、PR 流程） |
+| `SECURITY.md` | 安全策略（漏洞报告流程 + 安全审计清单） |
+| `.github/ISSUE_TEMPLATE/bug_report.md` | Bug 报告模板 |
+| `.github/ISSUE_TEMPLATE/feature_request.md` | 功能请求模板 |
+
+#### 19.2 文档更新
+
+- `PROGRESS.md`：更新测试数 73→150、日期 6/24→6/27、新增安全测试覆盖率指标
+- `DESIGN-DOC.md`：统一版本号 v11.0（头部 v6.0 → v11.0）
+
+#### 19.3 清理过时构件
+
+- 删除 `deliverables/` 目录（过时的审查报告快照）
+- 删除 `.workbuddy/` 目录（过时的工作记忆缓存）
+
+---
+
+### Phase 20：新一轮修复优化（2026-06-28）
+
+#### 20.1 修复项
+
+| 修复项 | 说明 | 文件 |
+|--------|------|------|
+| TypeScript 类型 | 修复 `tests/security.test.ts` 的 `Response` / `NextResponse` 类型不匹配，`pnpm typecheck` 恢复通过 | `tests/security.test.ts` |
+| CSP hydration | 开发/E2E 下 CSP 阻止 Next hydration 的问题；`next.config.ts` 只在 dev 模式允许 `unsafe-eval`，生产 CSP 不放宽 | `next.config.ts` |
+| E2E 稳定性 | 导航根节点加 hydration 标记，调整搜索 E2E 避免 SSR 可见但客户端事件未挂载时就输入导致假失败 | `e2e/home.spec.ts`, `components/Navigation.tsx` |
+| 工具详情空白页 | 未知 slug 渲染现有 404 UI | `app/tool/[slug]/page.tsx`, `app/tool/[slug]/not-found.tsx`（新增） |
+| API 动态路由 | `/api/tools` 改为显式动态路由，消除构建时 `Dynamic server usage` 日志 | `app/api/tools/route.ts` |
+| SQL typo | 修复 `migration-reviews.sql` 里的 `gen_random.uuid()` | `scripts/migration-reviews.sql` |
+| 密码 fallback | 移除 `dedupe-figma-api.mjs` 的 `admin123` 默认密码 fallback | `scripts/dedupe-figma-api.mjs` |
+| 审计漏洞 | 添加 `postcss` override 到 `pnpm-workspace.yaml`，审计漏洞已清零 | `pnpm-workspace.yaml`, `pnpm-lock.yaml` |
+| ESLint warning | 移除未用 import，忽略 coverage 产物 | `eslint.config.mjs` |
+
+#### 20.2 质量验证
+
+| 指标 | 状态 | 数值 |
+|------|------|------|
+| ESLint | 通过 | 0 errors, 0 warnings |
+| TypeScript | 通过 | 0 errors |
+| 单元测试 | 通过 | 150/150 (4 test files) |
+| 生产构建 | 通过 | next build 成功 ✅ |
+| 审计 | 通过 | 无已知漏洞 ✅ |
+| E2E | 通过 | 34/34 ✅ |
+
+#### 20.3 数据库迁移确认
+
+经查询生产库（`vyqqbypwrbdcafanzwmj`），确认此前标记为待办的 SQL 迁移**实际上早已执行**：
+
+| 迁移 | 验证结果 |
+|------|----------|
+| `migration-slug.sql` | slug 列已存在、全部 513 条数据已回填、唯一索引 `idx_nav_links_slug_approved` 有效、trigger `trg_nav_links_auto_slug` 已注册 |
+| `migration-user-favorites.sql` | `user_favorites` 表已创建、3 条 RLS 策略（SELECT/INSERT/DELETE）已生效 |
+
+---
+
 ## 九、待办事项
 
 ### 短期
@@ -625,8 +720,8 @@ pnpm sync         # 数据库同步
 - [x] 动态 OG 图片生成（next/og Edge Runtime）
 - [x] ModelRanking 动态导入（减少初始 JS bundle）
 - [x] 无障碍 skip-to-content 链接
-- [ ] 运行 migration-slug.sql 到 Supabase
-- [ ] 运行 migration-user-favorites.sql 到 Supabase
+- [x] 运行 migration-slug.sql 到 Supabase — ✅ 已执行（slug 列+索引+trigger）
+- [x] 运行 migration-user-favorites.sql 到 Supabase — ✅ 已执行（表+RLS）
 - [ ] 配置 GitHub OAuth App（Callback URL: /api/auth/callback/github）
 - [ ] 移动端底栏图标在低分辨率下的可读性测试
 
@@ -646,4 +741,4 @@ pnpm sync         # 数据库同步
 
 ---
 
-> 文档版本 v11.0 · 2026-06-24 · Phase 17 完成：E2E 测试扩充至 34 项（覆盖搜索、收藏、404、API 文档、工具详情页、移动端）
+> 文档版本 v12.0 · 2026-06-27 · Phase 19 完成：安全测试覆盖 + GitHub 标准文档补齐

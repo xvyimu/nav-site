@@ -6,6 +6,8 @@ const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
+const isDev = process.env.NODE_ENV !== "production";
+
 const securityHeaders = [
   {
     key: "X-Frame-Options",
@@ -31,7 +33,14 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com",
+      [
+        "script-src",
+        "'self'",
+        "'unsafe-inline'",
+        ...(isDev ? ["'unsafe-eval'"] : []),
+        "https://www.googletagmanager.com",
+        "https://www.google-analytics.com",
+      ].join(" "),
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://www.google.com https://www.google-analytics.com",
       "font-src 'self' data:",

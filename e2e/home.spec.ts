@@ -23,6 +23,7 @@ test.describe("首页", () => {
 
     const searchInput = page.locator('input[placeholder*="搜索"]').first();
     await expect(searchInput).toBeVisible({ timeout: 15000 });
+    await page.waitForFunction(() => "next" in window);
 
     // Header 导航按钮存在
     await expect(page.locator("header")).toBeVisible();
@@ -33,6 +34,7 @@ test.describe("首页", () => {
   });
 
   test("服务端搜索功能正常工作", async ({ page }) => {
+    test.slow();
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
     const searchInput = page.locator('input[placeholder*="搜索"]').first();
@@ -41,22 +43,26 @@ test.describe("首页", () => {
     // 先填入部分字符再绑定响应等待，避免错过 200ms 防抖后的请求。
     // 使用 Promise.all 确保监听在 fill 触发请求之前就绪，且不 catch：
     // 请求未到达即视为失败（CLAUDE-HANDOFF 已知问题 #2 的修复方案）。
+    await page.locator('[data-nav-hydrated="true"]').waitFor({ timeout: 15000 });
+
+    const searchResponse = page.waitForResponse(
+      (res) => {
+        if (res.status() !== 200) return false;
+        const url = new URL(res.url());
+        return url.pathname === "/api/search" && url.searchParams.get("q") === "openai";
+      },
+      { timeout: 15000 }
+    );
+
     await searchInput.fill("openai");
-    await Promise.all([
-      page.waitForResponse(
-        (res) => res.url().includes("/api/search") && res.status() === 200,
-        { timeout: 15000 }
-      ),
-      // 触发一次输入事件确保防抖计时器重置
-      searchInput.press("End"),
-    ]);
+    await searchResponse;
 
     // 验证搜索结果区域出现
-    const searchResults = page.locator('text=/搜索结果/');
     const emptyState = page.locator('text=/没有找到/');
+    const openAiResult = page.getByRole("link", { name: /OpenAI Platform/ });
 
     // 至少有一种状态出现
-    await expect(searchResults.or(emptyState)).toBeVisible({ timeout: 10000 });
+    await expect(openAiResult.or(emptyState)).toBeVisible({ timeout: 10000 });
   });
 
   test("分类导航存在并可切换", async ({ page }) => {
@@ -141,6 +147,7 @@ test.describe("API 文档页面", () => {
 
 test.describe("工具详情页", () => {
   test("未找到工具时显示 404 内容", async ({ page }) => {
+    test.slow();
     await page.goto("/tool/nonexistent-tool-slug-12345", { waitUntil: "domcontentloaded" });
 
     // 验证显示 404 页面内容（dev 模式下状态码可能为 200）

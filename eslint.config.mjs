@@ -22,6 +22,7 @@ const eslintConfig = defineConfig([
     "vendor/**",
     "nm_temp/**",
     // Generated / auxiliary directories (contain minified or third-party JS):
+    "coverage/**",
     "nav-site-audit/**",
     "ai-nav-research/**",
     ".workbuddy/**",

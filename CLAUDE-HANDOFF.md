@@ -1,8 +1,8 @@
-# Claude Code 项目接手提示词（v5 — 2026-06-25）
+# Claude Code 项目接手提示词（v6 — 2026-06-28）
 
 ## 项目接手：综合导航站 (nav-site)
 
-项目位于 `D:\nav-site`，开发端口 3264（`npm run dev`）。
+项目位于 `D:\nav-site`，开发端口 3264（`pnpm dev`）。
 部署地址：https://yuanjia1314.ccwu.cc
 
 ## 技术栈
@@ -18,10 +18,11 @@
 
 ## 当前状态
 
-- **514 个收录站点**，9 个分类，29 条模型排行榜数据
-- 74 个单元测试全部通过
-- ESLint 0 errors, TypeScript 0 errors, 生产构建成功（`next build --webpack`，30 路由）
-- **安全审计 51/51 项全部修复完成**（P0×9 + P1×12 + P2×12 + P3×15）
+- **513 个收录站点**，11 个分类，29 条模型排行榜数据
+- 150 个单元测试全部通过
+- ESLint 0 errors, TypeScript 0 errors, 生产构建成功（`next build --webpack`），E2E 34/34 全绿
+- 安全审计漏洞清零（postcss override 已配置）
+- **数据库迁移已确认**：slug 列索引/trigger + user_favorites 表/RLS 均已在生产库就绪
 
 ## ⚠️ 环境注意事项（必读）
 
@@ -38,7 +39,7 @@
 
 ### 包管理器
 
-项目从 pnpm 迁移到 npm（`node-linker=hoisted` 模式也有问题）。当前使用 `package-lock.json`。`pnpm-lock.yaml` 和 `pnpm-workspace.yaml` 已删除。`package.json` 中 `packageManager` 字段已移除。
+项目使用 **pnpm**（`pnpm-lock.yaml`，`node_modules` 由 pnpm 安装）。历史上从 pnpm 迁移到过 npm，后又迁回 pnpm。所有命令使用 `pnpm` 前缀。
 
 ### MCP 配置
 
@@ -57,7 +58,7 @@
 | P2-5 | Sentry 添加 environment/release 标签 | `sentry.*.config.ts` |
 | P2-6 | .gitignore 添加 `!.env.example` 例外 | `.gitignore` |
 | P2-7 | MCP 配置改为开发库 | `.mcp.json` |
-| P2-12 | CI 从 pnpm 迁移到 npm + cache: npm | `.github/workflows/ci.yml` |
+| P2-12 | CI 从 npm 迁移回 pnpm | `.github/workflows/ci.yml` |
 | P3-2 | globals.css rgb 统一为 oklch | `app/globals.css` |
 | P3-3 | UI 文案确认全部中文化 | — |
 | P3-4 | NavSkeleton 硬编码提取为常量 | `components/NavSkeleton.tsx` |
@@ -113,13 +114,13 @@
 ## 关键命令
 
 ```bash
-npm run dev          # 启动开发服务器（端口 3264，webpack 模式）
-npm run build        # 生产构建（webpack 模式）
-npm run lint         # ESLint 检查
-npm run typecheck    # TypeScript 类型检查
-npm test             # 单元测试
-npm run e2e          # E2E 测试（需先启动 dev server）
-npm run analyze      # Bundle 分析
+pnpm dev          # 启动开发服务器（端口 3264，webpack 模式）
+pnpm build        # 生产构建（webpack 模式）
+pnpm lint         # ESLint 检查
+pnpm typecheck    # TypeScript 类型检查
+pnpm test         # 单元测试
+pnpm e2e          # E2E 测试（需先启动 dev server）
+pnpm analyze      # Bundle 分析
 ```
 
 > ⚠️ 不要使用 `pnpm` 或不加 `--webpack` 的 `next build/dev`，会因 NTFS reparse point 问题失败。
@@ -170,7 +171,7 @@ npm run analyze      # Bundle 分析
 1. ~~**E2E Figma 测试偶发失败**~~ — ✅ 已解决（Phase C）
 2. **E2E 搜索测试偶发失败** — 并发测试时 200ms 防抖 + 1s 等待不够稳定。可在 playwright 配置中增加超时或改用 `waitForResponse` 但不 catch
 3. **API /api/tools 构建时打印 Dynamic server usage 日志** — 预期行为（访问 request.url），不影响运行
-4. **NTFS Reparse Point 导致 Turbopack 不可用** — `node_modules` 中 30 个包目录有损坏的 pnpm junction。webpack 模式可正常工作。彻底修复需在全新目录执行 `npm install`（当前 ghost 目录无法删除）
+4. **NTFS Reparse Point 导致 Turbopack 不可用** — `node_modules` 中 30 个包目录有损坏的 pnpm junction。webpack 模式可正常工作。
 5. **Ghost 目录占用 ~2.4GB** — `deps`、`node_modules_broken`、`node_modules_old_*`、`node_modules_phantom_*` 无法删除，已在 tsconfig.json 和 vitest.config.ts 中排除
 6. ~~**安全审计 51 项**~~ — ✅ 全部修复完成（2026-06-25）
 
@@ -180,7 +181,7 @@ npm run analyze      # Bundle 分析
 2. 新增分类需在 `lib/nav-config.ts` 添加 slug 映射，在 `lib/category-icons.ts` 添加图标
 3. API 路由使用 `lib/logger.ts` 结构化日志，错误处理统一 try-catch
 4. 速率限制使用 `lib/rate-limit.ts`
-5. 提交代码前必须通过：`npm run lint && npm run typecheck && npm test && npm run build`
+5. 提交代码前必须通过：`pnpm lint && pnpm typecheck && pnpm test && pnpm build`
 6. E2E 测试使用 `domcontentloaded` 而非 `networkidle`（HMR WebSocket 会导致超时）
 7. Playwright 配置端口为 3264（非默认 3000）
 8. 认证：管理员用 Credentials provider（role: "admin"），普通用户用 GitHub OAuth（role: "user"）

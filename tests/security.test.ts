@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isSafeUrl, withTimeout, extractDomain, getClientIp, escapeJsonForHtml } from "@/lib/utils";
 import { requireAdmin, unauthorized } from "@/lib/admin-auth";
@@ -710,11 +711,11 @@ describe("withAdminGet — 只读路由包装器", () => {
     vi.resetModules();
     vi.doMock("@/lib/admin-auth", () => ({
       requireAdmin: vi.fn(() => Promise.resolve({ authorized: true })),
-      unauthorized: () => new Response(JSON.stringify({ error: "未授权" }), { status: 401 }),
+      unauthorized: () => NextResponse.json({ error: "未授权" }, { status: 401 }),
     }));
 
     const { withAdminGet } = await import("@/lib/with-admin");
-    const handler = vi.fn(async () => new Response(JSON.stringify({ data: "ok" }), { status: 200 }));
+    const handler = vi.fn(async () => NextResponse.json({ data: "ok" }, { status: 200 }));
     const wrapped = withAdminGet(handler);
 
     const res = await wrapped();
@@ -726,11 +727,11 @@ describe("withAdminGet — 只读路由包装器", () => {
     vi.resetModules();
     vi.doMock("@/lib/admin-auth", () => ({
       requireAdmin: vi.fn(() => Promise.resolve({ authorized: false })),
-      unauthorized: () => new Response(JSON.stringify({ error: "未授权" }), { status: 401 }),
+      unauthorized: () => NextResponse.json({ error: "未授权" }, { status: 401 }),
     }));
 
     const { withAdminGet } = await import("@/lib/with-admin");
-    const handler = vi.fn(async () => new Response(JSON.stringify({ data: "ok" }), { status: 200 }));
+    const handler = vi.fn(async () => NextResponse.json({ data: "ok" }, { status: 200 }));
     const wrapped = withAdminGet(handler);
 
     const res = await wrapped();
@@ -747,13 +748,13 @@ describe("withAdminWrite — 写路由包装器（鉴权 + Zod 校验）", () =>
   it("鉴权通过 + 合法输入时执行 handler", async () => {
     vi.doMock("@/lib/admin-auth", () => ({
       requireAdmin: vi.fn(() => Promise.resolve({ authorized: true })),
-      unauthorized: () => new Response(JSON.stringify({ error: "未授权" }), { status: 401 }),
+      unauthorized: () => NextResponse.json({ error: "未授权" }, { status: 401 }),
     }));
 
     const { withAdminWrite } = await import("@/lib/with-admin");
     const schema = z.object({ name: z.string().min(1) });
     const handler = vi.fn(async ({ parsed }) =>
-      new Response(JSON.stringify({ name: parsed.name }), { status: 200 })
+      NextResponse.json({ name: parsed.name }, { status: 200 })
     );
     const wrapped = withAdminWrite(schema, handler);
 
@@ -769,7 +770,7 @@ describe("withAdminWrite — 写路由包装器（鉴权 + Zod 校验）", () =>
   it("鉴权失败时返回 401", async () => {
     vi.doMock("@/lib/admin-auth", () => ({
       requireAdmin: vi.fn(() => Promise.resolve({ authorized: false })),
-      unauthorized: () => new Response(JSON.stringify({ error: "未授权" }), { status: 401 }),
+      unauthorized: () => NextResponse.json({ error: "未授权" }, { status: 401 }),
     }));
 
     const { withAdminWrite } = await import("@/lib/with-admin");
@@ -789,7 +790,7 @@ describe("withAdminWrite — 写路由包装器（鉴权 + Zod 校验）", () =>
   it("非法输入时返回 400 并包含验证错误详情", async () => {
     vi.doMock("@/lib/admin-auth", () => ({
       requireAdmin: vi.fn(() => Promise.resolve({ authorized: true })),
-      unauthorized: () => new Response(JSON.stringify({ error: "未授权" }), { status: 401 }),
+      unauthorized: () => NextResponse.json({ error: "未授权" }, { status: 401 }),
     }));
 
     const { withAdminWrite } = await import("@/lib/with-admin");
@@ -892,6 +893,6 @@ describe("escapeJsonForHtml — JSON HTML 转义", () => {
   });
 
   it("转义 Unicode 行分隔符", () => {
-    expect(escapeJsonForHtml("a b")).toBe("a\\u2028b");
+    expect(escapeJsonForHtml("a\u2028b")).toBe("a\\u2028b");
   });
 });
