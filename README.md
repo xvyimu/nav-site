@@ -219,6 +219,14 @@ push/PR → quality (lint + tsc + test+coverage)
 
 搜索请求通过 `/api/search` API 在服务端执行。默认使用 Fuse.js 模糊搜索；传入 `semantic=true` 时调用本地 embedding 服务生成 512 维向量，再通过 Supabase pgvector RPC 检索，服务不可用时自动回退到 Fuse.js。200ms 防抖，支持分类过滤。
 
+**搜索质量优化（Phase 22）：**
+- **BGE query prefix** — 查询向量加中文前缀 `"为这个句子生成表示以用于检索相关文章："`，文档向量不加（BGE 官方要求）
+- **增强 embedding 文本** — 回填文本格式 `"title description [分类名]"`，提升语义区分度
+- **短查询保护** — `<3` 字符跳过语义搜索，回退 Fuse.js
+- **RRF 混合排序** — K=60 互惠排名融合，融合 Fuse.js + pgvector 双源结果
+- **业务信号加权** — featured/paid +0.05 similarity boost，click_count>5 +0.02
+- **金标准评估框架** — 6 条金标准查询 × recall@10，`QUALITY_TEST_BASE_URL` 集成测试
+
 `/api/search` emits low-sensitivity structured logs with request id, query length, query hash, mode, result count, duration, and fallback reason. Raw query text is intentionally not logged.
 
 ### 用户收藏同步

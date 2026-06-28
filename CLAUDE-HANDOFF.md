@@ -1,4 +1,4 @@
-# Claude Code 项目接手提示词（v6 — 2026-06-28）
+# Claude Code 项目接手提示词（v7 — 2026-06-28）
 
 ## 项目接手：综合导航站 (nav-site)
 
@@ -14,16 +14,16 @@
 - Fuse.js 服务端搜索 + pgvector 语义搜索 + React cache() 数据去重
 - Motion 动画 + Lucide React 图标
 - Sentry 监控（共享配置 `sentry.shared.config.ts`）
-- Vitest 单元测试（74 个） + Playwright E2E 测试
+- Vitest 单元测试（169 个 + 20 Python 测试） + Playwright E2E 测试
 
 ## 当前状态
 
 - **513 个收录站点**，11 个分类，29 条模型排行榜数据
-- 150 个单元测试全部通过
+- **169 个 Vitest 单元测试全部通过** + 20 Python 测试全绿
 - ESLint 0 errors, TypeScript 0 errors, 生产构建成功（`next build --webpack`），E2E 34/34 全绿
 - 安全审计漏洞清零（postcss override 已配置）
 - **数据库迁移已确认**：slug 列索引/trigger + user_favorites 表/RLS 均已在生产库就绪
-- **pgvector 语义搜索已完成**：生产库 vector 扩展/RPC/索引就绪，513 个链接 embedding 已回填
+- **pgvector 搜索质量调优已完成 (Phase 22)**: BGE query prefix, 增强 embedding 文本(含分类名), 短查询保护(<3字符回退Fuse.js), RRF混合排序(K=60), 业务信号加权, 金标准评估框架(6条查询), 513条embedding重新回填
 - 本地 embedding 微服务：`scripts/embed-server.py`，模型 `BAAI/bge-small-zh-v1.5`，默认 `http://127.0.0.1:8003`
 
 ## ⚠️ 环境注意事项（必读）
@@ -48,6 +48,18 @@
 `.mcp.json` 有意指向**开发库**（`nzaocqwumlmbewoddysd`），而非生产库（`vyqqbypwrbdcafanzwmj`）。这是安全最佳实践——通过 MCP 工具操作数据库时只影响开发环境，生产数据需通过 admin API 手动操作。
 
 ## 已完成任务
+
+### v5 会话：搜索质量调优（Phase 22）
+
+| 优化项 | 说明 | 状态 |
+|--------|------|------|
+| BGE query prefix | 查询向量加中文前缀，文档向量不加 | ✅ |
+| 增强 embedding 文本 | 回填 `"title description [分类名]"` | ✅ |
+| 短查询保护 | <3 字符跳过语义搜索 | ✅ |
+| 业务信号加权 | featured/paid +0.05, click_count>5 +0.02 | ✅ |
+| RRF 混合排序 | K=60 互惠排名融合 | ✅ |
+| 金标准评估框架 | 6 条查询 × recall@10 | ✅ |
+| 513 条 embedding 重新回填 | 含分类名，已执行 | ✅ |
 
 ### v4 会话：审计剩余项全量修复（P2/P3）
 
@@ -106,7 +118,7 @@
 
 接手前请先阅读以下文件了解项目全貌：
 
-1. `docs/PROGRESS.md` — 完整的项目进度记录（Phase 1-17）
+1. `docs/PROGRESS.md` — 完整的项目进度记录（Phase 1-22）
 2. `README.md` — 项目结构、API 端点、环境变量、数据库迁移
 3. `DESIGN-DOC.md` — 设计规范、布局结构、技术架构
 4. `CLAUDE.md` — 开发约定和代码规范
@@ -122,6 +134,7 @@ pnpm build                     # 生产构建（webpack 模式）
 pnpm lint         # ESLint 检查
 pnpm typecheck    # TypeScript 类型检查
 pnpm test         # 单元测试
+pnpm test:quality  # 搜索质量金标准评估（需 QUALITY_TEST_BASE_URL）
 pnpm e2e          # E2E 测试（需先启动 dev server）
 pnpm analyze      # Bundle 分析
 ```

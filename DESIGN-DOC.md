@@ -2,7 +2,7 @@
 
 > 设计定位：面向开发者的综合资源导航平台 · 一站式覆盖 AI/云服务/开发工具/开源项目/设计/学习
 >
-> 文档版本 v11.0 · 2026-06-27 · 514 站点 · 9 分类 · next-auth v5 · 服务端搜索 · GitHub OAuth
+> 文档版本 v12.0 · 2026-06-28 · 513 站点 · 11 分类 · next-auth v5 · 服务端搜索 + pgvector 语义搜索 · GitHub OAuth
 
 ---
 
@@ -169,7 +169,7 @@
 | 动画 | motion (framer-motion) |
 | 数据库 | Supabase PostgreSQL (单库模式) |
 | 认证 | next-auth v5 (Credentials + GitHub OAuth) |
-| 搜索 | Fuse.js 服务端搜索 (`/api/search` API) |
+| 搜索 | Fuse.js 服务端搜索 + pgvector 语义搜索、RRF 混合排序 (`/api/search` API, `?semantic=true`) |
 | 部署 | Netlify |
 
 ### 6.2 数据流
@@ -182,7 +182,7 @@
                     │
               用户浏览器
                     │
-         搜索 → /api/search → Fuse.js 服务端
+         搜索 → /api/search → Fuse.js + pgvector 语义搜索 (RRF K=60 混合)
          收藏 → localStorage + /api/favorites (登录后同步)
          点击 → /api/click → click_count + 1
 ```
@@ -254,5 +254,5 @@
 
 ---
 
-> 文档版本 v11.0 · 2026-06-27
+> 文档版本 v12.0 · 2026-06-28
 > 进度详情请参阅 `docs/PROGRESS.md`

@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### 搜索质量优化
+- feat: pgvector 语义搜索基础实现（BAAI/bge-small-zh-v1.5 本地嵌入微服务，端口 8003）
+- feat: BGE query prefix — 查询向量加中文检索前缀，文档向量不加
+- feat: 增强 embedding 文本 — 回填 `"title description [分类名]"` 格式
+- feat: 短查询保护 — <3 字符跳过语义搜索，回退 Fuse.js
+- feat: RRF 混合排序（K=60 互惠排名融合）替代 bucket 策略
+- feat: 业务信号加权 — featured/paid +0.05, click_count>5 +0.02
+- feat: 金标准评估框架 — 6 条查询 × recall@10，`QUALITY_TEST_BASE_URL` 集成测试
+- chore: 513 条 embedding 回填（含分类名）
+- test: 新增 14 个搜索优化 TypeScript 测试 + 20 个 Python 测试
+- test: 单元测试总数 150→169
+
 - fix: 修复安全测试中原始 U+2028 字符导致 ESLint 解析错误
 - chore: 新增 CONTRIBUTING.md / SECURITY.md / LICENSE / Issue 模板
 - chore: 配置 Dependabot 自动依赖更新

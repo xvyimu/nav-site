@@ -1,6 +1,6 @@
 # 综合导航站 — 项目进度文档
 
-> 最后更新：2026-06-28 · 版本 v13.0
+> 最后更新：2026-06-28 · 版本 v14.0
 > 项目路径：`d:\nav-site` · 开发端口：3264
 
 ---
@@ -15,7 +15,7 @@
 - 模型排行榜：29 条（7 个维度榜单）
 - 向量维度：512 维（BAAI/bge-small-zh-v1.5 嵌入模型）
 
-> 文档版本 v13.0 · 2026-06-28 · Phase 21 完成：pgvector 语义搜索
+> 文档版本 v14.0 · 2026-06-28 · Phase 22 完成：pgvector 搜索质量调优
 
 ## 二、技术栈
 
@@ -41,7 +41,8 @@
 |------|------|------|
 | ESLint | 通过 | 0 errors, 1 warning (no-unused-vars) |
 | TypeScript | 通过 | 0 errors (strict mode) |
-| 单元测试 | 通过 | 150/150 (4 test files) |
+| 单元测试 | 通过 | 169/169 (7 TypeScript test files + 20 Python tests) |
+| 搜索质量金标准 | 通过 | 6 条金标准查询 × recall@10 评估框架 |
 | 安全测试覆盖率 | 通过 | admin-auth 100%, schemas 100%, utils 100%, with-admin 100%, rate-limit 79% |
 | E2E 测试 | 通过 | 34/34 (chromium + mobile-chrome) |
 | 生产构建 | 通过 | next build 成功 (28 routes) |
@@ -702,6 +703,81 @@ pnpm sync         # 数据库同步
 
 ---
 
+### Phase 21：pgvector 语义搜索基础（2026-06-28）
+
+#### 21.1 基础实现
+
+- 引入 BAAI/bge-small-zh-v1.5 本地嵌入微服务（FastAPI + uvicorn，端口 8003）
+- 实现 `/api/search?semantic=true` 语义搜索端点
+- Fuse.js 回退机制：embedding 服务不可用时自动降级到模糊搜索
+- pgvector 512 维向量存储 + `search_links_semantic` RPC 余弦相似度搜索
+- 新增 Python embedding 测试（10 tests）
+
+**核心文件**：
+- `scripts/embed-server.py` — 嵌入微服务（BGE 模型，端口 8003）
+- `scripts/backfill-embeddings.py` — 回填脚本
+- `scripts/migration-pgvector.sql` — pgvector 扩展 + 向量列 + RPC
+- `scripts/tests/test_embed_server.py` — 嵌入服务测试
+- `scripts/tests/test_backfill.py` — 回填脚本测试
+
+#### 21.2 质量验证
+
+| 指标 | 状态 | 数值 |
+|------|------|------|
+| ESLint | 通过 | 0 errors, 0 warnings |
+| TypeScript | 通过 | 0 errors |
+| 单元测试 | 通过 | 150/150 |
+| Python 测试 | 通过 | 20/20 |
+| 513 条 embedding 回填 | 通过 | 全部成功 |
+
+---
+
+### Phase 22：搜索质量优化（2026-06-28） ✅
+
+**Pipeline**: Planner → Coder → Tester → Reviewer → **SHIP**
+
+#### 22.1 七项优化
+
+| # | 优化项 | 优先级 | 说明 |
+|---|--------|--------|------|
+| 1 | BGE query prefix | P0 | 查询向量加中文前缀 `"为这个句子生成表示以用于检索相关文章："`，文档向量不加（BGE 官方要求） |
+| 2 | 增强 embedding 文本 | P0 | 回填文本格式 `"title description [分类名]"`，包含分类名提升语义区分度 |
+| 3 | 短查询保护 | P0 | `<3` 字符跳过语义搜索，回退 Fuse.js（避免短查询低质量匹配） |
+| 4 | ~~词边界关键词匹配~~ | — | 已废弃（被 RRF 替代，RRF subsumes 关键字提升全部逻辑） |
+| 5 | 业务信号加权 | P1 | featured/paid +0.05 similarity boost，click_count>5 +0.02 |
+| 6 | RRF 混合排序 | P2 | K=60 互惠排名融合，替代 bucket 策略，消除 keyword 饥饿 |
+| 7 | 金标准评估框架 | Infra | 6 条金标准查询 × recall@10，`QUALITY_TEST_BASE_URL` 集成测试 |
+
+#### 22.2 代码变更
+
+| 文件 | 变更 |
+|------|------|
+| `app/api/search/route.ts` | `MIN_SEMANTIC_QUERY_LENGTH=3`、embed endpoint → `/embed-query`、RRF `mergeResults()`、删除 `isStrongKeywordMatch()`、`SemanticRow` 新增 featured/paid/click_count、business signal boost |
+| `scripts/embed-server.py` | 新增 `BGE_QUERY_PREFIX` 常量 + `/embed-query` 端点 |
+| `scripts/backfill-embeddings.py` | `fetch_links()` join 分类名、`generate_embedding_text()` 输出 `"title description [分类名]"` |
+| `scripts/migration-pgvector.sql` | RPC 新增返回 `featured BOOLEAN`, `paid BOOLEAN`, `click_count INTEGER` |
+| `tests/search-optimization.test.ts` | 新建，14 个测试覆盖全部 7 项优化 |
+| `tests/search-quality.test.ts` | 新建，金标准集成测试 |
+| `tests/fixtures/golden-queries.json` | 新建，6 条金标准查询 |
+
+#### 22.3 数据库回填
+
+- 513 条 embedding 全部回填完成（`backfill-embeddings.py --apply`）
+- 分类名已嵌入 embedding 文本，提升语义区分度
+- RPC 已更新返回业务信号字段
+
+#### 22.4 质量验证
+
+| 指标 | 状态 | 数值 |
+|------|------|------|
+| ESLint | 通过 | 0 errors, 0 warnings |
+| TypeScript | 通过 | 0 errors |
+| Vitest 单元测试 | 通过 | 169 passed, 6 skipped |
+| Python 测试 | 通过 | 20/20 |
+| Review Verdict | **SHIP** | 7 项优化全部正确实现，无安全漏洞，无回归 |
+
+---
+
 ## 九、待办事项
 
 ### 短期
@@ -738,9 +814,10 @@ pnpm sync         # 数据库同步
 
 ### 长期
 - [x] pgvector 语义搜索 ✅ (Phase v21)
+- [x] 搜索质量调优 ✅ (Phase v22: BGE prefix + 增强文本 + 短查询保护 + RRF + 业务信号 + 金标准评估)
 - [ ] 国际化 (i18n)
 - [ ] PWA 离线支持
 
 ---
 
-> 文档版本 v12.0 · 2026-06-27 · Phase 19 完成：安全测试覆盖 + GitHub 标准文档补齐
+> 文档版本 v14.0 · 2026-06-28 · Phase 22 完成：搜索质量优化
