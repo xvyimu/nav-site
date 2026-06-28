@@ -5,7 +5,7 @@ import NextImage from "next/image";
 import { type NavLink, getLinkType, relativeTime } from "@/lib/types";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
-import { Globe, Heart } from "lucide-react";
+import { Globe, Heart, Sparkles } from "lucide-react";
 import { useFavoritesContext } from "@/components/FavoritesProvider";
 import { isSafeUrl, extractDomain } from "@/lib/utils";
 import { highlightSearchTerm } from "@/lib/highlight";
@@ -15,6 +15,7 @@ function LinkCardComponent({ link, index = 0, searchQuery = "" }: { link: NavLin
   const safeUrl = isSafeUrl(link.url) ? link.url : "#";
   const type = getLinkType(link.category_slug ?? null);
   const ts = relativeTime(link.updated_at || link.created_at);
+  const searchMeta = link.searchMeta;
 
   const { isFavorite, toggleFavorite } = useFavoritesContext();
   const fav = isFavorite(link.id);
@@ -130,6 +131,15 @@ function LinkCardComponent({ link, index = 0, searchQuery = "" }: { link: NavLin
                 <span className="font-mono truncate">{domain}</span>
                 {ts && <><span aria-hidden="true">·</span><span className="shrink-0">{ts}</span></>}
               </div>
+              {searchMeta && (
+                <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-muted-foreground/70">
+                  <Sparkles className="h-3 w-3 shrink-0 text-primary/70" aria-hidden="true" />
+                  <span className="truncate">{searchMeta.explanation.reason}</span>
+                  <span className="shrink-0 rounded bg-muted px-1 py-[1px] text-[9px] text-muted-foreground">
+                    {searchMeta.explanation.label}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Favorite toggle */}

@@ -30,29 +30,114 @@ function isMissingRelationError(error: { code?: string; message?: string }): boo
   );
 }
 
+function isMissingTagsJoinError(error: { code?: string; message?: string }): boolean {
+  return (
+    isMissingRelationError(error) ||
+    error.code === "PGRST200" ||
+    /nav_links_tags|tags|relationship/i.test(error.message ?? "")
+  );
+}
+
 /**
- * Supabase 链接行（含 join 字段）的松散类型。
- * 生成类型可能不包含 nav_links_tags join，故用此辅助类型安全访问。
+ * Supabase 链接行（含分类 join 字段）的松散类型。
  */
 interface RawLinkRow {
   nav_categories?: { name: string; slug: string } | null;
-  nav_links_tags?: Array<{ tags: Tag | null }> | null;
   updated_at?: string | null;
   created_at: string;
   [key: string]: unknown;
 }
 
-/** 将 Supabase 返回的链接行映射为 NavLink（含分类名与标签） */
+/** 将 Supabase 返回的链接行映射为 NavLink（含分类名） */
 function mapLinkRow(l: RawLinkRow): NavLink {
   return {
     ...(l as unknown as NavLink),
     category_name: l.nav_categories?.name,
     category_slug: l.nav_categories?.slug,
     updated_at: l.updated_at ?? l.created_at,
-    tags: (l.nav_links_tags ?? [])
-      .map((nt) => nt.tags)
-      .filter((t): t is Tag => t !== null),
+    tags: (l as unknown as NavLink).tags ?? [],
   };
+}
+
+interface RawLinkTagRow {
+  link_id: string;
+  tag_id: string;
+}
+
+let warnedMissingTagsTables = false;
+
+async function attachTagsToLinks(
+  supabase: SupabaseServerClient,
+  links: NavLink[],
+): Promise<NavLink[]> {
+  if (links.length === 0) return links;
+
+  const linkIds = links.map((link) => link.id);
+  const { data: linkTags, error: linkTagsError } = await supabase
+    .from("nav_links_tags")
+    .select("link_id, tag_id")
+    .in("link_id", linkIds);
+
+  if (linkTagsError) {
+    if (isMissingTagsJoinError(linkTagsError)) {
+      if (!warnedMissingTagsTables) {
+        logger.warn("Tags tables unavailable; returning links without tags", {
+          source: "repositories",
+          code: linkTagsError.code,
+        });
+        warnedMissingTagsTables = true;
+      }
+      return links;
+    }
+    logger.warn("Failed to fetch link tags; returning links without tags", {
+      source: "repositories",
+      code: linkTagsError.code,
+    });
+    return links;
+  }
+
+  const rows = (linkTags ?? []) as RawLinkTagRow[];
+  const tagIds = Array.from(new Set(rows.map((row) => row.tag_id)));
+  if (tagIds.length === 0) return links;
+
+  const { data: tags, error: tagsError } = await supabase
+    .from("tags")
+    .select("id, name, slug, created_at")
+    .in("id", tagIds);
+
+  if (tagsError) {
+    if (isMissingTagsJoinError(tagsError)) {
+      if (!warnedMissingTagsTables) {
+        logger.warn("Tags table unavailable; returning links without tags", {
+          source: "repositories",
+          code: tagsError.code,
+        });
+        warnedMissingTagsTables = true;
+      }
+      return links;
+    }
+    logger.warn("Failed to fetch tags; returning links without tags", {
+      source: "repositories",
+      code: tagsError.code,
+    });
+    return links;
+  }
+
+  const tagsById = new Map((tags ?? []).map((tag) => [tag.id, tag as Tag]));
+  const tagsByLinkId = new Map<string, Tag[]>();
+
+  for (const row of rows) {
+    const tag = tagsById.get(row.tag_id);
+    if (!tag) continue;
+    const current = tagsByLinkId.get(row.link_id) ?? [];
+    current.push(tag);
+    tagsByLinkId.set(row.link_id, current);
+  }
+
+  return links.map((link) => ({
+    ...link,
+    tags: tagsByLinkId.get(link.id) ?? [],
+  }));
 }
 
 // ── 分类 ──
@@ -88,29 +173,35 @@ interface GetApprovedLinksOpts {
  */
 async function getApprovedLinksImpl(options?: GetApprovedLinksOpts): Promise<NavLink[]> {
   const supabase = await createClient();
-  let query = supabase
+  const selectBasic = "*, nav_categories(name, slug)";
+
+  const buildQuery = (select: string) => {
+    let query = supabase
     .from("nav_links")
-    .select("*, nav_categories(name, slug)")
+    .select(select)
     .eq("approved", true)
     .order("featured", { ascending: false })
     .order("paid", { ascending: false })
     .order("created_at", { ascending: false });
 
-  if (options?.limit) {
-    query = query.range(
-      options.offset ?? 0,
-      (options.offset ?? 0) + options.limit - 1
-    );
-  }
+    if (options?.limit) {
+      query = query.range(
+        options.offset ?? 0,
+        (options.offset ?? 0) + options.limit - 1
+      );
+    }
 
-  const { data, error } = await query;
+    return query;
+  };
+
+  const { data, error } = await buildQuery(selectBasic);
 
   if (error) {
     logger.error("Failed to fetch links", { source: "repositories" }, error);
     throw new Error("Failed to fetch links");
   }
 
-  return (data ?? []).map(mapLinkRow);
+  return attachTagsToLinks(supabase, ((data ?? []) as unknown as RawLinkRow[]).map(mapLinkRow));
 }
 
 export const getApprovedLinks = cache(getApprovedLinksImpl);

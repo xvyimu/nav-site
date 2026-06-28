@@ -5,6 +5,12 @@ import type { NavLink, Category, Tag, ModelRanking } from "@/lib/types";
 import { SECTION_LABELS } from "@/lib/nav-config";
 import { isSafeUrl } from "@/lib/utils";
 import { getDescendantSlugs } from "@/lib/category-tree";
+import type {
+  PopularityFilter,
+  SearchFacets,
+  SearchSuggestion,
+} from "@/lib/search-experience";
+import { buildSearchFacets, buildSearchSuggestions } from "@/lib/search-experience";
 
 /** 侧边栏树节点（含计数和子节点） */
 export interface SidebarTabNode {
@@ -15,6 +21,13 @@ export interface SidebarTabNode {
 }
 
 type SortMode = "default" | "newest" | "popular";
+
+const EMPTY_SEARCH_FACETS: SearchFacets = {
+  categories: [],
+  tags: [],
+  ratings: [],
+  popularity: [],
+};
 
 /** 简单文本匹配（替代 Fuse.js — 排行榜仅 29 条，精确匹配即可） */
 function matchRankings(rankings: ModelRanking[], q: string) {
@@ -58,6 +71,11 @@ export function useLinksFilter({
   // ── Server search results ──
   const [serverResults, setServerResults] = useState<NavLink[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [searchFacets, setSearchFacets] = useState<SearchFacets>(EMPTY_SEARCH_FACETS);
+  const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
+  const [zeroResultRecommendations, setZeroResultRecommendations] = useState<NavLink[]>([]);
+  const [minRatingFilter, setMinRatingFilter] = useState<number | null>(null);
+  const [popularityFilter, setPopularityFilter] = useState<PopularityFilter | null>(null);
 
   // ── 后代 slug 映射（slug → 包含自身及所有后代的 slug 集合）──
   // 用于选中父分类时聚合显示子分类的链接
@@ -125,9 +143,18 @@ export function useLinksFilter({
   useEffect(() => {
     const q = rawSearch.trim();
     if (!q) {
+      const localFacets = buildSearchFacets(links, {
+        category: activeCategory,
+        tagSlugs: activeTags,
+        minRating: minRatingFilter,
+        popularity: popularityFilter,
+      });
       setSearch("");
       setServerResults([]);
       setSearchLoading(false);
+      setSearchFacets(localFacets);
+      setSearchSuggestions(buildSearchSuggestions("", links, localFacets));
+      setZeroResultRecommendations([]);
       return;
     }
 
@@ -140,6 +167,9 @@ export function useLinksFilter({
         const params = new URLSearchParams({ q });
         if (semanticSearch) params.set("semantic", "true");
         if (activeCategory !== "all") params.set("category", activeCategory);
+        if (activeTags.length > 0) params.set("tag", activeTags.join(","));
+        if (minRatingFilter !== null) params.set("minRating", String(minRatingFilter));
+        if (popularityFilter) params.set("popularity", popularityFilter);
         const res = await fetch(`/api/search?${params}`, { signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
@@ -156,15 +186,28 @@ export function useLinksFilter({
             featured: r.featured as boolean,
             click_count: r.click_count as number,
             created_at: "",
+            score: r.score as number | undefined,
+            similarity: r.similarity as number | undefined,
+            avg_rating: r.avg_rating as number | undefined,
+            review_count: r.review_count as number | undefined,
             category_name: r.category_name as string | undefined,
             category_slug: r.category_slug as string | undefined,
+            tags: r.tags as NavLink["tags"],
+            searchMeta: r.searchMeta as NavLink["searchMeta"],
           }));
           setServerResults(mapped);
+          setSearchFacets((data.facets ?? EMPTY_SEARCH_FACETS) as SearchFacets);
+          setSearchSuggestions((data.suggestions ?? []) as SearchSuggestion[]);
+          setZeroResultRecommendations((data.recommendations ?? []) as NavLink[]);
         }
       } catch (err) {
         // AbortError 是正常的取消行为，不需要处理
         if (err instanceof DOMException && err.name === "AbortError") return;
         // 网络错误时回退到客户端搜索
+        setServerResults([]);
+        setSearchFacets(EMPTY_SEARCH_FACETS);
+        setSearchSuggestions([]);
+        setZeroResultRecommendations([]);
       }
       setSearchLoading(false);
     }, 200);
@@ -173,7 +216,7 @@ export function useLinksFilter({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [rawSearch, activeCategory, semanticSearch]);
+  }, [rawSearch, activeCategory, semanticSearch, activeTags, minRatingFilter, popularityFilter, links]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // ── ⌘1-4: switch categories ──
@@ -202,6 +245,11 @@ export function useLinksFilter({
     );
   }, []);
   const clearTags = useCallback(() => setActiveTags([]), []);
+  const clearSearchExperienceFilters = useCallback(() => {
+    setActiveTags([]);
+    setMinRatingFilter(null);
+    setPopularityFilter(null);
+  }, []);
 
   // 从 links 中提取去重后的标签列表（按名称排序）
   const availableTags = useMemo(() => {
@@ -458,7 +506,15 @@ export function useLinksFilter({
     activeTags,
     toggleTag,
     clearTags,
+    clearSearchExperienceFilters,
     availableTags,
+    minRatingFilter,
+    setMinRatingFilter,
+    popularityFilter,
+    setPopularityFilter,
+    searchFacets,
+    searchSuggestions,
+    zeroResultRecommendations,
 
     // Refs
     inputRef,

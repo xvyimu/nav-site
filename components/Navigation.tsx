@@ -6,6 +6,7 @@ import { type Category, type NavLink } from "@/lib/types";
 import { motion } from "motion/react";
 import { Search, PackageOpen, Waves, Trophy } from "lucide-react";
 import { SearchBar } from "./SearchBar";
+import { SearchExperiencePanel } from "./SearchExperiencePanel";
 import type { ModelRanking as ModelRankingType } from "@/lib/types";
 import { staggerContainer, fadeInUp, slideDown } from "@/lib/animations";
 import { Sidebar } from "./Sidebar";
@@ -49,7 +50,10 @@ export function Navigation({
     semanticSearch,
     setSemanticSearch,
     // Tag filter
-    activeTags, toggleTag, clearTags, availableTags,
+    activeTags, toggleTag, clearTags, clearSearchExperienceFilters, availableTags,
+    minRatingFilter, setMinRatingFilter,
+    popularityFilter, setPopularityFilter,
+    searchFacets, searchSuggestions, zeroResultRecommendations,
     // Refs (only used in event handlers and JSX ref props)
     inputRef, resultsRef, announceRef,
     // Tab data
@@ -106,6 +110,32 @@ export function Navigation({
               loading={searchLoading}
               semantic={semanticSearch}
               onSemanticChange={setSemanticSearch}
+            />
+          </motion.div>
+
+          <motion.div variants={slideDown}>
+            <SearchExperiencePanel
+              query={rawSearch.trim()}
+              loading={searchLoading}
+              suggestions={searchSuggestions}
+              facets={searchFacets}
+              results={flatResults.map((item) => item.link)}
+              activeTags={activeTags}
+              activeCategory={activeCategory}
+              onSuggestion={(value) => {
+                setRawSearch(value);
+                inputRef.current?.focus();
+              }}
+              onCategoryChange={setActiveCategory}
+              onToggleTag={toggleTag}
+              minRating={minRatingFilter}
+              onMinRatingChange={setMinRatingFilter}
+              popularity={popularityFilter}
+              onPopularityChange={setPopularityFilter}
+              onClearFilters={() => {
+                clearSearchExperienceFilters();
+                setActiveCategory("all");
+              }}
             />
           </motion.div>
 
@@ -167,16 +197,33 @@ export function Navigation({
                 <ModelRanking data={filteredRankings} />
               </motion.section>
             )}
+
+            {q && flatResults.length === 0 && zeroResultRecommendations.length > 0 && (
+              <CategorySection
+                section={{
+                  key: "zero-result-recommendations",
+                  links: zeroResultRecommendations,
+                  label: "推荐工具",
+                  accent: "",
+                }}
+                sectionOffset={0}
+                activeCategory="zero-result-recommendations"
+                focusedIndex={-1}
+                onFocusChange={() => {}}
+                onKeyDown={() => {}}
+                searchQuery={q}
+              />
+            )}
           </div>
 
           {/* Search empty state */}
-          {mounted && flatResults.length === 0 && q && (
+          {mounted && flatResults.length === 0 && q && zeroResultRecommendations.length === 0 && (
             <motion.div className="flex flex-col items-center gap-3 py-20 text-muted-foreground/40" variants={fadeInUp}>
               <Search className="h-8 w-8" aria-hidden="true" />
               <p className="text-sm text-muted-foreground">
                 {`没有找到与"${q}"匹配的内容`}
               </p>
-              <button type="button" aria-label="清除筛选" onClick={() => { setRawSearch(""); setSearch(""); setActiveCategory("all"); inputRef.current?.focus(); }}
+              <button type="button" aria-label="清除筛选" onClick={() => { setRawSearch(""); setSearch(""); setActiveCategory("all"); clearSearchExperienceFilters(); inputRef.current?.focus(); }}
                 className="text-xs text-muted-foreground/70 hover:text-muted-foreground underline-offset-2 underline transition-colors">
                 清除筛选
               </button>

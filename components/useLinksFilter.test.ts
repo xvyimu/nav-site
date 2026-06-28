@@ -104,6 +104,76 @@ describe("useLinksFilter", () => {
     expect(result.current.filtered.some((l) => l.id === "l1")).toBe(true);
   });
 
+  it("sends productized search filters and preserves search metadata", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [{
+          id: "l1",
+          title: "ChatGPT",
+          url: "https://example.com",
+          description: "AI API tool",
+          icon: null,
+          category_name: "AI",
+          category_slug: "ai-tools",
+          featured: true,
+          paid: false,
+          click_count: 12,
+          tags: [{ id: "t1", name: "API", slug: "api", created_at: "2026-01-01T00:00:00Z" }],
+          avg_rating: 4.8,
+          review_count: 9,
+          searchMeta: {
+            query: "chat",
+            expandedTerms: ["chat"],
+            source: "hybrid",
+            highlights: [{ field: "description", label: "描述", value: "AI API tool" }],
+            explanation: {
+              label: "混合命中 98%",
+              reason: "描述 · 精选 · 热门",
+              matchedFields: ["description"],
+            },
+          },
+        }],
+        facets: {
+          categories: [],
+          tags: [{ value: "api", label: "API", count: 1, active: true }],
+          ratings: [{ value: "4", label: "4+", count: 1, active: true }],
+          popularity: [{ value: "featured", label: "精选", count: 1, active: true }],
+        },
+        suggestions: [{ type: "tool", value: "ChatGPT", label: "ChatGPT" }],
+        recommendations: [],
+        total: 1,
+        query: "chat",
+      }),
+    } as never);
+
+    const links = [
+      makeLink({
+        id: "l1",
+        title: "ChatGPT",
+        category_slug: "ai-tools",
+        tags: [{ id: "t1", name: "API", slug: "api", created_at: "2026-01-01T00:00:00Z" }],
+      }),
+    ];
+    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+
+    act(() => result.current.toggleTag("api"));
+    act(() => result.current.setMinRatingFilter(4));
+    act(() => result.current.setPopularityFilter("featured"));
+    act(() => result.current.setActiveCategory("ai-tools"));
+    act(() => result.current.setRawSearch("chat"));
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+
+    const calledUrl = String(vi.mocked(global.fetch).mock.calls[0][0]);
+    expect(calledUrl).toContain("category=ai-tools");
+    expect(calledUrl).toContain("tag=api");
+    expect(calledUrl).toContain("minRating=4");
+    expect(calledUrl).toContain("popularity=featured");
+    expect(result.current.searchFacets.tags[0].active).toBe(true);
+    expect(result.current.searchSuggestions[0].label).toBe("ChatGPT");
+    expect(result.current.filtered[0].searchMeta?.explanation.label).toBe("混合命中 98%");
+  });
+
   it("sorts by newest when sortMode is 'newest'", () => {
     const links = [
       makeLink({ id: "l1", created_at: "2026-06-10T00:00:00Z", category_slug: "cloud-vps" }),

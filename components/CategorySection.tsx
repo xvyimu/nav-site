@@ -33,11 +33,12 @@ export function CategorySection({
   searchQuery = "",
 }: CategorySectionProps) {
   if (section.links.length === 0) return null;
-  if (activeCategory !== "all" && activeCategory !== section.key) return null;
+  const isSearchSection = section.key === "search-results" || section.key === "zero-result-recommendations";
+  if (!isSearchSection && activeCategory !== "all" && activeCategory !== section.key) return null;
 
   return (
     <motion.section variants={fadeInUp}>
-      {activeCategory === "all" && (
+      {(activeCategory === "all" || isSearchSection) && (
         <h2 className={`mb-3 text-xs font-medium uppercase tracking-widest ${section.accent} flex items-center gap-2`}>
           <span className="inline-block w-4 h-px bg-current opacity-50" />
           {section.label}

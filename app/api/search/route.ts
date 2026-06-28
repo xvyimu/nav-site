@@ -2,10 +2,21 @@
   import { getApprovedLinks } from "@/lib/repositories";
   import { createServiceRoleClient } from "@/lib/supabase/server";
   import type Fuse from "fuse.js";
-  import type { NavLink } from "@/lib/types";
+  import type { NavLink, SearchSource } from "@/lib/types";
   import { logger } from "@/lib/logger";
   import { withTimeout } from "@/lib/utils";
   import { createHash, randomUUID } from "node:crypto";
+  import {
+    applySearchFilters,
+    buildSearchFacets,
+    buildSearchMeta,
+    buildSearchSuggestions,
+    buildZeroResultRecommendations,
+    expandQueryTerms,
+    normalizeSearchFilters,
+    type PopularityFilter,
+    type SearchFilters,
+  } from "@/lib/search-experience";
 
   export const dynamic = "force-dynamic";
   export const runtime = "nodejs";
@@ -18,6 +29,10 @@
   const MIN_SEMANTIC_SIMILARITY = 0.35;
   const CATEGORY_SLUG_RE = /^[a-z0-9-]{1,50}$/;
   const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+  function normalizeHostname(hostname: string): string {
+    return hostname.replace(/^\[(.*)\]$/, "$1").toLowerCase();
+  }
 
   // ── 结果类型 ──
 
@@ -38,6 +53,10 @@
     similarity?: number;
     /** Result source */
     source: "fuse" | "semantic";
+    tags?: NavLink["tags"];
+    review_count?: number;
+    avg_rating?: number;
+    searchMeta?: NavLink["searchMeta"];
   }
 
   interface SearchParams {
@@ -45,6 +64,7 @@
     category?: string;
     limit: number;
     semantic: boolean;
+    filters: SearchFilters;
   }
 
   function badRequest(message: string, requestId?: string): NextResponse {
@@ -102,11 +122,41 @@
       return badRequest(`limit must be an integer from 1 to ${MAX_LIMIT}`, requestId);
     }
 
+    const tagSlugs = searchParams
+      .getAll("tag")
+      .flatMap((value) => value.split(","))
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (tagSlugs.some((tag) => !CATEGORY_SLUG_RE.test(tag))) {
+      return badRequest("tag must be a valid slug", requestId);
+    }
+
+    const minRatingParam = searchParams.get("minRating");
+    const minRating = minRatingParam ? Number(minRatingParam) : null;
+    if (minRating !== null && (!Number.isFinite(minRating) || minRating < 1 || minRating > 5)) {
+      return badRequest("minRating must be a number from 1 to 5", requestId);
+    }
+
+    const popularityParam = searchParams.get("popularity");
+    const popularity =
+      popularityParam === "featured" || popularityParam === "popular"
+        ? popularityParam
+        : null;
+    if (popularityParam && !popularity) {
+      return badRequest("popularity must be featured or popular", requestId);
+    }
+
     return {
       q,
       category,
       limit,
       semantic: searchParams.get("semantic") === "true",
+      filters: normalizeSearchFilters({
+        category,
+        tagSlugs,
+        minRating,
+        popularity: popularity as PopularityFilter | null,
+      }),
     };
   }
 
@@ -115,7 +165,10 @@
 
     try {
       const url = new URL(raw);
-      if ((url.protocol !== "http:" && url.protocol !== "https:") || !LOOPBACK_HOSTS.has(url.hostname)) {
+      if (
+        (url.protocol !== "http:" && url.protocol !== "https:") ||
+        !LOOPBACK_HOSTS.has(normalizeHostname(url.hostname))
+      ) {
         logger.warn("Ignoring non-loopback EMBED_SERVER_URL", { source: "api-search" });
         return null;
       }
@@ -153,43 +206,40 @@
     });
   }
 
-  async function getFuseInstance(category?: string): Promise<{ fuse: Fuse<NavLink>; links: NavLink[] }> {
+  async function getSearchPool(
+    category?: string,
+    filters?: SearchFilters,
+  ): Promise<{ fuse: Fuse<NavLink>; links: NavLink[]; allLinks: NavLink[] }> {
     const now = Date.now();
     const { default: FuseModule } = await import("fuse.js");
+    let allLinks: NavLink[];
 
     // 检查缓存是否有效
     if (fuseCache && now - fuseCache.timestamp < CACHE_TTL_MS) {
-      let pool = fuseCache.links;
-      if (category && category !== "all") {
-        pool = fuseCache.links.filter((l) => l.category_slug === category);
-      }
+      allLinks = fuseCache.links;
+    } else {
+      allLinks = await withTimeout(getApprovedLinks(), FETCH_TIMEOUT).catch(() => {
+        logger.warn("Search API: getApprovedLinks timed out");
+        return [];
+      });
 
-      return {
-        fuse: createFuse(FuseModule, pool),
-        links: pool,
+      fuseCache = {
+        fuse: createFuse(FuseModule, allLinks),
+        links: allLinks,
+        timestamp: now,
       };
     }
-
-    // 缓存过期或不存在，重新加载
-    const allLinks = await withTimeout(getApprovedLinks(), FETCH_TIMEOUT).catch(() => {
-      logger.warn("Search API: getApprovedLinks timed out");
-      return [];
-    });
-
-    fuseCache = {
-      fuse: createFuse(FuseModule, allLinks),
-      links: allLinks,
-      timestamp: now,
-    };
 
     let pool = allLinks;
     if (category && category !== "all") {
       pool = allLinks.filter((l) => l.category_slug === category);
     }
+    pool = applySearchFilters(pool, filters);
 
     return {
       fuse: createFuse(FuseModule, pool),
       links: pool,
+      allLinks,
     };
   }
 
@@ -311,6 +361,9 @@
             featured: link?.featured ?? false,
             paid: link?.paid ?? false,
             click_count: link?.click_count ?? 0,
+            tags: link?.tags,
+            review_count: link?.review_count,
+            avg_rating: link?.avg_rating,
             similarity: r.similarity,
             source: "semantic" as const,
           };
@@ -326,6 +379,25 @@
     score?: number;
   };
 
+  function searchFuseTerms(fuse: Fuse<NavLink>, terms: string[], limit: number): FuseResultItem[] {
+    const byId = new Map<string, FuseResultItem>();
+    const queryTerms = terms.length > 0 ? terms : [""];
+
+    for (const term of queryTerms) {
+      if (!term) continue;
+      for (const result of fuse.search(term).slice(0, limit)) {
+        const existing = byId.get(result.item.id);
+        if (!existing || (result.score ?? 1) < (existing.score ?? 1)) {
+          byId.set(result.item.id, result);
+        }
+      }
+    }
+
+    return Array.from(byId.values())
+      .sort((a, b) => (a.score ?? 1) - (b.score ?? 1))
+      .slice(0, limit);
+  }
+
   function toFuseResults(raw: FuseResultItem[], limit: number): SearchResult[] {
     return raw.slice(0, limit).map((r) => ({
       id: r.item.id,
@@ -338,9 +410,62 @@
       featured: r.item.featured,
       paid: r.item.paid,
       click_count: r.item.click_count,
+      tags: r.item.tags,
+      review_count: r.item.review_count,
+      avg_rating: r.item.avg_rating,
       score: r.score ?? 1,
       source: "fuse" as const,
     }));
+  }
+
+  function toNavLinkResult(result: SearchResult): NavLink {
+    return {
+      id: result.id,
+      title: result.title,
+      url: result.url,
+      description: result.description,
+      icon: result.icon,
+      category_id: null,
+      approved: true,
+      paid: result.paid,
+      featured: result.featured,
+      click_count: result.click_count,
+      created_at: "",
+      category_name: result.category_name,
+      category_slug: result.category_slug,
+      tags: result.tags,
+      review_count: result.review_count,
+      avg_rating: result.avg_rating,
+      score: result.score,
+      similarity: result.similarity,
+      searchMeta: result.searchMeta,
+    };
+  }
+
+  function decorateResults(
+    results: SearchResult[],
+    query: string,
+    terms: string[],
+    semanticIds = new Set<string>(),
+    fuseIds = new Set<string>(),
+  ): NavLink[] {
+    return results.map((result) => {
+      const source: SearchSource =
+        semanticIds.has(result.id) && fuseIds.has(result.id)
+          ? "hybrid"
+          : result.source;
+      return toNavLinkResult({
+        ...result,
+        searchMeta: buildSearchMeta({
+          link: toNavLinkResult(result),
+          query,
+          terms,
+          source,
+          score: result.score,
+          similarity: result.similarity,
+        }),
+      });
+    });
   }
 
   /**
@@ -430,7 +555,11 @@
       const parsed = parseSearchParams(searchParams, requestId);
       if (parsed instanceof NextResponse) return parsed;
 
-      const { q, category, limit, semantic } = parsed;
+      const { q, category, limit, semantic, filters } = parsed;
+      const { terms, appliedSynonyms } = expandQueryTerms(q);
+      const { fuse, links, allLinks } = await getSearchPool(category, filters);
+      const facets = buildSearchFacets(allLinks, { ...filters, category });
+      const suggestions = buildSearchSuggestions(q, allLinks, facets);
 
       if (!q) {
         logger.info("Search API completed", searchLogContext(requestId, parsed, startedAt, {
@@ -442,6 +571,12 @@
             results: [],
             total: 0,
             query: "",
+            mode: semantic ? "semantic" : "fuse",
+            facets,
+            suggestions,
+            recommendations: buildZeroResultRecommendations(links, 6),
+            expandedTerms: [],
+            appliedSynonyms: [],
           },
           {
             headers: {
@@ -451,9 +586,9 @@
         );
       }
 
-      const { fuse, links } = await getFuseInstance(category);
       const linksById = new Map(links.map((link) => [link.id, link]));
-      const fuseResults = toFuseResults(fuse.search(q), limit * 2);
+      const fuseResults = toFuseResults(searchFuseTerms(fuse, terms, limit * 2), limit * 2);
+      const fuseIds = new Set(fuseResults.map((result) => result.id));
 
       if (semantic) {
         // ── 语义搜索模式 ──
@@ -465,6 +600,10 @@
           const embedding = await getEmbedding(q);
           if (embedding) {
             semanticResults = await searchSemantic(embedding, limit, category, linksById);
+            semanticResults = semanticResults.filter((result) => {
+              const link = linksById.get(result.id);
+              return link ? applySearchFilters([link], filters).length > 0 : true;
+            });
             if (semanticResults.length === 0) {
               fallbackReason = "semantic_empty";
             }
@@ -475,6 +614,8 @@
           fallbackReason = "short_query";
         }
         const results = mergeResults(semanticResults, fuseResults, limit, q);
+        const semanticIds = new Set(semanticResults.map((result) => result.id));
+        const decoratedResults = decorateResults(results, q, terms, semanticIds, fuseIds);
         logger.info("Search API completed", searchLogContext(requestId, parsed, startedAt, {
           resultCount: results.length,
           fuseCandidateCount: fuseResults.length,
@@ -485,10 +626,16 @@
 
         return NextResponse.json(
           {
-            results,
-            total: results.length,
+            results: decoratedResults,
+            total: decoratedResults.length,
             query: q,
             mode: "semantic",
+            facets,
+            suggestions,
+            recommendations: decoratedResults.length === 0 ? buildZeroResultRecommendations(links, 6) : [],
+            expandedTerms: terms,
+            appliedSynonyms,
+            fallbackReason,
           },
           {
             headers: {
@@ -501,6 +648,7 @@
 
       // ── 传统 Fuse.js 模糊搜索模式 ──
       const results = fuseResults.slice(0, limit);
+      const decoratedResults = decorateResults(results, q, terms, new Set(), fuseIds);
       logger.info("Search API completed", searchLogContext(requestId, parsed, startedAt, {
         resultCount: results.length,
         fuseCandidateCount: fuseResults.length,
@@ -509,10 +657,15 @@
 
       return NextResponse.json(
         {
-          results,
+          results: decoratedResults,
           total: fuseResults.length,
           query: q,
           mode: "fuse",
+          facets,
+          suggestions,
+          recommendations: decoratedResults.length === 0 ? buildZeroResultRecommendations(links, 6) : [],
+          expandedTerms: terms,
+          appliedSynonyms,
         },
         {
           headers: {

@@ -41,17 +41,39 @@ CREATE INDEX IF NOT EXISTS idx_nav_links_tags_tag_id ON nav_links_tags(tag_id);
 ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tags FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY "Anyone can read tags"
-  ON tags FOR SELECT
-  USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'tags' AND policyname = 'Anyone can read tags'
+  ) THEN
+    CREATE POLICY "Anyone can read tags"
+      ON tags FOR SELECT
+      USING (true);
+  END IF;
+END $$;
+
+GRANT SELECT ON tags TO anon, authenticated, service_role;
+GRANT INSERT, UPDATE, DELETE ON tags TO service_role;
 
 -- nav_links_tags: 所有人可读（前台需展示标签），仅 service_role 可写
 ALTER TABLE nav_links_tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nav_links_tags FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY "Anyone can read link-tag associations"
-  ON nav_links_tags FOR SELECT
-  USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'nav_links_tags' AND policyname = 'Anyone can read link-tag associations'
+  ) THEN
+    CREATE POLICY "Anyone can read link-tag associations"
+      ON nav_links_tags FOR SELECT
+      USING (true);
+  END IF;
+END $$;
+
+GRANT SELECT ON nav_links_tags TO anon, authenticated, service_role;
+GRANT INSERT, UPDATE, DELETE ON nav_links_tags TO service_role;
 
 -- 4. 注释
 COMMENT ON TABLE tags IS '标签字典，用于链接的多标签分类';

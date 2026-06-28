@@ -32,11 +32,16 @@ export interface NavLink {
   created_at: string;
   updated_at?: string | null;
   slug?: string | null;
+  review_count?: number;
+  avg_rating?: number;
+  score?: number;
+  similarity?: number;
   // Joined field
   category_name?: string;
   category_slug?: string;
   // 关联标签（通过 nav_links_tags join 填充）
   tags?: Tag[];
+  searchMeta?: SearchMeta;
 }
 
 export interface NavLinkWithCategory extends NavLink {
@@ -108,6 +113,32 @@ export interface ReviewStats {
   three_star_count: number;
   two_star_count: number;
   one_star_count: number;
+}
+
+// ── Search experience ───────────────────────────────────────
+
+export type SearchSource = "fuse" | "semantic" | "hybrid";
+
+export type SearchMatchField = "title" | "description" | "category" | "tag" | "url";
+
+export interface SearchHighlight {
+  field: SearchMatchField;
+  label: string;
+  value: string;
+}
+
+export interface SearchMeta {
+  query: string;
+  expandedTerms: string[];
+  source: SearchSource;
+  score?: number;
+  similarity?: number;
+  highlights: SearchHighlight[];
+  explanation: {
+    label: string;
+    reason: string;
+    matchedFields: SearchMatchField[];
+  };
 }
 
 // ── 模型排行榜 ──
