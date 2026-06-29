@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { signOut } from "next-auth/react";
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -10,15 +11,15 @@ export default function LogoutButton() {
   async function logout() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/login", { method: "DELETE" });
-      if (!res.ok) {
-        console.error("登出失败:", res.status);
-      }
+      // 统一走 NextAuth 的 /api/auth/signout 路径
+      // 这会清除 next-auth.session-token cookie
+      await signOut({ redirect: false });
     } catch (e) {
       console.error("登出请求错误:", e);
     } finally {
       setLoading(false);
       router.push("/login");
+      router.refresh();
     }
   }
 
