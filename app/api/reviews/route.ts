@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { logger } from "@/lib/logger";
+import { getClientIp } from "@/lib/utils";
+import { reviewSchema } from "@/lib/schemas";
 import {
   getToolReviews,
   getReviewStats,
@@ -10,12 +11,6 @@ import {
   recordReviewAttempt,
   MissingDatabaseMigrationError,
 } from "@/lib/repositories";
-
-const reviewSchema = z.object({
-  link_id: z.string().uuid("工具 ID 格式不正确"),
-  rating: z.number().int().min(1, "评分最低 1 星").max(5, "评分最高 5 星"),
-  comment: z.string().max(500, "评论不能超过 500 字符").nullish().default(null),
-});
 
 /**
  * 获取工具评价
@@ -77,10 +72,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const ip =
-      request.headers.get("x-nf-client-connection-ip") ||
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      "unknown";
+    const ip = getClientIp(request);
 
     // 速率限制
     const allowed = await checkReviewRateLimit(ip);

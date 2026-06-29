@@ -146,3 +146,15 @@ export const submitLinkSchema = z.object({
 
 /** 收藏 linkIds schema */
 export const linkIdsSchema = z.array(z.string().uuid()).min(1).max(100);
+
+/** 点击计数 schema（用于 /api/click） */
+export const clickSchema = z.object({
+  url: urlSchema,
+});
+
+/** 工具评价 schema（用于 /api/reviews POST） */
+export const reviewSchema = z.object({
+  link_id: z.string().uuid("工具 ID 格式不正确"),
+  rating: z.number().int().min(1, "评分最低 1 星").max(5, "评分最高 5 星"),
+  comment: z.string().max(500, "评论不能超过 500 字符").nullish().default(null),
+});

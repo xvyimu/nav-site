@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { getClientIp } from "@/lib/utils";
-import { urlSchema } from "@/lib/schemas";
+import { clickSchema } from "@/lib/schemas";
 import { checkClickRateLimit, recordClick, incrementClickCount } from "@/lib/rate-limit";
 import { findApprovedLinkByUrl } from "@/lib/repositories";
-
-const clickSchema = z.object({
-  url: urlSchema,
-});
 
 export async function POST(request: Request) {
   try {
