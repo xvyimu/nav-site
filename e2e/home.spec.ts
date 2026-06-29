@@ -244,3 +244,117 @@ test.describe("移动端", () => {
     await expect(menuButton).toBeVisible();
   });
 });
+
+test.describe.serial("ToolQuickView 预览弹窗", () => {
+  test.beforeEach(async ({ page }) => {
+    test.slow();
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    // 等待 hydration 完成（SSR 不渲染预览按钮，需 Client Component hydrate）
+    await expect(page.locator('[data-nav-hydrated="true"]')).toBeAttached({ timeout: 30000 });
+    // 等待卡片数据加载（预览按钮在 LinkCard 内部，卡片不出现则没有按钮）
+    await expect(page.locator('a[href^="http"]').first()).toBeVisible({ timeout: 30000 });
+    // 等待预览按钮出现在卡片中
+    await expect(page.locator('button[aria-label^="预览"]').first()).toBeVisible({ timeout: 15000 });
+  });
+
+  test("点击预览按钮打开弹窗并验证 aria 属性", async ({ page }) => {
+    const previewBtn = page.locator('button[aria-label^="预览"]').first();
+    await previewBtn.click();
+
+    // 弹窗应为 dialog role
+    const dialog = page.locator('[role="dialog"]');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAttribute("aria-modal", "true");
+    await expect(dialog).toHaveAttribute("aria-labelledby", "tool-quick-view-title");
+    await expect(dialog).toHaveAttribute("aria-describedby", "tool-quick-view-desc");
+  });
+
+  test("弹窗包含打开网站链接和收藏按钮", async ({ page }) => {
+    const previewBtn = page.locator('button[aria-label^="预览"]').first();
+    await previewBtn.click();
+
+    // 弹窗内的按钮用更具体的 selector
+    await expect(page.getByRole("link", { name: "打开网站" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "收藏", exact: true })).toBeVisible();
+
+    // 打开网站链接应指向外部地址
+    const openLink = page.getByRole("link", { name: "打开网站" });
+    await expect(openLink).toHaveAttribute("target", "_blank");
+    await expect(openLink).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  test("Escape 键关闭弹窗", async ({ page }) => {
+    const previewBtn = page.locator('button[aria-label^="预览"]').first();
+    await previewBtn.click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+  });
+
+  test("背板点击关闭弹窗", async ({ page }) => {
+    const previewBtn = page.locator('button[aria-label^="预览"]').first();
+    await previewBtn.click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible();
+
+    // 点击背板遮罩顶部区域（避开 aside 面板覆盖区）
+    const backdrop = page.locator('button[aria-label="关闭工具预览"]').first();
+    await backdrop.click({ position: { x: 200, y: 50 } });
+    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+  });
+
+  test("显示工具信息和评分", async ({ page }) => {
+    const previewBtn = page.locator('button[aria-label^="预览"]').first();
+    await previewBtn.click();
+
+    // 弹窗应显示工具名称（h2）
+    await expect(page.locator("#tool-quick-view-title")).toBeVisible();
+
+    // 收录说明区域存在
+    await expect(page.locator("text=收录说明")).toBeVisible();
+
+    // 分类、点击量、评分 dialogs 内用 aria-label 定位
+    await expect(page.locator('[role="dialog"] dl:has(dd:text("分类"))')).toBeVisible();
+    await expect(page.locator('[role="dialog"] dl:has(dd:text("点击量"))')).toBeVisible();
+    await expect(page.locator('[role="dialog"] dl:has(dd:text("评分"))')).toBeVisible();
+  });
+
+  test("Tab 键在弹窗内循环不外逸", async ({ page }) => {
+    const previewBtn = page.locator('button[aria-label^="预览"]').first();
+    await previewBtn.click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible();
+
+    const aside = page.locator("aside.nav-quick-view");
+
+    // 初始焦点在关闭按钮（closeRef.current?.focus()）
+    // 连按 Tab 6 次（弹窗内仅 3 个可聚焦元素：关闭按钮 / 打开网站 / 收藏），
+    // 验证焦点始终在 aside 内，不外逸到页面其他元素
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press("Tab");
+      const inAside = await aside.evaluate((el) => el.contains(document.activeElement));
+      expect(inAside, `Tab #${i + 1}: 焦点外逸到 aside 之外`).toBe(true);
+    }
+
+    // Shift+Tab 反向循环，同样不应外逸
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press("Shift+Tab");
+      const inAside = await aside.evaluate((el) => el.contains(document.activeElement));
+      expect(inAside, `Shift+Tab #${i + 1}: 焦点外逸到 aside 之外`).toBe(true);
+    }
+
+    await page.keyboard.press("Escape");
+  });
+
+  test("关闭后焦点回到触发按钮", async ({ page }) => {
+    const previewBtn = page.locator('button[aria-label^="预览"]').first();
+    await previewBtn.click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible();
+
+    // Escape 关闭
+    await page.keyboard.press("Escape");
+    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+
+    // 焦点应回到预览按钮（triggerRef.current?.focus()）
+    await expect(previewBtn).toBeFocused();
+  });
+});
