@@ -12,6 +12,63 @@ import type {
 } from "@/lib/search-experience";
 import { buildSearchFacets, buildSearchSuggestions } from "@/lib/search-experience";
 
+/**
+ * URL ↔ 筛选状态双向同步
+ *
+ * 参数命名（与 API、JSON-LD、tool 页回链统一）：
+ *   q          搜索词（对应 layout.tsx 的 SearchAction urlTemplate）
+ *   cat        分类 slug（对应 tool/[slug]/page.tsx 的 /?cat= 链接）
+ *   tag        标签 slug，逗号分隔（对应 /api/search 的 tag 参数）
+ *   minRating  1-5
+ *   popularity featured | popular
+ *   semantic   false 时才写入 URL（默认 true，保持 URL 简洁）
+ *
+ * 策略：
+ *   - 挂载时从 URL 读取初始值（lazy initializer）
+ *   - state 变化 → window.history.replaceState（不触发 popstate，无 re-render）
+ *   - 浏览器前进/后退 → popstate → 重新 setState
+ *   - 搜索词同步的是 debounce 后的 `search` 而非 `rawSearch`，避免每次按键都改 URL
+ */
+interface ParsedUrlFilters {
+  q: string;
+  cat: string;
+  tags: string[];
+  minRating: number | null;
+  popularity: PopularityFilter | null;
+  semantic: boolean;
+}
+
+function parseFiltersFromUrl(sp: URLSearchParams): ParsedUrlFilters {
+  const q = sp.get("q")?.trim() ?? "";
+  const cat = sp.get("cat")?.trim() || "all";
+  const tags = sp
+    .getAll("tag")
+    .flatMap((v) => v.split(","))
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const minRatingRaw = sp.get("minRating");
+  const minRatingNum = minRatingRaw ? Number(minRatingRaw) : null;
+  const minRating =
+    minRatingNum !== null &&
+    Number.isFinite(minRatingNum) &&
+    minRatingNum >= 1 &&
+    minRatingNum <= 5
+      ? minRatingNum
+      : null;
+  const popularityRaw = sp.get("popularity");
+  const popularity: PopularityFilter | null =
+    popularityRaw === "featured" || popularityRaw === "popular" ? popularityRaw : null;
+  const semantic = sp.get("semantic") !== "false"; // 默认 true
+  return { q, cat, tags, minRating, popularity, semantic };
+}
+
+function readInitialFilters(): ParsedUrlFilters {
+  if (typeof window === "undefined") {
+    return { q: "", cat: "all", tags: [], minRating: null, popularity: null, semantic: true };
+  }
+  return parseFiltersFromUrl(new URLSearchParams(window.location.search));
+}
+
 /** 侧边栏树节点（含计数和子节点） */
 export interface SidebarTabNode {
   key: string;
@@ -50,13 +107,14 @@ export function useLinksFilter({
   links: NavLink[];
   modelRankings: ModelRanking[];
 }) {
-  const [activeCategory, setActiveCategory] = useState("all");
-  const [rawSearch, setRawSearch] = useState("");
-  const [search, setSearch] = useState("");
-  const [semanticSearch, setSemanticSearch] = useState(true);
+  const [initial] = useState(readInitialFilters);
+  const [activeCategory, setActiveCategory] = useState(initial.cat);
+  const [rawSearch, setRawSearch] = useState(initial.q);
+  const [search, setSearch] = useState(initial.q);
+  const [semanticSearch, setSemanticSearch] = useState(initial.semantic);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   // 多标签筛选（AND 语义：必须同时拥有所有选中的标签 slug）
-  const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [activeTags, setActiveTags] = useState<string[]>(initial.tags);
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("nav-sort-mode");
@@ -74,8 +132,8 @@ export function useLinksFilter({
   const [searchFacets, setSearchFacets] = useState<SearchFacets>(EMPTY_SEARCH_FACETS);
   const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
   const [zeroResultRecommendations, setZeroResultRecommendations] = useState<NavLink[]>([]);
-  const [minRatingFilter, setMinRatingFilter] = useState<number | null>(null);
-  const [popularityFilter, setPopularityFilter] = useState<PopularityFilter | null>(null);
+  const [minRatingFilter, setMinRatingFilter] = useState<number | null>(initial.minRating);
+  const [popularityFilter, setPopularityFilter] = useState<PopularityFilter | null>(initial.popularity);
 
   // ── 后代 slug 映射（slug → 包含自身及所有后代的 slug 集合）──
   // 用于选中父分类时聚合显示子分类的链接
@@ -137,6 +195,43 @@ export function useLinksFilter({
 
   // ── Persist sort ──
   useEffect(() => { localStorage.setItem("nav-sort-mode", sortMode); }, [sortMode]);
+
+  // ── State → URL 同步（debounce 后的 search + 其他筛选）──
+  // 用 replaceState 而非 router.replace，避免触发服务端重渲染
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams();
+    const trimmedSearch = search.trim();
+    if (trimmedSearch) sp.set("q", trimmedSearch);
+    if (activeCategory !== "all") sp.set("cat", activeCategory);
+    if (activeTags.length > 0) sp.set("tag", activeTags.join(","));
+    if (minRatingFilter !== null) sp.set("minRating", String(minRatingFilter));
+    if (popularityFilter) sp.set("popularity", popularityFilter);
+    if (!semanticSearch) sp.set("semantic", "false");
+    const qs = sp.toString();
+    const newUrl = qs ? `/?${qs}` : "/";
+    const currentUrl = window.location.pathname + window.location.search;
+    if (currentUrl !== newUrl) {
+      window.history.replaceState(null, "", newUrl);
+    }
+  }, [search, activeCategory, activeTags, minRatingFilter, popularityFilter, semanticSearch]);
+
+  // ── 浏览器前进/后退 → State 同步 ──
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handlePopState = () => {
+      const parsed = parseFiltersFromUrl(new URLSearchParams(window.location.search));
+      setActiveCategory(parsed.cat);
+      setRawSearch(parsed.q);
+      setSearch(parsed.q);
+      setActiveTags(parsed.tags);
+      setMinRatingFilter(parsed.minRating);
+      setPopularityFilter(parsed.popularity);
+      setSemanticSearch(parsed.semantic);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // ── Debounce: 200ms → server search ──
   /* eslint-disable react-hooks/set-state-in-effect */

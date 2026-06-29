@@ -37,6 +37,8 @@ const rankings: ModelRanking[] = [
 describe("useLinksFilter", () => {
   beforeEach(() => {
     localStorage.clear();
+    // 重置 URL，避免上一个测试的筛选状态通过 URL 同步泄漏到下一个测试
+    window.history.replaceState(null, "", "/");
     vi.useFakeTimers();
     // Default fetch mock: empty search results
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
@@ -250,5 +252,43 @@ describe("useLinksFilter", () => {
     const relay = result.current.tabCounts.find((t) => t.key === "free-relay");
     expect(bigTech?.count).toBe(2);
     expect(relay?.count).toBe(1);
+  });
+
+  // ── URL ↔ state 同步 ──
+
+  it("从 URL 读取初始筛选状态", () => {
+    window.history.replaceState(null, "", "/?cat=cloud-vps&tag=api&minRating=4&popularity=featured&semantic=false");
+    const links = [makeLink({ id: "l1", category_slug: "cloud-vps" })];
+    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    expect(result.current.activeCategory).toBe("cloud-vps");
+    expect(result.current.activeTags).toEqual(["api"]);
+    expect(result.current.minRatingFilter).toBe(4);
+    expect(result.current.popularityFilter).toBe("featured");
+    expect(result.current.semanticSearch).toBe(false);
+  });
+
+  it("切换分类时同步到 URL", () => {
+    const links = [makeLink({ id: "l1", category_slug: "cloud-vps" })];
+    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    act(() => result.current.setActiveCategory("cloud-vps"));
+    expect(window.location.search).toContain("cat=cloud-vps");
+    act(() => result.current.toggleTag("api"));
+    expect(window.location.search).toContain("tag=api");
+    act(() => result.current.setMinRatingFilter(4));
+    expect(window.location.search).toContain("minRating=4");
+  });
+
+  it("popstate 事件触发状态回填", () => {
+    const links = [makeLink({ id: "l1", category_slug: "cloud-vps" })];
+    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    // 先切到 cloud-vps
+    act(() => result.current.setActiveCategory("cloud-vps"));
+    expect(result.current.activeCategory).toBe("cloud-vps");
+    // 模拟浏览器后退到无筛选状态
+    act(() => {
+      window.history.replaceState(null, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(result.current.activeCategory).toBe("all");
   });
 });
