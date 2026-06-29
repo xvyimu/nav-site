@@ -31,7 +31,7 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 // 恒定时间延迟，防止时序攻击
 const LOGIN_DELAY_MS = 800;
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth } = NextAuth({
   providers: [
     Credentials({
       credentials: { password: { label: "密码", type: "password" } },

@@ -1,4 +1,4 @@
-import type { NavLink, SearchSource } from "@/lib/types";
+import type { NavLink } from "@/lib/types";
 import type Fuse from "fuse.js";
 import type { SearchFilters } from "@/lib/search-experience";
 
@@ -67,20 +67,3 @@ export interface FuseCache {
   links: NavLink[];
   timestamp: number;
 }
-
-/** 主 search() 函数的返回结构 */
-export interface SearchResponse {
-  results: NavLink[];
-  total: number;
-  query: string;
-  mode: "fuse" | "semantic";
-  facets: ReturnType<typeof import("@/lib/search-experience").buildSearchFacets>;
-  suggestions: ReturnType<typeof import("@/lib/search-experience").buildSearchSuggestions>;
-  recommendations: ReturnType<typeof import("@/lib/search-experience").buildZeroResultRecommendations>;
-  expandedTerms: string[];
-  appliedSynonyms: string[];
-  fallbackReason?: "short_query" | "embedding_unavailable" | "semantic_empty" | null;
-}
-
-/** 给 SearchSource 类型补一个混合来源（hybrid）的本地别名，便于 merge.ts 使用 */
-export type MergedSource = SearchSource | "hybrid";

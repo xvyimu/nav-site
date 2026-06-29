@@ -92,7 +92,7 @@ export function relativeTime(dateStr: string | null | undefined): string {
 
 // ── 工具评价 ──
 
-export interface ToolReview {
+interface ToolReview {
   id: string;
   link_id: string;
   ip: string;

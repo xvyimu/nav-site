@@ -17,10 +17,3 @@ export function slugify(title: string): string {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
 }
-
-/**
- * 从 slug 反向匹配标题（模糊匹配）
- */
-export function deslugify(slug: string): string {
-  return slug.replace(/-/g, " ").trim();
-}
