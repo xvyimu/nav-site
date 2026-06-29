@@ -1,10 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { auth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+import { getClientIp } from "@/lib/utils";
 import { linkIdsSchema } from "@/lib/schemas";
+import { checkRateLimit, recordAttempt } from "@/lib/rate-limit";
+import {
+  getUserFavorites,
+  addUserFavorites,
+  removeUserFavorite,
+  clearUserFavorites,
+} from "@/lib/repositories";
 
 export const dynamic = "force-dynamic";
+
+// 速率限制参数：每 IP 每 15 分钟最多 30 次写操作（POST/DELETE）
+const FAVORITES_WINDOW_MS = 15 * 60 * 1000;
+const FAVORITES_MAX_ATTEMPTS = 30;
+
+/**
+ * 收藏写操作（POST/DELETE）的速率限制包装。
+ * GET 不限速（只读），但所有写操作都会先经过 IP 限流再走 repository 层。
+ *
+ * 限流策略：
+ * - fail-open：DB 故障时放行（避免影响正常用户）
+ * - 每条记录都通过 recordAttempt 留痕，便于审计
+ */
+async function enforceFavoritesRateLimit(ip: string): Promise<{ allowed: boolean; count: number }> {
+  return checkRateLimit(
+    "favorites_rate_limits",
+    ip,
+    FAVORITES_WINDOW_MS,
+    FAVORITES_MAX_ATTEMPTS,
+    false // fail-open
+  );
+}
 
 // GET /api/favorites — 获取当前用户的收藏列表
 export async function GET() {
@@ -14,21 +43,8 @@ export async function GET() {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
-    const userId = session.user.id;
-    const supabase = await createClient();
-
-    const { data, error } = await supabase
-      .from("user_favorites")
-      .select("link_id")
-      .eq("user_id", userId);
-
-    if (error) {
-      logger.error("Failed to fetch favorites", { source: "api-favorites", userId }, error);
-      return NextResponse.json({ error: "获取收藏失败" }, { status: 500 });
-    }
-
-    const linkIds = (data ?? []).map((r) => r.link_id);
-    return NextResponse.json({ favorites: linkIds });
+    const favorites = await getUserFavorites(session.user.id);
+    return NextResponse.json({ favorites });
   } catch (e) {
     logger.error("Favorites GET error", { source: "api-favorites" }, e instanceof Error ? e : undefined);
     return NextResponse.json({ error: "服务器错误" }, { status: 500 });
@@ -43,7 +59,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const ip = getClientIp(request);
+
+    // IP 速率限制（防御凭证滥用）
+    const { allowed } = await enforceFavoritesRateLimit(ip);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "操作过于频繁，请 15 分钟后再试" },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { linkIds } = body as { linkIds?: string[] };
 
@@ -52,23 +78,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "linkIds 格式不正确" }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const result = await addUserFavorites(session.user.id, parsed.data);
+    await recordAttempt("favorites_rate_limits", ip, !("error" in result));
 
-    const rows = parsed.data.map((link_id) => ({
-      user_id: userId,
-      link_id,
-    }));
-
-    const { error } = await supabase
-      .from("user_favorites")
-      .upsert(rows, { onConflict: "user_id,link_id", ignoreDuplicates: true });
-
-    if (error) {
-      logger.error("Failed to add favorites", { source: "api-favorites", userId }, error);
-      return NextResponse.json({ error: "添加收藏失败" }, { status: 500 });
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, added: parsed.data.length });
+    return NextResponse.json({ ok: true, added: result.added });
   } catch (e) {
     logger.error("Favorites POST error", { source: "api-favorites" }, e instanceof Error ? e : undefined);
     return NextResponse.json({ error: "服务器错误" }, { status: 500 });
@@ -83,44 +100,36 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const ip = getClientIp(request);
+
+    const { allowed } = await enforceFavoritesRateLimit(ip);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "操作过于频繁，请 15 分钟后再试" },
+        { status: 429 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const linkId = searchParams.get("linkId");
     const all = searchParams.get("all") === "true";
 
-    const supabase = await createClient();
-
+    let result: { ok?: true; cleared?: true; error?: string };
     if (all) {
-      // 清空当前用户的所有收藏
-      const { error } = await supabase
-        .from("user_favorites")
-        .delete()
-        .eq("user_id", userId);
-
-      if (error) {
-        logger.error("Failed to clear favorites", { source: "api-favorites", userId }, error);
-        return NextResponse.json({ error: "清空收藏失败" }, { status: 500 });
-      }
-
-      return NextResponse.json({ ok: true, cleared: true });
-    }
-
-    if (!linkId) {
+      result = await clearUserFavorites(session.user.id);
+    } else if (!linkId) {
       return NextResponse.json({ error: "缺少 linkId 或 all 参数" }, { status: 400 });
+    } else {
+      result = await removeUserFavorite(session.user.id, linkId);
     }
 
-    const { error } = await supabase
-      .from("user_favorites")
-      .delete()
-      .eq("user_id", userId)
-      .eq("link_id", linkId);
+    await recordAttempt("favorites_rate_limits", ip, !("error" in result));
 
-    if (error) {
-      logger.error("Failed to remove favorite", { source: "api-favorites", userId }, error);
-      return NextResponse.json({ error: "删除收藏失败" }, { status: 500 });
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(result.cleared ? { ok: true, cleared: true } : { ok: true });
   } catch (e) {
     logger.error("Favorites DELETE error", { source: "api-favorites" }, e instanceof Error ? e : undefined);
     return NextResponse.json({ error: "服务器错误" }, { status: 500 });
