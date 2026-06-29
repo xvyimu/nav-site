@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { motion } from "motion/react";
 import { PackageOpen, Search, Trophy, Waves } from "lucide-react";
@@ -58,12 +58,16 @@ export function Navigation({
   const [mounted, setMounted] = useState(false);
   const [previewLink, setPreviewLink] = useState<NavLink | null>(null);
 
+  // 稳定的预览回调：避免每次渲染都生成新引用，破坏 LinkCard / ToolQuickView 的 memo
+  const openPreview = useCallback((link: NavLink) => setPreviewLink(link), []);
+  const closePreview = useCallback(() => setPreviewLink(null), []);
+
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [activeCategory]);
+  }, [activeCategory, activeTags, minRatingFilter, popularityFilter]);
 
   const sectionOffset = featured.length + latest.length + popular.length;
   const topHeroTabs = tabTree
@@ -162,7 +166,7 @@ export function Navigation({
                 onFocusChange={setFocusedIndex}
                 onKeyDown={handleResultKeyDown}
                 searchQuery={q}
-                onPreview={setPreviewLink}
+                onPreview={openPreview}
               />
 
               {showLinks && linkSections.map((section) => (
@@ -175,7 +179,7 @@ export function Navigation({
                   onFocusChange={setFocusedIndex}
                   onKeyDown={handleResultKeyDown}
                   searchQuery={q}
-                  onPreview={setPreviewLink}
+                  onPreview={openPreview}
                 />
               ))}
 
@@ -205,7 +209,7 @@ export function Navigation({
                   onFocusChange={() => {}}
                   onKeyDown={() => {}}
                   searchQuery={q}
-                  onPreview={setPreviewLink}
+                  onPreview={openPreview}
                 />
               )}
             </div>
@@ -264,7 +268,7 @@ export function Navigation({
           <div className="h-16 md:hidden" />
         </div>
       </div>
-      <ToolQuickView link={previewLink} onClose={() => setPreviewLink(null)} />
+      <ToolQuickView link={previewLink} onClose={closePreview} />
     </div>
   );
 }
