@@ -758,6 +758,9 @@ describe("withAdminWrite — 写路由包装器（鉴权 + CSRF + Zod 校验）"
       body: JSON.stringify(body),
     });
 
+  // Next.js 16 动态路由要求 handler 第二参数为 { params: Promise<...> }
+  const mockCtx = { params: Promise.resolve({}) };
+
   it("鉴权通过 + 合法输入时执行 handler", async () => {
     vi.doMock("@/lib/auth", () => ({
       auth: vi.fn(() => Promise.resolve({ user: { id: "admin", role: "admin" } })),
@@ -770,7 +773,7 @@ describe("withAdminWrite — 写路由包装器（鉴权 + CSRF + Zod 校验）"
     );
     const wrapped = withAdminWrite(schema, handler);
 
-    const res = await wrapped(sameOriginReq({ name: "test" }));
+    const res = await wrapped(sameOriginReq({ name: "test" }), mockCtx);
     expect(handler).toHaveBeenCalledOnce();
     expect(res.status).toBe(200);
   });
@@ -785,7 +788,7 @@ describe("withAdminWrite — 写路由包装器（鉴权 + CSRF + Zod 校验）"
     const handler = vi.fn();
     const wrapped = withAdminWrite(schema, handler);
 
-    const res = await wrapped(sameOriginReq({ name: "test" }));
+    const res = await wrapped(sameOriginReq({ name: "test" }), mockCtx);
     expect(handler).not.toHaveBeenCalled();
     expect(res.status).toBe(401);
   });
@@ -800,7 +803,7 @@ describe("withAdminWrite — 写路由包装器（鉴权 + CSRF + Zod 校验）"
     const handler = vi.fn();
     const wrapped = withAdminWrite(schema, handler);
 
-    const res = await wrapped(sameOriginReq({ name: "" }));
+    const res = await wrapped(sameOriginReq({ name: "" }), mockCtx);
     expect(handler).not.toHaveBeenCalled();
     expect(res.status).toBe(400);
 
@@ -828,7 +831,7 @@ describe("withAdminWrite — 写路由包装器（鉴权 + CSRF + Zod 校验）"
       },
       body: JSON.stringify({ name: "test" }),
     });
-    const res = await wrapped(req);
+    const res = await wrapped(req, mockCtx);
     expect(handler).not.toHaveBeenCalled();
     expect(res.status).toBe(403);
   });
@@ -845,7 +848,7 @@ describe("withAdminWrite — 写路由包装器（鉴权 + CSRF + Zod 校验）"
     });
     const wrapped = withAdminWrite(schema, handler);
 
-    const res = await wrapped(sameOriginReq({ name: "test" }));
+    const res = await wrapped(sameOriginReq({ name: "test" }), mockCtx);
     expect(res.status).toBe(500);
   });
 });

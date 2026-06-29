@@ -111,8 +111,8 @@ export function withAdminWrite<T extends z.ZodType>(
     params?: Record<string, string>;
     request: Request;
   }) => Promise<NextResponse>,
-): (request: Request, ctx?: { params?: Promise<Record<string, string>> }) => Promise<NextResponse> {
-  return async (request: Request, ctx?: { params?: Promise<Record<string, string>> }) => {
+): (request: Request, ctx: { params: Promise<Record<string, string>> }) => Promise<NextResponse> {
+  return async (request: Request, ctx: { params: Promise<Record<string, string>> }) => {
     const { authorized } = await requireAdmin();
     if (!authorized) return unauthorized();
 
@@ -132,7 +132,7 @@ export function withAdminWrite<T extends z.ZodType>(
       return NextResponse.json({ error: "输入验证失败", details: errors }, { status: 400 });
     }
 
-    const routeParams = ctx?.params ? await ctx.params : undefined;
+    const routeParams = await ctx.params;
 
     try {
       return await handler({ parsed: parsed.data, params: routeParams, request });
@@ -151,15 +151,15 @@ export function withAdminWrite<T extends z.ZodType>(
  */
 export function withAdminDelete(
   handler: (params: { params?: Record<string, string>; request: Request }) => Promise<NextResponse>,
-): (request: Request, ctx?: { params?: Promise<Record<string, string>> }) => Promise<NextResponse> {
-  return async (request: Request, ctx?: { params?: Promise<Record<string, string>> }) => {
+): (request: Request, ctx: { params: Promise<Record<string, string>> }) => Promise<NextResponse> {
+  return async (request: Request, ctx: { params: Promise<Record<string, string>> }) => {
     const { authorized } = await requireAdmin();
     if (!authorized) return unauthorized();
 
     const csrfError = checkOrigin(request);
     if (csrfError) return csrfError;
 
-    const routeParams = ctx?.params ? await ctx.params : undefined;
+    const routeParams = await ctx.params;
 
     try {
       return await handler({ params: routeParams, request });
