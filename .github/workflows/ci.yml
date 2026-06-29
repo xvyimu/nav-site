@@ -79,7 +79,7 @@ jobs:
     name: E2E 测试
     runs-on: ubuntu-latest
     needs: build
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -118,8 +118,8 @@ jobs:
           curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:3264/ || echo "FAILED"
           curl -s http://localhost:3264/ | grep -o '搜索站点\|页面遇到了\|page-goto\|Suspense\|Error' || echo "NO_MARKERS_FOUND"
 
-      - name: 运行 E2E 测试
-        run: pnpm run e2e -- --project=chromium
+      - name: 运行 E2E 测试（chromium + mobile-chrome）
+        run: pnpm run e2e
         env:
           E2E_BASE_URL: http://localhost:3264
 
