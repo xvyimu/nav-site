@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback, useEffect, type KeyboardEvent } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect, type KeyboardEvent, type RefObject } from "react";
 import type { NavLink, Category, Tag, ModelRanking } from "@/lib/types";
 import { SECTION_LABELS } from "@/lib/nav-config";
 import { isSafeUrl } from "@/lib/utils";
@@ -11,6 +11,27 @@ import type {
   SearchSuggestion,
 } from "@/lib/search-experience";
 import { buildSearchFacets, buildSearchSuggestions } from "@/lib/search-experience";
+
+// ════════════════════════════════════════════════════════════
+//  共享类型与工具函数
+// ════════════════════════════════════════════════════════════
+
+/** 侧边栏树节点（含计数和子节点） */
+export interface SidebarTabNode {
+  key: string;
+  label: string;
+  count: number;
+  children: SidebarTabNode[];
+}
+
+type SortMode = "default" | "newest" | "popular";
+
+const EMPTY_SEARCH_FACETS: SearchFacets = {
+  categories: [],
+  tags: [],
+  ratings: [],
+  popularity: [],
+};
 
 /**
  * URL ↔ 筛选状态双向同步
@@ -69,23 +90,6 @@ function readInitialFilters(): ParsedUrlFilters {
   return parseFiltersFromUrl(new URLSearchParams(window.location.search));
 }
 
-/** 侧边栏树节点（含计数和子节点） */
-export interface SidebarTabNode {
-  key: string;
-  label: string;
-  count: number;
-  children: SidebarTabNode[];
-}
-
-type SortMode = "default" | "newest" | "popular";
-
-const EMPTY_SEARCH_FACETS: SearchFacets = {
-  categories: [],
-  tags: [],
-  ratings: [],
-  popularity: [],
-};
-
 /** 简单文本匹配（替代 Fuse.js — 排行榜仅 29 条，精确匹配即可） */
 function matchRankings(rankings: ModelRanking[], q: string) {
   if (!q) return rankings;
@@ -98,22 +102,37 @@ function matchRankings(rankings: ModelRanking[], q: string) {
   );
 }
 
-export function useLinksFilter({
-  categories,
-  links,
-  modelRankings,
-}: {
-  categories: Category[];
-  links: NavLink[];
-  modelRankings: ModelRanking[];
-}) {
+// ════════════════════════════════════════════════════════════
+//  Hook 1: useFilterState — 筛选状态 + URL 双向同步
+// ════════════════════════════════════════════════════════════
+
+interface FilterState {
+  activeCategory: string;
+  rawSearch: string;
+  search: string;
+  semanticSearch: boolean;
+  activeTags: string[];
+  sortMode: SortMode;
+  minRatingFilter: number | null;
+  popularityFilter: PopularityFilter | null;
+  setActiveCategory: (v: string) => void;
+  setRawSearch: (v: string) => void;
+  setSearch: (v: string) => void;
+  setSemanticSearch: (v: boolean) => void;
+  setSortMode: (v: SortMode) => void;
+  setMinRatingFilter: (v: number | null) => void;
+  setPopularityFilter: (v: PopularityFilter | null) => void;
+  toggleTag: (slug: string) => void;
+  clearTags: () => void;
+  clearSearchExperienceFilters: () => void;
+}
+
+function useFilterState(): FilterState {
   const [initial] = useState(readInitialFilters);
   const [activeCategory, setActiveCategory] = useState(initial.cat);
   const [rawSearch, setRawSearch] = useState(initial.q);
   const [search, setSearch] = useState(initial.q);
   const [semanticSearch, setSemanticSearch] = useState(initial.semantic);
-  const [focusedIndex, setFocusedIndex] = useState(-1);
-  // 多标签筛选（AND 语义：必须同时拥有所有选中的标签 slug）
   const [activeTags, setActiveTags] = useState<string[]>(initial.tags);
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     if (typeof window !== "undefined") {
@@ -122,82 +141,13 @@ export function useLinksFilter({
     }
     return "default";
   });
-  const inputRef = useRef<HTMLInputElement>(null);
-  const resultsRef = useRef<HTMLDivElement>(null);
-  const announceRef = useRef<HTMLDivElement>(null);
-
-  // ── Server search results ──
-  const [serverResults, setServerResults] = useState<NavLink[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchFacets, setSearchFacets] = useState<SearchFacets>(EMPTY_SEARCH_FACETS);
-  const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
-  const [zeroResultRecommendations, setZeroResultRecommendations] = useState<NavLink[]>([]);
   const [minRatingFilter, setMinRatingFilter] = useState<number | null>(initial.minRating);
   const [popularityFilter, setPopularityFilter] = useState<PopularityFilter | null>(initial.popularity);
 
-  // ── 后代 slug 映射（slug → 包含自身及所有后代的 slug 集合）──
-  // 用于选中父分类时聚合显示子分类的链接
-  const descendantSlugsMap = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const cat of categories) {
-      map.set(cat.slug, new Set(getDescendantSlugs(categories, cat.slug)));
-    }
-    return map;
-  }, [categories]);
-
-  // ── Tab keys（仅顶级分类）──
-  const tabKeys = useMemo(
-    () => [
-      { key: "all", label: "全部" },
-      ...categories
-        .filter((c) => !c.parent_id)
-        .map((c) => ({ key: c.slug, label: SECTION_LABELS[c.slug] || c.name })),
-    ],
-    [categories],
-  );
-
-  // ── 计算某分类的链接数（含子分类）──
-  const countLinksForSlug = useCallback(
-    (slug: string): number => {
-      const slugs = descendantSlugsMap.get(slug);
-      if (!slugs) return 0;
-      return links.filter((l) => slugs.has(l.category_slug ?? "")).length;
-    },
-    [links, descendantSlugsMap]
-  );
-
-  const tabCounts = useMemo(
-    () => tabKeys.map((tab) => ({
-      ...tab,
-      count: tab.key === "all" ? links.length : countLinksForSlug(tab.key),
-    })),
-    [tabKeys, links, countLinksForSlug]
-  );
-
-  // ── 侧边栏树形结构（"全部" + 顶级分类 + 子分类，含计数）──
-  const tabTree = useMemo<SidebarTabNode[]>(() => {
-    const buildNode = (cat: Category): SidebarTabNode => {
-      const children = categories.filter((c) => c.parent_id === cat.id);
-      return {
-        key: cat.slug,
-        label: SECTION_LABELS[cat.slug] || cat.name,
-        count: countLinksForSlug(cat.slug),
-        children: children.map(buildNode),
-      };
-    };
-    return [
-      { key: "all", label: "全部", count: links.length, children: [] },
-      ...categories
-        .filter((c) => !c.parent_id)
-        .map(buildNode),
-    ];
-  }, [categories, countLinksForSlug, links.length]);
-
-  // ── Persist sort ──
+  // 持久化排序模式
   useEffect(() => { localStorage.setItem("nav-sort-mode", sortMode); }, [sortMode]);
 
-  // ── State → URL 同步（debounce 后的 search + 其他筛选）──
-  // 用 replaceState 而非 router.replace，避免触发服务端重渲染
+  // State → URL 同步（debounce 后的 search + 其他筛选）
   useEffect(() => {
     if (typeof window === "undefined") return;
     const sp = new URLSearchParams();
@@ -216,7 +166,7 @@ export function useLinksFilter({
     }
   }, [search, activeCategory, activeTags, minRatingFilter, popularityFilter, semanticSearch]);
 
-  // ── 浏览器前进/后退 → State 同步 ──
+  // 浏览器前进/后退 → State 同步
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handlePopState = () => {
@@ -233,7 +183,66 @@ export function useLinksFilter({
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // ── Debounce: 200ms → server search ──
+  const toggleTag = useCallback((slug: string) => {
+    setActiveTags((prev) =>
+      prev.includes(slug)
+        ? prev.filter((s) => s !== slug)
+        : [...prev, slug]
+    );
+  }, []);
+  const clearTags = useCallback(() => setActiveTags([]), []);
+  const clearSearchExperienceFilters = useCallback(() => {
+    setActiveTags([]);
+    setMinRatingFilter(null);
+    setPopularityFilter(null);
+  }, []);
+
+  return {
+    activeCategory, rawSearch, search, semanticSearch, activeTags, sortMode,
+    minRatingFilter, popularityFilter,
+    setActiveCategory, setRawSearch, setSearch, setSemanticSearch, setSortMode,
+    setMinRatingFilter, setPopularityFilter,
+    toggleTag, clearTags, clearSearchExperienceFilters,
+  };
+}
+
+// ════════════════════════════════════════════════════════════
+//  Hook 2: useServerSearch — debounce + 服务端搜索结果
+// ════════════════════════════════════════════════════════════
+
+interface ServerSearchParams {
+  rawSearch: string;
+  semanticSearch: boolean;
+  activeCategory: string;
+  activeTags: string[];
+  minRatingFilter: number | null;
+  popularityFilter: PopularityFilter | null;
+  links: NavLink[];
+  setSearch: (v: string) => void;
+}
+
+interface ServerSearchState {
+  serverResults: NavLink[];
+  searchLoading: boolean;
+  searchFacets: SearchFacets;
+  searchSuggestions: SearchSuggestion[];
+  zeroResultRecommendations: NavLink[];
+  setServerResults: (v: NavLink[]) => void;
+}
+
+function useServerSearch(params: ServerSearchParams): ServerSearchState {
+  const {
+    rawSearch, semanticSearch, activeCategory, activeTags,
+    minRatingFilter, popularityFilter, links, setSearch,
+  } = params;
+
+  const [serverResults, setServerResults] = useState<NavLink[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchFacets, setSearchFacets] = useState<SearchFacets>(EMPTY_SEARCH_FACETS);
+  const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
+  const [zeroResultRecommendations, setZeroResultRecommendations] = useState<NavLink[]>([]);
+
+  // Debounce: 200ms → server search
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const q = rawSearch.trim();
@@ -259,13 +268,13 @@ export function useLinksFilter({
     const timer = setTimeout(async () => {
       setSearch(q);
       try {
-        const params = new URLSearchParams({ q });
-        if (semanticSearch) params.set("semantic", "true");
-        if (activeCategory !== "all") params.set("category", activeCategory);
-        if (activeTags.length > 0) params.set("tag", activeTags.join(","));
-        if (minRatingFilter !== null) params.set("minRating", String(minRatingFilter));
-        if (popularityFilter) params.set("popularity", popularityFilter);
-        const res = await fetch(`/api/search?${params}`, { signal: controller.signal });
+        const sp = new URLSearchParams({ q });
+        if (semanticSearch) sp.set("semantic", "true");
+        if (activeCategory !== "all") sp.set("category", activeCategory);
+        if (activeTags.length > 0) sp.set("tag", activeTags.join(","));
+        if (minRatingFilter !== null) sp.set("minRating", String(minRatingFilter));
+        if (popularityFilter) sp.set("popularity", popularityFilter);
+        const res = await fetch(`/api/search?${sp}`, { signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           // Map server results back to NavLink format
@@ -311,42 +320,116 @@ export function useLinksFilter({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [rawSearch, activeCategory, semanticSearch, activeTags, minRatingFilter, popularityFilter, links]);
+  }, [rawSearch, activeCategory, semanticSearch, activeTags, minRatingFilter, popularityFilter, links, setSearch]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // ── ⌘1-4: switch categories ──
-  useEffect(() => {
-    const handle = (e: globalThis.KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
-      const digit = parseInt(e.key);
-      if (digit >= 1 && digit <= 9 && digit <= tabKeys.length) {
-        e.preventDefault();
-        setActiveCategory(tabKeys[digit - 1].key);
-        inputRef.current?.focus();
-      }
-    };
-    document.addEventListener("keydown", handle);
-    return () => document.removeEventListener("keydown", handle);
-  }, [tabKeys]);
+  return {
+    serverResults, searchLoading, searchFacets, searchSuggestions,
+    zeroResultRecommendations, setServerResults,
+  };
+}
+
+// ════════════════════════════════════════════════════════════
+//  Hook 3: useDerivedLinks — 纯派生数据（无副作用）
+// ════════════════════════════════════════════════════════════
+
+interface DerivedLinksParams {
+  categories: Category[];
+  links: NavLink[];
+  modelRankings: ModelRanking[];
+  activeCategory: string;
+  activeTags: string[];
+  sortMode: SortMode;
+  search: string;
+  serverResults: NavLink[];
+}
+
+interface DerivedLinksState {
+  q: string;
+  filtered: NavLink[];
+  featured: NavLink[];
+  latest: NavLink[];
+  popular: NavLink[];
+  linkSections: { key: string; links: NavLink[]; label: string; accent: string }[];
+  filteredRankings: ModelRanking[];
+  showRankings: boolean;
+  showLinks: boolean;
+  flatResults: { type: "link"; link: NavLink }[];
+  totalResults: number;
+  hasResults: boolean;
+  tabKeys: { key: string; label: string }[];
+  tabCounts: { key: string; label: string; count: number }[];
+  tabTree: SidebarTabNode[];
+  currentLabel: string;
+  availableTags: Tag[];
+  descendantSlugsMap: Map<string, Set<string>>;
+}
+
+function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
+  const {
+    categories, links, modelRankings, activeCategory, activeTags,
+    sortMode, search, serverResults,
+  } = params;
 
   const q = search.trim().toLowerCase();
 
-  // ── Tag filter handlers ──
-  const toggleTag = useCallback((slug: string) => {
-    setActiveTags((prev) =>
-      prev.includes(slug)
-        ? prev.filter((s) => s !== slug)
-        : [...prev, slug]
-    );
-  }, []);
-  const clearTags = useCallback(() => setActiveTags([]), []);
-  const clearSearchExperienceFilters = useCallback(() => {
-    setActiveTags([]);
-    setMinRatingFilter(null);
-    setPopularityFilter(null);
-  }, []);
+  // 后代 slug 映射（slug → 包含自身及所有后代的 slug 集合）
+  const descendantSlugsMap = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const cat of categories) {
+      map.set(cat.slug, new Set(getDescendantSlugs(categories, cat.slug)));
+    }
+    return map;
+  }, [categories]);
 
-  // 从 links 中提取去重后的标签列表（按名称排序）
+  // Tab keys（仅顶级分类）
+  const tabKeys = useMemo(
+    () => [
+      { key: "all", label: "全部" },
+      ...categories
+        .filter((c) => !c.parent_id)
+        .map((c) => ({ key: c.slug, label: SECTION_LABELS[c.slug] || c.name })),
+    ],
+    [categories],
+  );
+
+  const countLinksForSlug = useCallback(
+    (slug: string): number => {
+      const slugs = descendantSlugsMap.get(slug);
+      if (!slugs) return 0;
+      return links.filter((l) => slugs.has(l.category_slug ?? "")).length;
+    },
+    [links, descendantSlugsMap]
+  );
+
+  const tabCounts = useMemo(
+    () => tabKeys.map((tab) => ({
+      ...tab,
+      count: tab.key === "all" ? links.length : countLinksForSlug(tab.key),
+    })),
+    [tabKeys, links, countLinksForSlug]
+  );
+
+  // 侧边栏树形结构
+  const tabTree = useMemo<SidebarTabNode[]>(() => {
+    const buildNode = (cat: Category): SidebarTabNode => {
+      const children = categories.filter((c) => c.parent_id === cat.id);
+      return {
+        key: cat.slug,
+        label: SECTION_LABELS[cat.slug] || cat.name,
+        count: countLinksForSlug(cat.slug),
+        children: children.map(buildNode),
+      };
+    };
+    return [
+      { key: "all", label: "全部", count: links.length, children: [] },
+      ...categories
+        .filter((c) => !c.parent_id)
+        .map(buildNode),
+    ];
+  }, [categories, countLinksForSlug, links.length]);
+
+  // 从 links 中提取去重后的标签列表
   const availableTags = useMemo(() => {
     const tagMap = new Map<string, Tag>();
     for (const link of links) {
@@ -357,13 +440,10 @@ export function useLinksFilter({
     return Array.from(tagMap.values()).sort((a, b) => a.name.localeCompare(b.name, "zh-Hans"));
   }, [links]);
 
-  // ── Filtered + sorted ──
-  // When searching: use server results. Otherwise: use local data.
-  // 标签筛选（AND 语义）会同时作用于搜索结果和分类结果
+  // Filtered + sorted
   const filtered = useMemo(() => {
     let pool: NavLink[];
     if (q) {
-      // Use server search results
       pool = serverResults;
       if (sortMode === "newest") {
         // Server results don't have created_at, fall back to score order
@@ -371,8 +451,6 @@ export function useLinksFilter({
         pool = [...pool].sort((a, b) => b.click_count - a.click_count);
       }
     } else {
-      // No search: filter locally
-      // 分类层级：选中父分类时聚合显示所有子分类的链接
       if (activeCategory === "all") {
         pool = links;
       } else {
@@ -389,7 +467,7 @@ export function useLinksFilter({
       }
     }
 
-    // 多标签筛选（AND 语义：必须同时拥有所有选中标签）
+    // 多标签筛选（AND 语义）
     if (activeTags.length > 0) {
       pool = pool.filter((link) => {
         const linkTagSlugs = (link.tags ?? []).map((t) => t.slug);
@@ -400,7 +478,6 @@ export function useLinksFilter({
     return pool;
   }, [links, serverResults, activeCategory, q, sortMode, activeTags, descendantSlugsMap]);
 
-  // ── Featured (fixed sort comparator) ──
   const featured = useMemo(
     () =>
       activeCategory === "all" && !q
@@ -409,7 +486,6 @@ export function useLinksFilter({
     [filtered, activeCategory, q],
   );
 
-  // ── Latest / popular ──
   const latest = useMemo(() => {
     if (activeCategory !== "all" || q) return [];
     if (sortMode === "newest") return [];
@@ -424,7 +500,6 @@ export function useLinksFilter({
       .slice(0, 6);
   }, [links, activeCategory, q, sortMode]);
 
-  // ── Popular (hot rankings by click_count) ──
   const popular = useMemo(() => {
     if (activeCategory !== "all" || q) return [];
     if (sortMode === "popular") return [];
@@ -434,9 +509,7 @@ export function useLinksFilter({
       .slice(0, 6);
   }, [links, activeCategory, q, sortMode]);
 
-  // ── Dynamic link sections ──
   const linkSections = useMemo(() => {
-    // Searching: show all results in a single section
     if (q) {
       return [{
         key: "search-results",
@@ -446,7 +519,6 @@ export function useLinksFilter({
       }];
     }
 
-    // Specific category selected: show all links for that category
     if (activeCategory !== "all" && activeCategory !== "model-ranking") {
       const cat = categories.find((c) => c.slug === activeCategory);
       if (!cat) return [];
@@ -459,8 +531,6 @@ export function useLinksFilter({
         },
       ];
     }
-    // "all" tab: show sections per top-level category (excluding model-ranking)
-    // 分类层级：仅展示顶级分类，子分类的链接聚合到父分类 section 中
     if (activeCategory !== "all") return [];
     const filterNonFeatured = (items: NavLink[]) =>
       q ? items : items.filter((l) => !l.featured && !l.paid);
@@ -481,13 +551,11 @@ export function useLinksFilter({
       .filter((s) => s.links.length > 0);
   }, [categories, filtered, activeCategory, q, descendantSlugsMap]);
 
-  // ── Current label ──
   const currentLabel = useMemo(
     () => tabKeys.find((t) => t.key === activeCategory)?.label ?? "全部",
     [tabKeys, activeCategory],
   );
 
-  // ── Filtered rankings (client-side simple text match — small dataset) ──
   const filteredRankings = useMemo(
     () => matchRankings(modelRankings, q),
     [modelRankings, q],
@@ -497,7 +565,6 @@ export function useLinksFilter({
     (activeCategory === "all" || activeCategory === "model-ranking") && filteredRankings.length > 0;
   const showLinks = activeCategory !== "model-ranking";
 
-  // ── Flat results for keyboard nav ──
   const flatResults = useMemo(() => {
     const items: { type: "link"; link: NavLink }[] = [];
     if (showLinks) {
@@ -516,8 +583,81 @@ export function useLinksFilter({
   const totalResults = flatResults.length + (showRankings ? filteredRankings.length : 0);
   const hasResults = totalResults > 0;
 
-  // ── Keyboard navigation ──
+  return {
+    q, filtered, featured, latest, popular, linkSections,
+    filteredRankings, showRankings, showLinks, flatResults,
+    totalResults, hasResults,
+    tabKeys, tabCounts, tabTree, currentLabel, availableTags, descendantSlugsMap,
+  };
+}
+
+// ════════════════════════════════════════════════════════════
+//  Hook 4: useKeyboardNav — 键盘导航 + 快捷键
+// ════════════════════════════════════════════════════════════
+
+interface KeyboardNavParams {
+  flatResults: { type: "link"; link: NavLink }[];
+  rawSearch: string;
+  search: string;
+  activeCategory: string;
+  activeTags: string[];
+  totalResults: number;
+  q: string;
+  tabKeys: { key: string; label: string }[];
+  inputRef: RefObject<HTMLInputElement | null>;
+  resultsRef: RefObject<HTMLDivElement | null>;
+  announceRef: RefObject<HTMLDivElement | null>;
+  setRawSearch: (v: string) => void;
+  setSearch: (v: string) => void;
+  setServerResults: (v: NavLink[]) => void;
+  setActiveCategory: (v: string) => void;
+}
+
+interface KeyboardNavState {
+  focusedIndex: number;
+  setFocusedIndex: (v: number) => void;
+  handleSearchKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
+  handleResultKeyDown: (e: KeyboardEvent<HTMLElement>, index: number) => void;
+  resetFocus: () => void;
+}
+
+function useKeyboardNav(params: KeyboardNavParams): KeyboardNavState {
+  const {
+    flatResults, rawSearch, search, activeCategory, activeTags,
+    totalResults, q, tabKeys,
+    inputRef, resultsRef, announceRef,
+    setRawSearch, setSearch, setServerResults, setActiveCategory,
+  } = params;
+
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+
   const resetFocus = useCallback(() => setFocusedIndex(-1), []);
+
+  // ⌘1-9: switch categories
+  useEffect(() => {
+    const handle = (e: globalThis.KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const digit = parseInt(e.key);
+      if (digit >= 1 && digit <= 9 && digit <= tabKeys.length) {
+        e.preventDefault();
+        setActiveCategory(tabKeys[digit - 1].key);
+        inputRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handle);
+    return () => document.removeEventListener("keydown", handle);
+  }, [tabKeys, setActiveCategory, inputRef]);
+
+  // Reset focus when search or category changes
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    resetFocus();
+  }, [search, activeCategory, activeTags, resetFocus]);
+
+  // Announce results count for screen readers
+  useEffect(() => {
+    if (announceRef.current && q) announceRef.current.textContent = `找到 ${totalResults} 个结果`;
+  }, [totalResults, q, announceRef]);
 
   const handleSearchKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -536,7 +676,7 @@ export function useLinksFilter({
           break;
       }
     },
-    [flatResults.length, rawSearch, resetFocus],
+    [flatResults.length, rawSearch, resetFocus, setRawSearch, setSearch, setServerResults, inputRef, resultsRef],
   );
 
   const handleResultKeyDown = useCallback(
@@ -573,43 +713,97 @@ export function useLinksFilter({
           break;
       }
     },
-    [flatResults],
+    [flatResults, inputRef, resultsRef],
   );
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    resetFocus();
-  }, [search, activeCategory, activeTags, resetFocus]);
+  return {
+    focusedIndex, setFocusedIndex,
+    handleSearchKeyDown, handleResultKeyDown, resetFocus,
+  };
+}
 
-  useEffect(() => {
-    if (announceRef.current && q) announceRef.current.textContent = `找到 ${totalResults} 个结果`;
-  }, [totalResults, q]);
+// ════════════════════════════════════════════════════════════
+//  组合层: useLinksFilter — 公开 API（与重构前完全一致）
+// ════════════════════════════════════════════════════════════
+
+export function useLinksFilter({
+  categories,
+  links,
+  modelRankings,
+}: {
+  categories: Category[];
+  links: NavLink[];
+  modelRankings: ModelRanking[];
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const announceRef = useRef<HTMLDivElement>(null);
+
+  const filters = useFilterState();
+  const serverSearch = useServerSearch({
+    rawSearch: filters.rawSearch,
+    semanticSearch: filters.semanticSearch,
+    activeCategory: filters.activeCategory,
+    activeTags: filters.activeTags,
+    minRatingFilter: filters.minRatingFilter,
+    popularityFilter: filters.popularityFilter,
+    links,
+    setSearch: filters.setSearch,
+  });
+  const derived = useDerivedLinks({
+    categories, links, modelRankings,
+    activeCategory: filters.activeCategory,
+    activeTags: filters.activeTags,
+    sortMode: filters.sortMode,
+    search: filters.search,
+    serverResults: serverSearch.serverResults,
+  });
+  const keyboard = useKeyboardNav({
+    flatResults: derived.flatResults,
+    rawSearch: filters.rawSearch,
+    search: filters.search,
+    activeCategory: filters.activeCategory,
+    activeTags: filters.activeTags,
+    totalResults: derived.totalResults,
+    q: derived.q,
+    tabKeys: derived.tabKeys,
+    inputRef, resultsRef, announceRef,
+    setRawSearch: filters.setRawSearch,
+    setSearch: filters.setSearch,
+    setServerResults: serverSearch.setServerResults,
+    setActiveCategory: filters.setActiveCategory,
+  });
 
   return {
     // State
-    activeCategory, setActiveCategory,
-    rawSearch, setRawSearch,
-    search, setSearch,
-    focusedIndex, setFocusedIndex,
-    sortMode, setSortMode,
-    q,
-    searchLoading,
-    semanticSearch,
-    setSemanticSearch,
+    activeCategory: filters.activeCategory,
+    setActiveCategory: filters.setActiveCategory,
+    rawSearch: filters.rawSearch,
+    setRawSearch: filters.setRawSearch,
+    search: filters.search,
+    setSearch: filters.setSearch,
+    focusedIndex: keyboard.focusedIndex,
+    setFocusedIndex: keyboard.setFocusedIndex,
+    sortMode: filters.sortMode,
+    setSortMode: filters.setSortMode,
+    q: derived.q,
+    searchLoading: serverSearch.searchLoading,
+    semanticSearch: filters.semanticSearch,
+    setSemanticSearch: filters.setSemanticSearch,
 
     // Tag filter
-    activeTags,
-    toggleTag,
-    clearTags,
-    clearSearchExperienceFilters,
-    availableTags,
-    minRatingFilter,
-    setMinRatingFilter,
-    popularityFilter,
-    setPopularityFilter,
-    searchFacets,
-    searchSuggestions,
-    zeroResultRecommendations,
+    activeTags: filters.activeTags,
+    toggleTag: filters.toggleTag,
+    clearTags: filters.clearTags,
+    clearSearchExperienceFilters: filters.clearSearchExperienceFilters,
+    availableTags: derived.availableTags,
+    minRatingFilter: filters.minRatingFilter,
+    setMinRatingFilter: filters.setMinRatingFilter,
+    popularityFilter: filters.popularityFilter,
+    setPopularityFilter: filters.setPopularityFilter,
+    searchFacets: serverSearch.searchFacets,
+    searchSuggestions: serverSearch.searchSuggestions,
+    zeroResultRecommendations: serverSearch.zeroResultRecommendations,
 
     // Refs
     inputRef,
@@ -617,27 +811,27 @@ export function useLinksFilter({
     announceRef,
 
     // Tab data
-    tabKeys,
-    tabCounts,
-    tabTree,
-    currentLabel,
+    tabKeys: derived.tabKeys,
+    tabCounts: derived.tabCounts,
+    tabTree: derived.tabTree,
+    currentLabel: derived.currentLabel,
 
     // Derived data
-    filtered,
-    featured,
-    latest,
-    popular,
-    linkSections,
-    showRankings,
-    showLinks,
-    filteredRankings,
-    flatResults,
-    totalResults,
-    hasResults,
+    filtered: derived.filtered,
+    featured: derived.featured,
+    latest: derived.latest,
+    popular: derived.popular,
+    linkSections: derived.linkSections,
+    showRankings: derived.showRankings,
+    showLinks: derived.showLinks,
+    filteredRankings: derived.filteredRankings,
+    flatResults: derived.flatResults,
+    totalResults: derived.totalResults,
+    hasResults: derived.hasResults,
 
     // Handlers
-    handleSearchKeyDown,
-    handleResultKeyDown,
-    resetFocus,
+    handleSearchKeyDown: keyboard.handleSearchKeyDown,
+    handleResultKeyDown: keyboard.handleResultKeyDown,
+    resetFocus: keyboard.resetFocus,
   };
 }
