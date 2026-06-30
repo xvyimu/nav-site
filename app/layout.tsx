@@ -11,6 +11,7 @@ import { Shell } from "@/components/Shell";
 import { FavoritesProvider } from "@/components/FavoritesProvider";
 import { Providers } from "@/components/Providers";
 import { escapeJsonForHtml } from "@/lib/utils";
+import { WebVitals } from "./_components/web-vitals";
 
 const ShortcutPanel = dynamic(() => import("@/components/ShortcutPanel").then((m) => m.ShortcutPanel));
 const Toaster = dynamic(() => import("@/components/ui/sonner").then((m) => m.Toaster));
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider>
+          <WebVitals />
           <PanguSpacing />
           <Providers>
             <FavoritesProvider>
