@@ -17,7 +17,7 @@
 | H4 | Favicon 同步 `new Image()` 加载阻塞 CLS | P1 | ❌ 已排除（CLS=0 实测） | — |
 | H5 | Motion 动画在低端设备触发 layout thrashing | P2 | ✅ 已修复（同 H2，layout prop） | layout prop |
 | H6 | 首屏 JS chunk 中存在可拆分的 sync import | P2 | ✅ 已修复（RSC 边界收缩准备，bundle +0.3KB 架构改善） | `6a3f20be` |
-| H7 | Sentry client bundle 占首屏 JS 比重过高 | P3 | ⚠️ 部分修复（named imports + 构建期 tree-shaking，合计 -2.9KB，核心仍在） | 待提交 |
+| H7 | Sentry client bundle 占首屏 JS 比重过高 | P3 | ⚠️ 部分修复（named imports + 构建期 tree-shaking，合计 -2.9KB，核心仍在） | `79f47095` |
 | H8 | 路由切换无 prefetch 导致 TTFB 偏高 | P3 | ❌ 已排除（静态审查） | — |
 
 **状态图例**：🔄 待验证 / 🔍 验证中 / ❌ 已排除 / ✅ 已修复 / ⚠️ 部分修复
@@ -572,7 +572,7 @@ Replay 核心 + rrweb 主体（~15-18KB）**仍在 bundle 中**——因为 SDK 
 
 ### commit
 
-待提交：5 文件 named import 替换 + findings.md 更新。
+`79f47095` — 5 文件 named import 替换 + findings.md H7 更新。已推送。
 
 ### commit
 
