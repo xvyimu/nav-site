@@ -406,3 +406,28 @@ html {
     @apply flex-row items-center gap-2;
   }
 }
+
+/* ===== Section 入场动画（替代 motion fadeInUp，减少客户端 JS 依赖） ===== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 减少动作时直接跳到终态，不让 fill-mode:both 把元素卡在 opacity:0 */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

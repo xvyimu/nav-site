@@ -1,9 +1,5 @@
-"use client";
-
 import { type KeyboardEvent } from "react";
 import { type NavLink } from "@/lib/types";
-import { motion } from "motion/react";
-import { fadeInUp } from "@/lib/animations";
 import { ResultGrid } from "./ResultGrid";
 
 interface CategorySectionConfig {
@@ -39,7 +35,7 @@ export function CategorySection({
   if (!isSearchSection && activeCategory !== "all" && activeCategory !== section.key) return null;
 
   return (
-    <motion.section variants={fadeInUp}>
+    <section className="animate-fade-in-up">
       {(activeCategory === "all" || isSearchSection) && (
         <h2 className={`atlas-section-label ${section.accent || "text-white/78"}`}>
           {section.label}
@@ -55,6 +51,6 @@ export function CategorySection({
         searchQuery={searchQuery}
         onPreview={onPreview}
       />
-    </motion.section>
+    </section>
   );
 }

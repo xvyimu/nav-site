@@ -59,8 +59,9 @@ test.describe("首页", () => {
   test("分类导航存在并可切换", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
-    const nav = page.locator("nav, aside, [role='navigation']");
-    await expect(nav.first()).toBeVisible({ timeout: 15000 });
+    // 精确定位分类侧边栏导航（<nav aria-label="导航分类">），避免 .first() 误中 header 的空 <nav>
+    const categoryNav = page.locator('nav[aria-label="导航分类"]');
+    await expect(categoryNav).toBeVisible({ timeout: 15000 });
 
     // 尝试点击一个分类标签
     const categoryTab = page.locator('[role="tab"]:has-text("AI")').first();

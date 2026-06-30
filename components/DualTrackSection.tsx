@@ -1,9 +1,5 @@
-"use client";
-
 import { type KeyboardEvent } from "react";
-import { motion } from "motion/react";
 import { Flame } from "lucide-react";
-import { fadeInUp } from "@/lib/animations";
 import { type NavLink } from "@/lib/types";
 import { ResultGrid } from "./ResultGrid";
 
@@ -33,7 +29,7 @@ export function DualTrackSection({
   return (
     <>
       {featured.length > 0 && (
-        <motion.section variants={fadeInUp}>
+        <section className="animate-fade-in-up">
           <h2 className="atlas-section-label text-emerald-100">推荐</h2>
           <ResultGrid
             links={featured}
@@ -44,11 +40,11 @@ export function DualTrackSection({
             searchQuery={searchQuery}
             onPreview={onPreview}
           />
-        </motion.section>
+        </section>
       )}
 
       {latest.length > 0 && (
-        <motion.section variants={fadeInUp}>
+        <section className="animate-fade-in-up">
           <h2 className="atlas-section-label text-white/68">最新添加</h2>
           <ResultGrid
             links={latest}
@@ -59,11 +55,11 @@ export function DualTrackSection({
             searchQuery={searchQuery}
             onPreview={onPreview}
           />
-        </motion.section>
+        </section>
       )}
 
       {popular.length > 0 && (
-        <motion.section variants={fadeInUp}>
+        <section className="animate-fade-in-up">
           <h2 className="atlas-section-label text-white/68">
             <Flame className="h-3.5 w-3.5 text-amber-200/80" />
             热门访问
@@ -77,7 +73,7 @@ export function DualTrackSection({
             searchQuery={searchQuery}
             onPreview={onPreview}
           />
-        </motion.section>
+        </section>
       )}
     </>
   );
