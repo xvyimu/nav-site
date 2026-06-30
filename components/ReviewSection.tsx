@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { relativeTime, type ReviewStats } from "@/lib/types";
-import { toast } from "sonner";
 
 interface Review {
   id: string;
@@ -110,6 +109,7 @@ export function ReviewSection({ linkId }: ReviewSectionProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const { toast } = await import("sonner");
     if (userRating === 0) {
       toast.error("请选择评分");
       return;

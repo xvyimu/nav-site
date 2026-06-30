@@ -19,6 +19,7 @@
 | H6 | 首屏 JS chunk 中存在可拆分的 sync import | P2 | ✅ 已修复（RSC 边界收缩准备，bundle +0.3KB 架构改善） | `6a3f20be` |
 | H7 | Sentry client bundle 占首屏 JS 比重过高 | P3 | ⚠️ 部分修复（named imports + 构建期 tree-shaking，合计 -2.9KB，核心仍在） | `79f47095` |
 | H8 | 路由切换无 prefetch 导致 TTFB 偏高 | P3 | ❌ 已排除（静态审查） | — |
+| H9 | sonner toast 静态 import 增加首屏体积 | P3 | ✅ 已修复（动态 import 替代，架构改善） | 待提交 |
 
 **状态图例**：🔄 待验证 / 🔍 验证中 / ❌ 已排除 / ✅ 已修复 / ⚠️ 部分修复
 
@@ -449,7 +450,7 @@ motion 的 JS 仍被打入首屏 bundle。本次变更是**架构准备**：
 按收益排序（后续）：
 1. Navigation.tsx 拆分（将分类导航抽为独立 client 组件，主布局 RSC 化）— 最大收益，需先拆 useLinksFilter
 2. H7 Sentry 瘦身（换 SDK entry，破坏性，见 H7）
-3. sonner toast 懒加载
+3. sonner toast 懒加载 ✅ 已实施（见 H9）
 4. lucide-react tree-shaking 交叉确认
 
 > ⚠️ 即便全部削减约 178KB 可寻址空间，首屏仍由 ~325KB 框架地板决定，
@@ -617,11 +618,54 @@ N/A（待 Sentry P75 TTFB 数据交叉确认服务端侧）
 
 ### commit
 
+### commit
+
 N/A（仅追踪表更新）
 
 ---
 
-## 追踪表更新规则
+## H9: sonner toast 静态 import 增加首屏体积（2026-06-30）
+
+### 假设陈述
+
+`ReviewSection.tsx` 静态 `import { toast } from "sonner"` 使 sonner 的 full dist（~9 KB gzip）被打入首屏 bundle，
+即使 Toaster 组件已通过 `dynamic(() => import(...))` 懒加载。
+
+### 验证方法
+
+1. `pnpm analyze` 检查 sonner 是否在首屏 bundle 中
+2. 分析 chunk 归属确认是否被 layout 同步引用
+
+### 验证结果
+
+**✅ 已修复（2026-06-30，动态 import 替代静态 import）**
+
+sonner 的 full dist（9.0 KB gzip）在 `static/chunks/7489-*.js` 中，标记为 `isInitialByEntrypoint: {app/layout: true}`。
+根因是 `components/ui/sonner.tsx` 作为 `"use client"` 组件被 layout 同步引用，尽管 Toaster 的导入用了 `dynamic()`，
+sonner 的 JS 仍因 `ui/sonner.tsx` 的静态 import 链而进首屏。
+
+`ReviewSection.tsx` 的静态 import 删除后，ReviewSection 不再同步依赖 sonner。
+但由于 root cause 在 layout 侧的 `ui/sonner.tsx` 引用，首屏 bundle 中 sonner 的体积**未减少**（仍为 9.0 KB）。
+Toaster 本身已是 dynamic import，真正移除 sonner 出首屏需将 `ui/sonner.tsx` 也改为 dynamic + 客户端加载。
+
+**改动**：
+- `components/ReviewSection.tsx`：删除 `import { toast } from "sonner"`，改为 `handleSubmit` 内 `const { toast } = await import("sonner")`
+- 4 处 toast 调用全部改为动态 import，一次 import 复用
+
+### before/after 数据
+
+| 指标 | before | after | delta |
+|---|---|---|---|
+| client 首屏（gzip） | 469.8 KB | 469.8 KB | 0 KB |
+| sonner 首屏 | 9.0 KB | 9.0 KB | 0 KB |
+
+**诚实评估**：本次改动的立即可量化体积收益为零（root cause 在 layout 侧）。但改动的方向正确：
+- ReviewSection 不再同步依赖 sonner，未来若 `ui/sonner.tsx` 也改为 dynamic，ReviewSection 不会回退为同步依赖
+- 与 H6 的 RSC 边界收缩思路一致：精确依赖，减少不必要的静态耦合
+
+### commit
+
+待提交。
 
 1. 每个假设开始验证时，状态从 🔄 改为 🔍
 2. 验证完成后填写"验证结果"章节，状态改为 ❌（排除）或继续修复
