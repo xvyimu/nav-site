@@ -2,10 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { motion } from "motion/react";
 import { PackageOpen, Search, Trophy, Waves } from "lucide-react";
 import { type Category, type ModelRanking as ModelRankingType, type NavLink } from "@/lib/types";
-import { fadeInUp, slideDown, staggerContainer } from "@/lib/animations";
 import { CategorySection } from "./CategorySection";
 import { DualTrackSection } from "./DualTrackSection";
 import { HomeHero } from "./HomeHero";
@@ -110,50 +108,42 @@ export function Navigation({
         />
 
         <div className="min-w-0 flex-1">
-          <motion.div
-            className="mx-auto max-w-[1520px] space-y-6 px-4 py-6 md:px-8 md:py-8"
-            variants={staggerContainer}
-            initial="hidden"
-            animate="show"
-          >
-            <motion.div variants={slideDown}>
-              <SearchExperiencePanel
-                query={rawSearch.trim()}
-                loading={searchLoading}
-                suggestions={searchSuggestions}
-                facets={searchFacets}
-                results={flatResults.map((item) => item.link)}
-                activeTags={activeTags}
-                activeCategory={activeCategory}
-                onSuggestion={(value) => {
-                  setRawSearch(value);
-                  inputRef.current?.focus();
-                }}
-                onCategoryChange={setActiveCategory}
-                onToggleTag={toggleTag}
-                minRating={minRatingFilter}
-                onMinRatingChange={setMinRatingFilter}
-                popularity={popularityFilter}
-                onPopularityChange={setPopularityFilter}
-                onClearFilters={() => {
-                  clearSearchExperienceFilters();
-                  setActiveCategory("all");
-                }}
-              />
-            </motion.div>
+          <div className="mx-auto max-w-[1520px] space-y-6 px-4 py-6 md:px-8 md:py-8">
+            <SearchExperiencePanel
+              query={rawSearch.trim()}
+              loading={searchLoading}
+              suggestions={searchSuggestions}
+              facets={searchFacets}
+              results={flatResults.map((item) => item.link)}
+              activeTags={activeTags}
+              activeCategory={activeCategory}
+              onSuggestion={(value) => {
+                setRawSearch(value);
+                inputRef.current?.focus();
+              }}
+              onCategoryChange={setActiveCategory}
+              onToggleTag={toggleTag}
+              minRating={minRatingFilter}
+              onMinRatingChange={setMinRatingFilter}
+              popularity={popularityFilter}
+              onPopularityChange={setPopularityFilter}
+              onClearFilters={() => {
+                clearSearchExperienceFilters();
+                setActiveCategory("all");
+              }}
+            />
 
             <div ref={announceRef} role="status" aria-live="polite" aria-atomic="true" className="sr-only" />
 
             {activeCategory !== "all" && (
-              <motion.nav
-                variants={slideDown}
-                className="flex items-center gap-1.5 text-xs font-mono uppercase text-white/60"
+              <nav
+                className="flex animate-slide-down items-center gap-1.5 text-xs font-mono uppercase text-white/60"
                 aria-label="Breadcrumb"
               >
                 <span>Atlas</span>
                 <span aria-hidden="true">/</span>
                 <span className="text-white/85">{currentLabel}</span>
-              </motion.nav>
+              </nav>
             )}
 
             <div ref={resultsRef} className="space-y-7">
@@ -184,7 +174,7 @@ export function Navigation({
               ))}
 
               {showRankings && (
-                <motion.section variants={fadeInUp}>
+                <section className="animate-fade-in-up">
                   {activeCategory === "all" && (
                     <h2 className="atlas-section-label text-emerald-100">
                       <Trophy className="h-3.5 w-3.5" />
@@ -192,7 +182,7 @@ export function Navigation({
                     </h2>
                   )}
                   <ModelRanking data={filteredRankings} />
-                </motion.section>
+                </section>
               )}
 
               {q && flatResults.length === 0 && zeroResultRecommendations.length > 0 && (
@@ -215,7 +205,7 @@ export function Navigation({
             </div>
 
             {mounted && flatResults.length === 0 && q && zeroResultRecommendations.length === 0 && (
-              <motion.div className="nav-empty-state" variants={fadeInUp}>
+              <div className="nav-empty-state animate-fade-in-up">
                 <Search className="h-8 w-8" aria-hidden="true" />
                 <p className="text-sm">{`没有找到与 "${q}" 匹配的内容`}</p>
                 <button
@@ -232,11 +222,11 @@ export function Navigation({
                 >
                   清除筛选
                 </button>
-              </motion.div>
+              </div>
             )}
 
             {mounted && flatResults.length === 0 && !q && (
-              <motion.div className="nav-empty-state" variants={fadeInUp}>
+              <div className="nav-empty-state animate-fade-in-up">
                 {activeCategory !== "all" ? (
                   <PackageOpen className="h-8 w-8" aria-hidden="true" />
                 ) : (
@@ -260,9 +250,9 @@ export function Navigation({
                     清除筛选
                   </button>
                 )}
-              </motion.div>
+              </div>
             )}
-          </motion.div>
+          </div>
 
           <MobileNav tabs={tabKeys} activeCategory={activeCategory} onSelect={setActiveCategory} />
           <div className="h-16 md:hidden" />

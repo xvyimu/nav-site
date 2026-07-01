@@ -2,10 +2,8 @@
 
 import { memo } from "react";
 import NextImage from "next/image";
-import { motion } from "motion/react";
 import { Eye, Globe, Heart, Sparkles } from "lucide-react";
 import { useFavoritesContext } from "@/components/FavoritesProvider";
-import { fadeInUp } from "@/lib/animations";
 import { highlightSearchTerm } from "@/lib/highlight";
 import { getLinkType, relativeTime, type NavLink } from "@/lib/types";
 import { extractDomain, isSafeUrl } from "@/lib/utils";
@@ -52,11 +50,9 @@ function LinkCardComponent({
           : "text-emerald-100";
 
   return (
-    <motion.div
-      variants={fadeInUp}
-      initial="hidden"
-      animate="show"
-      transition={{ delay: (index % 20) * 0.02 }}
+    <div
+      className="animate-fade-in-up"
+      style={{ animationDelay: `${(index % 20) * 0.02}s` }}
     >
       <a
         href={safeUrl}
@@ -147,7 +143,7 @@ function LinkCardComponent({
           </div>
         </div>
       </a>
-    </motion.div>
+    </div>
   );
 }
 

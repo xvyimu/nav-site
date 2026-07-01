@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { motion } from "motion/react";
 
 export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
@@ -36,12 +35,7 @@ export default function AdminLoginPage() {
 
   return (
     <div className="flex min-h-[80vh] items-center justify-center">
-      <motion.div
-        className="w-full max-w-sm"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
+      <div className="w-full max-w-sm animate-fade-in-up">
         <h1 className="mb-6 text-center text-lg font-medium text-foreground/80">
           管理面板
         </h1>
@@ -64,7 +58,7 @@ export default function AdminLoginPage() {
             {loading ? "验证中..." : "登录"}
           </button>
         </form>
-      </motion.div>
+      </div>
     </div>
   );
 }

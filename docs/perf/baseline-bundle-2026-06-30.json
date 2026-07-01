@@ -1,29 +1,29 @@
 {
-  "timestamp": "2026-06-30T14:05:36.950Z",
+  "timestamp": "2026-06-30T15:41:51.959Z",
   "reports": [
     {
       "file": "client.html",
-      "totalSize": 492101,
-      "totalSizeFormatted": "480.6 KB",
-      "initialSize": 481069,
-      "initialSizeFormatted": "469.8 KB",
-      "chunkCount": 63,
+      "totalSize": 490033,
+      "totalSizeFormatted": "478.5 KB",
+      "initialSize": 439896,
+      "initialSizeFormatted": "429.6 KB",
+      "chunkCount": 62,
       "topChunks": [
         {
-          "path": "static/chunks/301-454a197f936cc163.js",
-          "size": 142110,
+          "path": "static/chunks/301-901daecea6f9b373.js",
+          "size": 142116,
           "sizeFormatted": "138.8 KB",
           "initial": true
         },
         {
-          "path": "static/chunks/main-31a622858bd59796.js",
-          "size": 86151,
+          "path": "static/chunks/main-538e4659159dd798.js",
+          "size": 86157,
           "sizeFormatted": "84.1 KB",
           "initial": true
         },
         {
-          "path": "static/chunks/6723fd01-6d3144290d6fd398.js",
-          "size": 62878,
+          "path": "static/chunks/6723fd01-24581af01dd97ba5.js",
+          "size": 62879,
           "sizeFormatted": "61.4 KB",
           "initial": true
         },
@@ -34,32 +34,32 @@
           "initial": true
         },
         {
-          "path": "static/chunks/2554-971ac5b31d5c7bb4.js",
-          "size": 39352,
-          "sizeFormatted": "38.4 KB",
+          "path": "static/chunks/2588.64d1dd1f4fa7be2d.js",
+          "size": 39032,
+          "sizeFormatted": "38.1 KB",
+          "initial": false
+        },
+        {
+          "path": "static/chunks/app/page-c4bf03997656f258.js",
+          "size": 14302,
+          "sizeFormatted": "14.0 KB",
           "initial": true
         },
         {
-          "path": "static/chunks/app/page-8366eddfcf62a78a.js",
-          "size": 14443,
-          "sizeFormatted": "14.1 KB",
-          "initial": true
-        },
-        {
-          "path": "static/chunks/7489-d8f20be8d10eab56.js",
-          "size": 9411,
+          "path": "static/chunks/7489-0de45db5215d2d32.js",
+          "size": 9409,
           "sizeFormatted": "9.2 KB",
           "initial": true
         },
         {
-          "path": "static/chunks/5843-e38de1b066706d11.js",
-          "size": 6034,
-          "sizeFormatted": "5.9 KB",
+          "path": "static/chunks/4991-bfdd556ff3d03db5.js",
+          "size": 6928,
+          "sizeFormatted": "6.8 KB",
           "initial": true
         },
         {
-          "path": "static/chunks/8323-3e49fa4c525f5a52.js",
-          "size": 5985,
+          "path": "static/chunks/8323-7039de2cd5bd2803.js",
+          "size": 5984,
           "sizeFormatted": "5.8 KB",
           "initial": true
         },
@@ -70,55 +70,49 @@
           "initial": false
         },
         {
-          "path": "static/chunks/app/layout-46f0d747cf7d8206.js",
-          "size": 5007,
-          "sizeFormatted": "4.9 KB",
+          "path": "static/chunks/app/layout-5efe6cf790bfcfc7.js",
+          "size": 4912,
+          "sizeFormatted": "4.8 KB",
           "initial": true
         },
         {
-          "path": "static/chunks/3790-bb611d5496819ce7.js",
-          "size": 3931,
-          "sizeFormatted": "3.8 KB",
+          "path": "static/chunks/7437-d41f7f5a9fe6f9fe.js",
+          "size": 4862,
+          "sizeFormatted": "4.7 KB",
           "initial": true
         },
         {
-          "path": "static/chunks/2692-a0cb369eb2e917cc.js",
-          "size": 3277,
-          "sizeFormatted": "3.2 KB",
-          "initial": true
-        },
-        {
-          "path": "static/chunks/7217-a668aa2057b2d64b.js",
-          "size": 3212,
+          "path": "static/chunks/336-e47304a2c992a92b.js",
+          "size": 3168,
           "sizeFormatted": "3.1 KB",
           "initial": true
         },
         {
-          "path": "static/chunks/336-55802a48626e5a6f.js",
-          "size": 3167,
+          "path": "static/chunks/2692-5e5da272fc557404.js",
+          "size": 3140,
           "sizeFormatted": "3.1 KB",
           "initial": true
         },
         {
-          "path": "static/chunks/app/tool/[slug]/page-1d02b4e4a64485d5.js",
-          "size": 2945,
+          "path": "static/chunks/app/tool/[slug]/page-78638aa25a7a8fe4.js",
+          "size": 2943,
           "sizeFormatted": "2.9 KB",
           "initial": true
         },
         {
-          "path": "static/chunks/app/favorites/page-776280fda79e8471.js",
-          "size": 2601,
+          "path": "static/chunks/app/favorites/page-b2d3b25426e3a9fc.js",
+          "size": 2597,
           "sizeFormatted": "2.5 KB",
           "initial": true
         },
         {
-          "path": "static/chunks/app/admin/page-7a8e362a143c8589.js",
-          "size": 2341,
+          "path": "static/chunks/app/admin/page-f8b5d758c3d2536f.js",
+          "size": 2340,
           "sizeFormatted": "2.3 KB",
           "initial": true
         },
         {
-          "path": "static/chunks/app/error-b43b0cdf20e45547.js",
+          "path": "static/chunks/app/error-c118b6a7a111cda6.js",
           "size": 2167,
           "sizeFormatted": "2.1 KB",
           "initial": true
@@ -128,17 +122,23 @@
           "size": 2162,
           "sizeFormatted": "2.1 KB",
           "initial": false
+        },
+        {
+          "path": "static/chunks/8558-f93e66b2cf72ce13.js",
+          "size": 2034,
+          "sizeFormatted": "2.0 KB",
+          "initial": true
         }
       ],
       "topPackages": [
         {
           "name": "next",
-          "size": 272119,
-          "sizeFormatted": "265.7 KB"
+          "size": 273192,
+          "sizeFormatted": "266.8 KB"
         },
         {
           "name": "@sentry/core",
-          "size": 69842,
+          "size": 69851,
           "sizeFormatted": "68.2 KB"
         },
         {
@@ -148,13 +148,13 @@
         },
         {
           "name": "(app code)",
-          "size": 52454,
-          "sizeFormatted": "51.2 KB"
+          "size": 52008,
+          "sizeFormatted": "50.8 KB"
         },
         {
           "name": "motion-dom",
-          "size": 29226,
-          "sizeFormatted": "28.5 KB"
+          "size": 28877,
+          "sizeFormatted": "28.2 KB"
         },
         {
           "name": "@sentry/browser-utils",
@@ -162,19 +162,14 @@
           "sizeFormatted": "18.3 KB"
         },
         {
-          "name": "@sentry/browser",
-          "size": 17653,
-          "sizeFormatted": "17.2 KB"
-        },
-        {
           "name": "lucide-react",
-          "size": 16713,
-          "sizeFormatted": "16.3 KB"
+          "size": 17731,
+          "sizeFormatted": "17.3 KB"
         },
         {
-          "name": "framer-motion",
-          "size": 11338,
-          "sizeFormatted": "11.1 KB"
+          "name": "@sentry/browser",
+          "size": 17656,
+          "sizeFormatted": "17.2 KB"
         },
         {
           "name": "sonner",
@@ -182,8 +177,13 @@
           "sizeFormatted": "9.0 KB"
         },
         {
+          "name": "framer-motion",
+          "size": 8928,
+          "sizeFormatted": "8.7 KB"
+        },
+        {
           "name": "@sentry/nextjs",
-          "size": 6846,
+          "size": 6848,
           "sizeFormatted": "6.7 KB"
         },
         {
@@ -210,9 +210,9 @@
     },
     {
       "file": "edge.html",
-      "totalSize": 279689,
+      "totalSize": 279698,
       "totalSizeFormatted": "273.1 KB",
-      "initialSize": 279689,
+      "initialSize": 279698,
       "initialSizeFormatted": "273.1 KB",
       "chunkCount": 3,
       "topChunks": [
@@ -224,7 +224,7 @@
         },
         {
           "path": "edge-instrumentation.js",
-          "size": 57059,
+          "size": 57068,
           "sizeFormatted": "55.7 KB",
           "initial": true
         },
@@ -243,12 +243,12 @@
         },
         {
           "name": "@sentry/core",
-          "size": 32093,
+          "size": 32096,
           "sizeFormatted": "31.3 KB"
         },
         {
           "name": "@sentry/conventions",
-          "size": 18943,
+          "size": 18946,
           "sizeFormatted": "18.5 KB"
         },
         {
@@ -258,22 +258,22 @@
         },
         {
           "name": "@sentry/vercel-edge",
-          "size": 5813,
+          "size": 5814,
           "sizeFormatted": "5.7 KB"
         },
         {
           "name": "@sentry/opentelemetry",
-          "size": 2751,
+          "size": 2752,
           "sizeFormatted": "2.7 KB"
         },
         {
           "name": "(app code)",
-          "size": 1450,
+          "size": 1452,
           "sizeFormatted": "1.4 KB"
         },
         {
           "name": "@sentry/nextjs",
-          "size": 1251,
+          "size": 1253,
           "sizeFormatted": "1.2 KB"
         },
         {
@@ -285,34 +285,34 @@
     },
     {
       "file": "nodejs.html",
-      "totalSize": 2663571,
-      "totalSizeFormatted": "2.54 MB",
-      "initialSize": 2481923,
-      "initialSizeFormatted": "2.37 MB",
-      "chunkCount": 55,
+      "totalSize": 2624187,
+      "totalSizeFormatted": "2.50 MB",
+      "initialSize": 2442539,
+      "initialSizeFormatted": "2.33 MB",
+      "chunkCount": 54,
       "topChunks": [
         {
           "path": "../proxy.js",
-          "size": 603403,
+          "size": 603464,
           "sizeFormatted": "589.3 KB",
           "initial": true
         },
         {
           "path": "5019.js",
-          "size": 513488,
+          "size": 513538,
           "sizeFormatted": "501.5 KB",
           "initial": true
         },
         {
           "path": "../instrumentation.js",
-          "size": 408339,
+          "size": 408374,
           "sizeFormatted": "398.8 KB",
           "initial": true
         },
         {
           "path": "1386.js",
-          "size": 403359,
-          "sizeFormatted": "393.9 KB",
+          "size": 403410,
+          "sizeFormatted": "394.0 KB",
           "initial": true
         },
         {
@@ -320,12 +320,6 @@
           "size": 165759,
           "sizeFormatted": "161.9 KB",
           "initial": false
-        },
-        {
-          "path": "6247.js",
-          "size": 70891,
-          "sizeFormatted": "69.2 KB",
-          "initial": true
         },
         {
           "path": "5842.js",
@@ -346,9 +340,15 @@
           "initial": true
         },
         {
+          "path": "8154.js",
+          "size": 30479,
+          "sizeFormatted": "29.8 KB",
+          "initial": true
+        },
+        {
           "path": "../app/page.js",
-          "size": 23523,
-          "sizeFormatted": "23.0 KB",
+          "size": 25325,
+          "sizeFormatted": "24.7 KB",
           "initial": true
         },
         {
@@ -359,7 +359,7 @@
         },
         {
           "path": "../app/tool/[slug]/page.js",
-          "size": 17369,
+          "size": 17370,
           "sizeFormatted": "17.0 KB",
           "initial": true
         },
@@ -376,15 +376,15 @@
           "initial": true
         },
         {
-          "path": "../app/about/page.js",
-          "size": 11201,
-          "sizeFormatted": "10.9 KB",
+          "path": "../app/favorites/page.js",
+          "size": 13333,
+          "sizeFormatted": "13.0 KB",
           "initial": true
         },
         {
-          "path": "../app/favorites/page.js",
-          "size": 11018,
-          "sizeFormatted": "10.8 KB",
+          "path": "../app/about/page.js",
+          "size": 11201,
+          "sizeFormatted": "10.9 KB",
           "initial": true
         },
         {
@@ -395,7 +395,7 @@
         },
         {
           "path": "../app/login/page.js",
-          "size": 10747,
+          "size": 10709,
           "sizeFormatted": "10.5 KB",
           "initial": true
         },
@@ -420,7 +420,7 @@
         },
         {
           "name": "next",
-          "size": 1089745,
+          "size": 1092273,
           "sizeFormatted": "1.04 MB"
         },
         {
@@ -430,8 +430,8 @@
         },
         {
           "name": "@sentry/node",
-          "size": 1022504,
-          "sizeFormatted": "998.5 KB"
+          "size": 1022762,
+          "sizeFormatted": "998.8 KB"
         },
         {
           "name": "meriyah",
@@ -440,8 +440,8 @@
         },
         {
           "name": "(app code)",
-          "size": 638668,
-          "sizeFormatted": "623.7 KB"
+          "size": 648685,
+          "sizeFormatted": "633.5 KB"
         },
         {
           "name": "@sentry/node-core",
@@ -450,7 +450,7 @@
         },
         {
           "name": "@sentry/nextjs",
-          "size": 446273,
+          "size": 446281,
           "sizeFormatted": "435.8 KB"
         },
         {

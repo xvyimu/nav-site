@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { type Category } from "@/lib/types";
-import { motion } from "motion/react";
 
 export function SubmitForm({ categories }: { categories: Category[] }) {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -43,26 +42,22 @@ export function SubmitForm({ categories }: { categories: Category[] }) {
 
   if (status === "success") {
     return (
-      <motion.div
-        className="flex flex-col items-center gap-3 rounded-lg border bg-card p-8 text-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+      <div
+        className="flex flex-col items-center gap-3 rounded-lg border bg-card p-8 text-center animate-fade-in-up"
       >
         <span className="text-2xl">✅</span>
         <p className="text-sm text-foreground/70">{message}</p>
         <button type="button" aria-label="继续提交" onClick={() => setStatus("idle")} className="text-xs text-muted-foreground/50 underline underline-offset-2 hover:text-muted-foreground/80 transition-colors">
           继续提交
         </button>
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <motion.form
+    <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded-lg border bg-card p-6"
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
+      className="space-y-4 rounded-lg border bg-card p-6 animate-fade-in-up"
     >
       <div>
         <label htmlFor="title" className="mb-1 block text-xs font-medium text-foreground/60">
@@ -102,6 +97,6 @@ export function SubmitForm({ categories }: { categories: Category[] }) {
         className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-50 active:scale-[0.98]">
         {status === "loading" ? "提交中..." : "免费提交"}
       </button>
-    </motion.form>
+    </form>
   );
 }

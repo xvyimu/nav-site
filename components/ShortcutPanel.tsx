@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
 import { SECTION_LABELS } from "@/lib/nav-config";
 
 const baseShortcuts = [
@@ -43,27 +42,19 @@ export function ShortcutPanel() {
   }, [open]);
 
   return (
-    <AnimatePresence>
+    <>
       {open && (
         <>
           {/* 背景遮罩 */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+          <div
+            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm animate-fade-in"
             onClick={() => setOpen(false)}
             aria-hidden="true"
           />
 
           {/* 面板 */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -10 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-            className="fixed left-1/2 top-1/4 z-50 w-full max-w-sm -translate-x-1/2 rounded-xl border border-border bg-card p-6 shadow-2xl"
+          <div
+            className="fixed left-1/2 top-1/4 z-50 w-full max-w-sm -translate-x-1/2 rounded-xl border border-border bg-card p-6 shadow-2xl animate-fade-in-up"
             role="dialog"
             aria-label="快捷键列表"
           >
@@ -97,9 +88,9 @@ export function ShortcutPanel() {
                 </div>
               ))}
             </div>
-          </motion.div>
+          </div>
         </>
       )}
-    </AnimatePresence>
+    </>
   );
 }

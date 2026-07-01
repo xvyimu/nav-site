@@ -423,11 +423,49 @@ html {
   animation: fadeInUp 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Navigation slideDown 入场动画（替代 motion slideDown） */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* 减少动作时直接跳到终态，不让 fill-mode:both 把元素卡在 opacity:0 */
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-in-up {
+  .animate-fade-in-up,
+  .animate-slide-down,
+  .animate-fade-in,
+  .animate-slide-in {
     animation: none;
     opacity: 1;
     transform: none;
   }
+}
+
+/* ===== Sidebar 入场动画 ===== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.15s ease-out both;
+}
+
+@keyframes slideInFromLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-slide-in {
+  animation: slideInFromLeft 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

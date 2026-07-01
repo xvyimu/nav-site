@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown, ChevronRight, Compass, X } from "lucide-react";
 import { getCategoryIcon } from "@/lib/category-icons";
 import type { Tag } from "@/lib/types";
@@ -158,49 +157,37 @@ export function Sidebar({
 
   return (
     <>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm md:hidden"
-            aria-hidden="true"
-          />
-        )}
-      </AnimatePresence>
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm md:hidden animate-fade-in"
+          aria-hidden="true"
+        />
+      )}
 
-      <AnimatePresence>
-        {open && (
-          <motion.aside
-            ref={sidebarRef}
-            initial={{ x: "-100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "-100%" }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed left-0 top-0 z-50 h-full w-72 border-r border-white/10 bg-[#07100f] text-white md:hidden"
-            role="dialog"
-            aria-modal="true"
-            aria-label="导航分类"
-          >
-            <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
-              <span className="flex items-center gap-2 text-sm font-medium text-white/85">
-                <Compass className="h-5 w-5 text-emerald-100" />
-                导航图谱
-              </span>
-              <button
-                onClick={onClose}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
-                aria-label="关闭侧边栏"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            {links}
-          </motion.aside>
-        )}
-      </AnimatePresence>
+      {open && (
+        <aside
+          ref={sidebarRef}
+          className="fixed left-0 top-0 z-50 h-full w-72 border-r border-white/10 bg-[#07100f] text-white animate-slide-in md:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="导航分类"
+        >
+          <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
+            <span className="flex items-center gap-2 text-sm font-medium text-white/85">
+              <Compass className="h-5 w-5 text-emerald-100" />
+              导航图谱
+            </span>
+            <button
+              onClick={onClose}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="关闭侧边栏"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {links}
+        </aside>
+      )}
 
       <aside className="sticky top-20 hidden h-[calc(100vh-5rem)] w-64 shrink-0 overflow-y-auto border-r border-white/10 bg-[#07100f]/88 py-4 text-white backdrop-blur-xl md:block">
         {links}

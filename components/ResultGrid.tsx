@@ -2,7 +2,6 @@
 
 import { type KeyboardEvent } from "react";
 import { type NavLink } from "@/lib/types";
-import { motion } from "motion/react";
 import { LinkCard } from "./LinkCard";
 
 interface ResultGridProps {
@@ -23,7 +22,7 @@ interface ResultGridProps {
  * 性能：不使用 motion `layout` prop。首屏默认态会挂载 ~513 张卡片，
  * `layout` 会对每个元素做 FLIP 测量（getBoundingClientRect），513 个并发触发
  * 强制同步重排，是首屏 TBT / Style&Layout 的主要来源（见 docs/perf/findings.md H2/H5）。
- * 入场动画由 fadeInUp（opacity+transform，GPU 合成）承担，不需要 layout。
+ * 入场动画由 LinkCard 的 CSS fadeInUp 承担
  */
 export function ResultGrid({
   links,
@@ -39,7 +38,7 @@ export function ResultGrid({
       {links.map((link, i) => {
         const idx = baseIndex + i;
         return (
-          <motion.div
+          <div
             key={link.id}
             id={`result-${idx}`}
             role="listitem"
@@ -52,7 +51,7 @@ export function ResultGrid({
             className="outline-none rounded-xl transition-all duration-150"
           >
             <LinkCard link={link} index={idx} searchQuery={searchQuery} onPreview={onPreview} />
-          </motion.div>
+          </div>
         );
       })}
     </div>
