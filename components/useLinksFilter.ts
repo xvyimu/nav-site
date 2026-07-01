@@ -12,18 +12,20 @@ import type {
   SearchSuggestion,
 } from "@/lib/search-experience";
 import { buildSearchFacets, buildSearchSuggestions } from "@/lib/search-experience";
+import {
+  matchRankings,
+  buildDescendantSlugsMap as clientDescendantSlugsMap,
+  buildTabKeys as clientTabKeys,
+  buildTabCounts as clientTabCounts,
+  buildTabTree as clientTabTree,
+  buildAvailableTags as clientAvailableTags,
+  type SidebarTabNode,
+  type PrecomputedNavData,
+} from "@/lib/nav-derived-data";
 
 // ════════════════════════════════════════════════════════════
-//  共享类型与工具函数
+//  共享类型与工具函数（纯函数已迁移到 lib/nav-derived-data.ts）
 // ════════════════════════════════════════════════════════════
-
-/** 侧边栏树节点（含计数和子节点） */
-export interface SidebarTabNode {
-  key: string;
-  label: string;
-  count: number;
-  children: SidebarTabNode[];
-}
 
 type SortMode = "default" | "newest" | "popular";
 
@@ -89,18 +91,6 @@ function readInitialFilters(): ParsedUrlFilters {
     return { q: "", cat: "all", tags: [], minRating: null, popularity: null, semantic: true };
   }
   return parseFiltersFromUrl(new URLSearchParams(window.location.search));
-}
-
-/** 简单文本匹配（替代 Fuse.js — 排行榜仅 29 条，精确匹配即可） */
-function matchRankings(rankings: ModelRanking[], q: string) {
-  if (!q) return rankings;
-  const query = q.toLowerCase();
-  return rankings.filter(
-    (r) =>
-      r.model_name.toLowerCase().includes(query) ||
-      (r.description && r.description.toLowerCase().includes(query)) ||
-      (r.source && r.source.toLowerCase().includes(query)),
-  );
 }
 
 // ════════════════════════════════════════════════════════════
@@ -343,6 +333,7 @@ interface DerivedLinksParams {
   sortMode: SortMode;
   search: string;
   serverResults: NavLink[];
+  precomputed?: PrecomputedNavData;
 }
 
 interface DerivedLinksState {
@@ -369,13 +360,15 @@ interface DerivedLinksState {
 function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
   const {
     categories, links, modelRankings, activeCategory, activeTags,
-    sortMode, search, serverResults,
+    sortMode, search, serverResults, precomputed,
   } = params;
 
   const q = search.trim().toLowerCase();
 
-  // 后代 slug 映射（slug → 包含自身及所有后代的 slug 集合）
-  const descendantSlugsMap = useMemo(() => {
+  // ── 服务端预计算数据（precomputed 存在时跳过 5 个 useMemo）──
+
+  // 后代 slug 映射
+  const clientDescMap = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const cat of categories) {
       map.set(cat.slug, new Set(getDescendantSlugs(categories, cat.slug)));
@@ -383,63 +376,48 @@ function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
     return map;
   }, [categories]);
 
-  // Tab keys（仅顶级分类）
+  const descendantSlugsMap: Map<string, Set<string>> = useMemo(() => {
+    if (!precomputed) return clientDescMap;
+    // 从 Record<string, string[]> 转回 Map<string, Set<string>>
+    const map = new Map<string, Set<string>>();
+    for (const [slug, arr] of Object.entries(precomputed.descendantSlugsMap)) {
+      map.set(slug, new Set(arr));
+    }
+    return map;
+  }, [precomputed, clientDescMap]);
+
+  // Tab keys
   const tabKeys = useMemo(
-    () => [
+    () => precomputed?.tabKeys ?? [
       { key: "all", label: "全部" },
       ...categories
         .filter((c) => !c.parent_id)
         .map((c) => ({ key: c.slug, label: SECTION_LABELS[c.slug] || c.name })),
     ],
-    [categories],
+    [precomputed, categories],
   );
 
-  const countLinksForSlug = useCallback(
-    (slug: string): number => {
-      const slugs = descendantSlugsMap.get(slug);
-      if (!slugs) return 0;
-      return links.filter((l) => slugs.has(l.category_slug ?? "")).length;
-    },
-    [links, descendantSlugsMap]
-  );
-
+  // Tab counts
   const tabCounts = useMemo(
-    () => tabKeys.map((tab) => ({
-      ...tab,
-      count: tab.key === "all" ? links.length : countLinksForSlug(tab.key),
-    })),
-    [tabKeys, links, countLinksForSlug]
+    () => precomputed?.tabCounts ?? clientTabCounts(tabKeys, links, Object.fromEntries(
+      Array.from(clientDescMap.entries()).map(([k, v]) => [k, Array.from(v)])
+    )),
+    [precomputed, tabKeys, links, clientDescMap],
   );
 
   // 侧边栏树形结构
-  const tabTree = useMemo<SidebarTabNode[]>(() => {
-    const buildNode = (cat: Category): SidebarTabNode => {
-      const children = categories.filter((c) => c.parent_id === cat.id);
-      return {
-        key: cat.slug,
-        label: SECTION_LABELS[cat.slug] || cat.name,
-        count: countLinksForSlug(cat.slug),
-        children: children.map(buildNode),
-      };
-    };
-    return [
-      { key: "all", label: "全部", count: links.length, children: [] },
-      ...categories
-        .filter((c) => !c.parent_id)
-        .map(buildNode),
-    ];
-  }, [categories, countLinksForSlug, links.length]);
+  const tabTree = useMemo<SidebarTabNode[]>(
+    () => precomputed?.tabTree ?? clientTabTree(categories, links, Object.fromEntries(
+      Array.from(clientDescMap.entries()).map(([k, v]) => [k, Array.from(v)])
+    )),
+    [precomputed, categories, links, clientDescMap],
+  );
 
-  // 从 links 中提取去重后的标签列表
-  const availableTags = useMemo(() => {
-    const tagMap = new Map<string, Tag>();
-    for (const link of links) {
-      for (const tag of link.tags ?? []) {
-        if (!tagMap.has(tag.id)) tagMap.set(tag.id, tag);
-      }
-    }
-    return Array.from(tagMap.values()).sort((a, b) => a.name.localeCompare(b.name, "zh-Hans"));
-  }, [links]);
+  // 去重标签列表
+  const availableTags = useMemo(
+    () => precomputed?.availableTags ?? clientAvailableTags(links),
+    [precomputed, links],
+  );
 
   // Filtered + sorted
   const filtered = useMemo(() => {
@@ -728,10 +706,12 @@ export function useLinksFilter({
   categories,
   links,
   modelRankings,
+  precomputed,
 }: {
   categories: Category[];
   links: NavLink[];
   modelRankings: ModelRanking[];
+  precomputed?: PrecomputedNavData;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -755,6 +735,7 @@ export function useLinksFilter({
     sortMode: filters.sortMode,
     search: filters.search,
     serverResults: serverSearch.serverResults,
+    precomputed,
   });
   const keyboard = useKeyboardNav({
     flatResults: derived.flatResults,

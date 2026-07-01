@@ -9,6 +9,14 @@ import { getCategories, getApprovedLinks } from "@/lib/repositories";
 import { withTimeout, escapeJsonForHtml } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import { SECTION_LABELS } from "@/lib/nav-config";
+import {
+  buildDescendantSlugsMap,
+  buildTabKeys,
+  buildTabCounts,
+  buildTabTree,
+  buildAvailableTags,
+  type PrecomputedNavData,
+} from "@/lib/nav-derived-data";
 
 // ISR: 每 60 秒重新生成页面
 export const revalidate = 60;
@@ -67,6 +75,18 @@ export default async function Home({
   ]);
 
   const { cat } = await searchParams;
+
+  // 服务端预计算派生数据（useLinksFilter 中 5 个纯 useMemo 的服务端版本）
+  const descendantSlugsMap = buildDescendantSlugsMap(categories);
+  const tabKeys = buildTabKeys(categories);
+  const precomputed: PrecomputedNavData = {
+    descendantSlugsMap,
+    tabKeys,
+    tabCounts: buildTabCounts(tabKeys, links as NavLink[], descendantSlugsMap),
+    tabTree: buildTabTree(categories, links as NavLink[], descendantSlugsMap),
+    availableTags: buildAvailableTags(links as NavLink[]),
+  };
+
   const collectionJsonLd = cat ? buildCollectionPageJsonLd(cat, categories) : null;
 
   return (
@@ -83,6 +103,7 @@ export default async function Home({
             categories={categories}
             links={links as NavLink[]}
             modelRankings={rankings}
+            precomputed={precomputed}
           />
         </Suspense>
       </ErrorBoundary>

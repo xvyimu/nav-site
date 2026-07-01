@@ -1,0 +1,494 @@
+{
+  "timestamp": "2026-07-01T03:13:34.048Z",
+  "reports": [
+    {
+      "file": "client.html",
+      "totalSize": 490188,
+      "totalSizeFormatted": "478.7 KB",
+      "initialSize": 440051,
+      "initialSizeFormatted": "429.7 KB",
+      "chunkCount": 62,
+      "topChunks": [
+        {
+          "path": "static/chunks/301-30dabbe1a77a8580.js",
+          "size": 142113,
+          "sizeFormatted": "138.8 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/main-bbc8a63c05d53546.js",
+          "size": 86155,
+          "sizeFormatted": "84.1 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/6723fd01-24581af01dd97ba5.js",
+          "size": 62879,
+          "sizeFormatted": "61.4 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/framework-3b5d3b83bbd66e97.js",
+          "size": 59541,
+          "sizeFormatted": "58.1 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/2588.64d1dd1f4fa7be2d.js",
+          "size": 39032,
+          "sizeFormatted": "38.1 KB",
+          "initial": false
+        },
+        {
+          "path": "static/chunks/app/page-117070e80517c9ee.js",
+          "size": 14462,
+          "sizeFormatted": "14.1 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/7489-0de45db5215d2d32.js",
+          "size": 9409,
+          "sizeFormatted": "9.2 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/4991-bfdd556ff3d03db5.js",
+          "size": 6928,
+          "sizeFormatted": "6.8 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/8323-7039de2cd5bd2803.js",
+          "size": 5984,
+          "sizeFormatted": "5.8 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/5276.69aa2fa72d265c67.js",
+          "size": 5922,
+          "sizeFormatted": "5.8 KB",
+          "initial": false
+        },
+        {
+          "path": "static/chunks/app/layout-5efe6cf790bfcfc7.js",
+          "size": 4912,
+          "sizeFormatted": "4.8 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/7437-d41f7f5a9fe6f9fe.js",
+          "size": 4862,
+          "sizeFormatted": "4.7 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/336-e47304a2c992a92b.js",
+          "size": 3168,
+          "sizeFormatted": "3.1 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/2692-5e5da272fc557404.js",
+          "size": 3140,
+          "sizeFormatted": "3.1 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/app/tool/[slug]/page-78638aa25a7a8fe4.js",
+          "size": 2943,
+          "sizeFormatted": "2.9 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/app/favorites/page-b2d3b25426e3a9fc.js",
+          "size": 2597,
+          "sizeFormatted": "2.5 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/app/admin/page-f8b5d758c3d2536f.js",
+          "size": 2340,
+          "sizeFormatted": "2.3 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/app/error-c118b6a7a111cda6.js",
+          "size": 2167,
+          "sizeFormatted": "2.1 KB",
+          "initial": true
+        },
+        {
+          "path": "static/chunks/2991.08de905e5772ae94.js",
+          "size": 2162,
+          "sizeFormatted": "2.1 KB",
+          "initial": false
+        },
+        {
+          "path": "static/chunks/8558-f93e66b2cf72ce13.js",
+          "size": 2034,
+          "sizeFormatted": "2.0 KB",
+          "initial": true
+        }
+      ],
+      "topPackages": [
+        {
+          "name": "next",
+          "size": 273190,
+          "sizeFormatted": "266.8 KB"
+        },
+        {
+          "name": "@sentry/core",
+          "size": 69847,
+          "sizeFormatted": "68.2 KB"
+        },
+        {
+          "name": "react-dom",
+          "size": 56398,
+          "sizeFormatted": "55.1 KB"
+        },
+        {
+          "name": "(app code)",
+          "size": 52161,
+          "sizeFormatted": "50.9 KB"
+        },
+        {
+          "name": "motion-dom",
+          "size": 28877,
+          "sizeFormatted": "28.2 KB"
+        },
+        {
+          "name": "@sentry/browser-utils",
+          "size": 18785,
+          "sizeFormatted": "18.3 KB"
+        },
+        {
+          "name": "lucide-react",
+          "size": 17731,
+          "sizeFormatted": "17.3 KB"
+        },
+        {
+          "name": "@sentry/browser",
+          "size": 17655,
+          "sizeFormatted": "17.2 KB"
+        },
+        {
+          "name": "sonner",
+          "size": 9207,
+          "sizeFormatted": "9.0 KB"
+        },
+        {
+          "name": "framer-motion",
+          "size": 8928,
+          "sizeFormatted": "8.7 KB"
+        },
+        {
+          "name": "@sentry/nextjs",
+          "size": 6848,
+          "sizeFormatted": "6.7 KB"
+        },
+        {
+          "name": "pangu",
+          "size": 5713,
+          "sizeFormatted": "5.6 KB"
+        },
+        {
+          "name": "react",
+          "size": 3136,
+          "sizeFormatted": "3.1 KB"
+        },
+        {
+          "name": "scheduler",
+          "size": 1515,
+          "sizeFormatted": "1.5 KB"
+        },
+        {
+          "name": "@auth/core",
+          "size": 1502,
+          "sizeFormatted": "1.5 KB"
+        }
+      ]
+    },
+    {
+      "file": "edge.html",
+      "totalSize": 279689,
+      "totalSizeFormatted": "273.1 KB",
+      "initialSize": 279689,
+      "initialSizeFormatted": "273.1 KB",
+      "chunkCount": 3,
+      "topChunks": [
+        {
+          "path": "app/opengraph-image/route.js",
+          "size": 221512,
+          "sizeFormatted": "216.3 KB",
+          "initial": true
+        },
+        {
+          "path": "edge-instrumentation.js",
+          "size": 57059,
+          "sizeFormatted": "55.7 KB",
+          "initial": true
+        },
+        {
+          "path": "edge-runtime-webpack.js",
+          "size": 1118,
+          "sizeFormatted": "1.1 KB",
+          "initial": true
+        }
+      ],
+      "topPackages": [
+        {
+          "name": "next",
+          "size": 226497,
+          "sizeFormatted": "221.2 KB"
+        },
+        {
+          "name": "@sentry/core",
+          "size": 32094,
+          "sizeFormatted": "31.3 KB"
+        },
+        {
+          "name": "@sentry/conventions",
+          "size": 18944,
+          "sizeFormatted": "18.5 KB"
+        },
+        {
+          "name": "@opentelemetry/api",
+          "size": 6683,
+          "sizeFormatted": "6.5 KB"
+        },
+        {
+          "name": "@sentry/vercel-edge",
+          "size": 5813,
+          "sizeFormatted": "5.7 KB"
+        },
+        {
+          "name": "@sentry/opentelemetry",
+          "size": 2751,
+          "sizeFormatted": "2.7 KB"
+        },
+        {
+          "name": "(app code)",
+          "size": 1452,
+          "sizeFormatted": "1.4 KB"
+        },
+        {
+          "name": "@sentry/nextjs",
+          "size": 1253,
+          "sizeFormatted": "1.2 KB"
+        },
+        {
+          "name": "@opentelemetry/core",
+          "size": 333,
+          "sizeFormatted": "333 B"
+        }
+      ]
+    },
+    {
+      "file": "nodejs.html",
+      "totalSize": 2624788,
+      "totalSizeFormatted": "2.50 MB",
+      "initialSize": 2443140,
+      "initialSizeFormatted": "2.33 MB",
+      "chunkCount": 54,
+      "topChunks": [
+        {
+          "path": "../proxy.js",
+          "size": 603442,
+          "sizeFormatted": "589.3 KB",
+          "initial": true
+        },
+        {
+          "path": "5019.js",
+          "size": 513520,
+          "sizeFormatted": "501.5 KB",
+          "initial": true
+        },
+        {
+          "path": "../instrumentation.js",
+          "size": 408358,
+          "sizeFormatted": "398.8 KB",
+          "initial": true
+        },
+        {
+          "path": "1386.js",
+          "size": 403395,
+          "sizeFormatted": "393.9 KB",
+          "initial": true
+        },
+        {
+          "path": "5539.js",
+          "size": 165759,
+          "sizeFormatted": "161.9 KB",
+          "initial": false
+        },
+        {
+          "path": "5842.js",
+          "size": 61190,
+          "sizeFormatted": "59.8 KB",
+          "initial": true
+        },
+        {
+          "path": "1926.js",
+          "size": 50309,
+          "sizeFormatted": "49.1 KB",
+          "initial": true
+        },
+        {
+          "path": "8865.js",
+          "size": 47183,
+          "sizeFormatted": "46.1 KB",
+          "initial": true
+        },
+        {
+          "path": "8154.js",
+          "size": 30479,
+          "sizeFormatted": "29.8 KB",
+          "initial": true
+        },
+        {
+          "path": "../app/page.js",
+          "size": 25997,
+          "sizeFormatted": "25.4 KB",
+          "initial": true
+        },
+        {
+          "path": "9499.js",
+          "size": 17475,
+          "sizeFormatted": "17.1 KB",
+          "initial": true
+        },
+        {
+          "path": "../app/tool/[slug]/page.js",
+          "size": 17370,
+          "sizeFormatted": "17.0 KB",
+          "initial": true
+        },
+        {
+          "path": "../app/favicon.ico/route.js",
+          "size": 14177,
+          "sizeFormatted": "13.8 KB",
+          "initial": true
+        },
+        {
+          "path": "../app/api-docs/page.js",
+          "size": 13660,
+          "sizeFormatted": "13.3 KB",
+          "initial": true
+        },
+        {
+          "path": "../app/favorites/page.js",
+          "size": 13333,
+          "sizeFormatted": "13.0 KB",
+          "initial": true
+        },
+        {
+          "path": "../app/about/page.js",
+          "size": 11201,
+          "sizeFormatted": "10.9 KB",
+          "initial": true
+        },
+        {
+          "path": "../app/_global-error/page.js",
+          "size": 10983,
+          "sizeFormatted": "10.7 KB",
+          "initial": true
+        },
+        {
+          "path": "../app/login/page.js",
+          "size": 10709,
+          "sizeFormatted": "10.5 KB",
+          "initial": true
+        },
+        {
+          "path": "6686.js",
+          "size": 10625,
+          "sizeFormatted": "10.4 KB",
+          "initial": true
+        },
+        {
+          "path": "../app/admin/page.js",
+          "size": 10612,
+          "sizeFormatted": "10.4 KB",
+          "initial": true
+        }
+      ],
+      "topPackages": [
+        {
+          "name": "@sentry/core",
+          "size": 1794296,
+          "sizeFormatted": "1.71 MB"
+        },
+        {
+          "name": "next",
+          "size": 1092273,
+          "sizeFormatted": "1.04 MB"
+        },
+        {
+          "name": "@sentry/conventions",
+          "size": 1041068,
+          "sizeFormatted": "1016.7 KB"
+        },
+        {
+          "name": "@sentry/node",
+          "size": 1022682,
+          "sizeFormatted": "998.7 KB"
+        },
+        {
+          "name": "meriyah",
+          "size": 733830,
+          "sizeFormatted": "716.6 KB"
+        },
+        {
+          "name": "(app code)",
+          "size": 649341,
+          "sizeFormatted": "634.1 KB"
+        },
+        {
+          "name": "@sentry/node-core",
+          "size": 547811,
+          "sizeFormatted": "535.0 KB"
+        },
+        {
+          "name": "@sentry/nextjs",
+          "size": 446279,
+          "sizeFormatted": "435.8 KB"
+        },
+        {
+          "name": "source-map",
+          "size": 222287,
+          "sizeFormatted": "217.1 KB"
+        },
+        {
+          "name": "undici",
+          "size": 188834,
+          "sizeFormatted": "184.4 KB"
+        },
+        {
+          "name": "@sentry/opentelemetry",
+          "size": 161902,
+          "sizeFormatted": "158.1 KB"
+        },
+        {
+          "name": "@opentelemetry/semantic-conventions",
+          "size": 131348,
+          "sizeFormatted": "128.3 KB"
+        },
+        {
+          "name": "esquery",
+          "size": 93632,
+          "sizeFormatted": "91.4 KB"
+        },
+        {
+          "name": "@apm-js-collab/code-transformer",
+          "size": 83945,
+          "sizeFormatted": "82.0 KB"
+        },
+        {
+          "name": "astring",
+          "size": 79644,
+          "sizeFormatted": "77.8 KB"
+        }
+      ]
+    }
+  ]
+}

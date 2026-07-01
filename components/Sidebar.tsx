@@ -4,21 +4,14 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Compass, X } from "lucide-react";
 import { getCategoryIcon } from "@/lib/category-icons";
 import type { Tag } from "@/lib/types";
+import type { SidebarTabNode } from "@/lib/nav-derived-data";
+import { useShell } from "./Shell";
 import { TagFilter } from "./TagFilter";
-
-interface SidebarTabNode {
-  key: string;
-  label: string;
-  count: number;
-  children: SidebarTabNode[];
-}
 
 interface SidebarProps {
   tabs: SidebarTabNode[];
   activeKey: string;
   onSelect: (key: string) => void;
-  open: boolean;
-  onClose: () => void;
   tags?: Tag[];
   activeTags?: string[];
   onToggleTag?: (slug: string) => void;
@@ -29,13 +22,12 @@ export function Sidebar({
   tabs,
   activeKey,
   onSelect,
-  open,
-  onClose,
   tags = [],
   activeTags = [],
   onToggleTag,
   onClearTags,
 }: SidebarProps) {
+  const { sidebarOpen: open, closeSidebar: onClose } = useShell();
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 

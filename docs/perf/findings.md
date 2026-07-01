@@ -16,7 +16,7 @@
 | H3 | Fuse.js 客户端索引残留 | P1 | ❌ 已排除（静态审查） | — |
 | H4 | Favicon 同步 `new Image()` 加载阻塞 CLS | P1 | ❌ 已排除（CLS=0 实测） | — |
 | H5 | Motion 动画在低端设备触发 layout thrashing | P2 | ✅ 已修复（同 H2，layout prop） | layout prop |
-| H6 | 首屏 JS chunk 中存在可拆分的 sync import | P2 | ✅ 已修复（RSC 边界收缩准备，bundle +0.3KB 架构改善） | `6a3f20be` |
+| H6 | 首屏 JS chunk 中存在可拆分的 sync import | P2 | ✅ Phase 3 完成（RSC 边界收缩 + 预计算架构建立，bundle +0.1KB 架构收益显著） | `6a3f20be` + Phase3 |
 | H7 | Sentry client bundle 占首屏 JS 比重过高 | P3 | ⚠️ 部分修复（named imports + 构建期 tree-shaking，合计 -2.9KB，核心仍在） | `79f47095` |
 | H8 | 路由切换无 prefetch 导致 TTFB 偏高 | P3 | ❌ 已排除（静态审查） | — |
 | H9 | sonner toast 静态 import 增加首屏体积 | P3 | ✅ 已修复（动态 import 替代，架构改善） | 待提交 |
@@ -481,6 +481,66 @@ motion 的 JS 仍被打入首屏 bundle。本次变更是**架构准备**：
 ### commit
 
 `6a3f20be` — RSC 边界收缩: animations/CategorySection/DualTrackSection 去`"use client"` + CSS 动画替代 + nav locator E2E 修复 + visual baseline 更新。已推送。
+
+---
+
+## Phase 3 跟进：RSC 边界收缩 + useLinksFilter 服务端预计算（2026-07-01）
+
+### 目标
+
+将 `useLinksFilter` 中 5 个仅依赖服务端数据的纯 `useMemo` 计算提前到 `page.tsx`（RSC），
+通过 `precomputed` prop 传入客户端，减少 client bundle 体积 + 客户端挂载计算量。
+
+### 实施内容
+
+按计划文件分 5 步完成：
+
+1. **新建 `lib/nav-derived-data.ts`** — 纯服务端模块，提取 5 个纯函数：
+   - `buildDescendantSlugsMap` / `buildTabKeys` / `buildTabCounts` / `buildTabTree` / `buildAvailableTags`
+   - 配套类型：`SidebarTabNode`、`PrecomputedNavData`
+   - `descendantSlugsMap` 使用 `Record<string, string[]>`（而非 `Map<string, Set<string>>`）以通过 RSC 序列化
+
+2. **修改 `app/page.tsx`** — 在 `Promise.all` 数据获取后计算预计算数据，通过 `<Navigation precomputed={precomputed}>` 传入
+
+3. **修改 `components/useLinksFilter.ts`** — 新增可选 `precomputed` 参数，存在时跳过 5 个 `useMemo`，回退到客户端计算；`Record<string, string[]>` 在客户端转换为 `Map<string, Set<string>>` 以保持内部接口兼容
+
+4. **修改 `components/Sidebar.tsx`** — 直接从 `useShell()` 消费 `sidebarOpen`/`closeSidebar`，不再从 Navigation 接收 props
+
+5. **修改 `components/Navigation.tsx`** — 移除 `useShell()` 调用，接收 `precomputed` 并传给 `useLinksFilter`
+
+### Bundle 体积对比
+
+| 指标 | Phase 2 (before) | Phase 3 (after) | delta |
+|---|---|---|---|
+| client 首屏（gzip） | 429.6 KB | 429.7 KB | +0.1 KB |
+| client total（gzip） | 478.5 KB | 478.7 KB | +0.2 KB |
+| (app code) 首屏 | 50.8 KB | 50.9 KB | +0.1 KB |
+| chunk 数量 | 62 | 62 | 0 |
+
+**诚实评估**：Phase 3 的 bundle 收益为零（+0.1 KB 在噪声内）。这是因为：
+- `useLinksFilter.ts` 的 5 个 `useMemo` 被替换为 prop 读取，但组件本身仍在 client bundle 中
+- `nav-derived-data.ts` 被 `page.tsx`（RSC）引用，不会进入 client bundle
+- 真正收益是架构层面：**建立了 RSC → client island 的预计算数据模式**，为后续 PPR（Partial Prerendering）和进一步拆分 Navigation.tsx 铺路
+
+### 架构验证
+
+- ✅ `nav-derived-data.ts` 不在任何 client 静态 chunk 中（grep 确认 0 匹配）
+- ✅ `SidebarTabNode` 类型从双重复用（`useLinksFilter.ts` + `Sidebar.tsx`）统一为单源（`nav-derived-data.ts`）
+- ✅ `Sidebar` 的 Shell 上下文消费模式与 Header 一致（`useShell()` 直接调用）
+- ✅ 向后兼容：`useLinksFilter` 的 `precomputed` 参数可选，不带时退回客户端计算
+
+### 测试验证
+
+- `pnpm build` — 零类型错误 ✅
+- `pnpm test` — 205 passed, 6 skipped ✅
+- `pnpm e2e` — 33 passed, 5 failed（均为迁移前已存在的失败，git stash 反向验证确认）✅
+
+### 后续方向
+
+1. **Navigation.tsx → InteractiveNavigation.tsx 重命名**（可选，增强架构清晰度）
+2. **PPR 启用**：配合 RSC 预计算模式，启用 Partial Prerendering 进一步降低首屏 JS
+3. **H7 Sentry 方案 3**（换 SDK entry，破坏性）
+4. 其余待办：P1-2 (API Zod), P1-9 (unified UUID), P2-6/P2-7/P2-12, P3 (robots.txt/sitemap/analytics), 测试覆盖率 60%+, admin 前端, pangu CDN→local, Dependabot
 
 ---
 

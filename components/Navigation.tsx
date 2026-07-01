@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { PackageOpen, Search, Trophy, Waves } from "lucide-react";
 import { type Category, type ModelRanking as ModelRankingType, type NavLink } from "@/lib/types";
+import type { PrecomputedNavData } from "@/lib/nav-derived-data";
 import { CategorySection } from "./CategorySection";
 import { DualTrackSection } from "./DualTrackSection";
 import { HomeHero } from "./HomeHero";
 import { SearchExperiencePanel } from "./SearchExperiencePanel";
 import { Sidebar } from "./Sidebar";
 import { ToolQuickView } from "./ToolQuickView";
-import { useShell } from "./Shell";
 import { useLinksFilter } from "./useLinksFilter";
 
 const MobileNav = dynamic(() => import("./MobileNav").then((m) => m.MobileNav), {
@@ -27,12 +27,13 @@ export function Navigation({
   categories,
   links,
   modelRankings = [],
+  precomputed,
 }: {
   categories: Category[];
   links: NavLink[];
   modelRankings?: ModelRankingType[];
+  precomputed?: PrecomputedNavData;
 }) {
-  const { sidebarOpen, closeSidebar } = useShell();
   const {
     activeCategory, setActiveCategory,
     rawSearch, setRawSearch,
@@ -52,7 +53,7 @@ export function Navigation({
     showRankings, showLinks, filteredRankings,
     flatResults,
     handleSearchKeyDown, handleResultKeyDown,
-  } = useLinksFilter({ categories, links, modelRankings });
+  } = useLinksFilter({ categories, links, modelRankings, precomputed });
   const [mounted, setMounted] = useState(false);
   const [previewLink, setPreviewLink] = useState<NavLink | null>(null);
 
@@ -99,8 +100,6 @@ export function Navigation({
           tabs={tabTree}
           activeKey={activeCategory}
           onSelect={setActiveCategory}
-          open={sidebarOpen}
-          onClose={closeSidebar}
           tags={availableTags}
           activeTags={activeTags}
           onToggleTag={toggleTag}
