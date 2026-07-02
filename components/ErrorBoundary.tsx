@@ -1,7 +1,6 @@
 "use client";
 
 import { Component, type ReactNode, type ErrorInfo } from "react";
-import { captureException } from "@sentry/nextjs";
 
 interface Props {
   children: ReactNode;
@@ -18,6 +17,10 @@ interface State {
  *
  * 用于包裹可能出错的组件区域（如第三方嵌入、复杂交互组件），
  * 防止单个组件崩溃导致整页白屏。
+ *
+ * 性能说明：captureException 使用动态 import()，使 @sentry/nextjs
+ * 不进入首页 bundle（~110 KB 节省）。
+ * 仅在 ErrorBoundary 实际捕获错误时才会加载 Sentry 模块。
  */
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
@@ -30,15 +33,18 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    captureException(error, {
-      contexts: {
-        react: {
-          componentStack: errorInfo.componentStack,
+    // 动态导入避免 @sentry/nextjs 进入首屏 bundle
+    import("@sentry/nextjs").then(({ captureException }) => {
+      captureException(error, {
+        contexts: {
+          react: {
+            componentStack: errorInfo.componentStack,
+          },
         },
-      },
-      tags: {
-        source: "error-boundary",
-      },
+        tags: {
+          source: "error-boundary",
+        },
+      });
     });
   }
 

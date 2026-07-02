@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApprovedLinksForApi, getCategories } from "@/lib/repositories";
 import { slugify } from "@/lib/slugify";
 import { logger } from "@/lib/logger";
+import { toolsQuerySchema } from "@/lib/schemas";
 import { withTimeout } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -21,10 +22,21 @@ const FETCH_TIMEOUT = 8000;
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const category = searchParams.get("category") ?? undefined;
-    const limitParam = searchParams.get("limit");
-    const search = searchParams.get("search")?.toLowerCase();
-    const idsParam = searchParams.get("ids");
+
+    // Zod 查询参数校验（searchParams.get 返回 null，需转为 undefined 以适配 optional）
+    const rawQuery = Object.fromEntries(
+      ["limit", "category", "search", "ids"].map(k => [k, searchParams.get(k) ?? undefined])
+    );
+    const zodResult = toolsQuerySchema.safeParse(rawQuery);
+    if (!zodResult.success) {
+      const fieldErrors = zodResult.error.flatten().fieldErrors;
+      const firstError = Object.values(fieldErrors).flat()[0] || "查询参数验证失败";
+      return NextResponse.json({ error: firstError }, { status: 400 });
+    }
+
+    const category = zodResult.data.category ?? undefined;
+    const search = zodResult.data.search?.toLowerCase();
+    const idsParam = zodResult.data.ids;
     const ids = idsParam ? idsParam.split(",").filter(Boolean) : undefined;
 
     const [links, categories] = await Promise.all([
@@ -53,12 +65,9 @@ export async function GET(request: NextRequest) {
       result = result.filter((l) => idSet.has(l.id));
     }
 
-    // 数量限制（上限 100，防止滥用）
-    if (limitParam) {
-      const limit = parseInt(limitParam, 10);
-      if (!isNaN(limit) && limit > 0) {
-        result = result.slice(0, Math.min(limit, 100));
-      }
+    // 数量限制（上限 100，防止滥用，Zod 已校验范围）
+    if (zodResult.data.limit !== undefined) {
+      result = result.slice(0, Math.min(zodResult.data.limit, 100));
     }
 
     // 构建分类映射

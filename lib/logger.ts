@@ -37,13 +37,46 @@ function shouldLog(level: LogLevel): boolean {
   return LEVEL_PRIORITY[level] <= LEVEL_PRIORITY[MIN_LEVEL];
 }
 
+function safeStringify(obj: unknown): string {
+  try {
+    return JSON.stringify(obj);
+  } catch {
+    try {
+      return JSON.stringify(obj, getCircularReplacer());
+    } catch {
+      return "[unserializable]";
+    }
+  }
+}
+
+function getCircularReplacer() {
+  const seen = new WeakSet();
+  return (_key: string, value: unknown) => {
+    if (typeof value === "object" && value !== null) {
+      if (seen.has(value)) return "[circular]";
+      seen.add(value);
+    }
+    return value;
+  };
+}
+
 function formatEntry(entry: LogEntry): string {
   if (process.env.NODE_ENV === "production") {
     // 生产环境输出 JSON 格式，便于日志聚合
-    return JSON.stringify(entry);
+    try {
+      return JSON.stringify(entry);
+    } catch {
+      return JSON.stringify({
+        level: entry.level,
+        message: entry.message,
+        timestamp: entry.timestamp,
+        error: entry.error ? { name: entry.error.name, message: entry.error.message } : undefined,
+        context: entry.context ? { source: (entry.context as { source?: string }).source } : undefined,
+      });
+    }
   }
   // 开发环境输出可读格式
-  const ctx = entry.context ? ` ${JSON.stringify(entry.context)}` : "";
+  const ctx = entry.context ? ` ${safeStringify(entry.context)}` : "";
   const err = entry.error ? `\n  ${entry.error.name}: ${entry.error.message}` : "";
   return `[${entry.level.toUpperCase()}] ${entry.message}${ctx}${err}`;
 }

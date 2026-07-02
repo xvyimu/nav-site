@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { getClientIp } from "@/lib/utils";
-import { reviewSchema } from "@/lib/schemas";
+import { reviewSchema, reviewsQuerySchema } from "@/lib/schemas";
 import {
   getToolReviews,
   getReviewStats,
@@ -19,14 +19,21 @@ import {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const linkId = searchParams.get("link_id");
 
-    if (!linkId) {
+    // Zod 查询参数校验
+    const zodResult = reviewsQuerySchema.safeParse({
+      link_id: searchParams.get("link_id"),
+    });
+    if (!zodResult.success) {
+      const fieldErrors = zodResult.error.flatten().fieldErrors;
+      const firstError = Object.values(fieldErrors).flat()[0] || "缺少 link_id 参数";
       return NextResponse.json(
-        { error: "缺少 link_id 参数" },
+        { error: firstError },
         { status: 400 }
       );
     }
+
+    const linkId = zodResult.data.link_id;
 
     const [reviews, stats] = await Promise.all([
       getToolReviews(linkId),

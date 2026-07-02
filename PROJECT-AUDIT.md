@@ -416,7 +416,7 @@ const isLoggedIn = !!(req as any).auth;
 
 - **环境变量隔离**：开发库和生产库使用独立的 URL 和 Key，`config.ts` 禁止开发环境回退到生产库凭据
 - **.gitignore**：`.env*` 通配符会忽略 `.env.example`，不利于新开发者上手
-- **MCP 配置**：`.mcp.json` 硬编码生产库 `project_ref`，AI agent 可能误操作生产数据
+- **MCP 配置**：`.mcp.json` 硬编码开发库 `project_ref`（非生产库），AI agent 操作的是开发库数据； `.mcp.json.example` 提供模板
 - **pre-commit hook**：检测私钥/GitHub Token/Stripe Key 等，但正则有限，不检测 Google API Key、JWT 等
 
 ### 5.4 输入验证与输出编码
@@ -484,7 +484,7 @@ const isLoggedIn = !!(req as any).auth;
 | P2-4 | PanguSpacing 直接修改 DOM | `PanguSpacing.tsx` | 考虑在渲染时处理而非运行时修改 DOM |
 | P2-5 | ~~Sentry 缺少 environment/release 标签~~ ✅ | Sentry configs | 已添加 environment + release 标签 |
 | P2-6 | ~~~.gitignore 忽略 .env.example~~ ✅ | `.gitignore` | 已添加 `!.env.example` 例外 |
-| P2-7 | MCP 配置硬编码生产库 | `.mcp.json` | 改为开发库或添加环境切换 |
+| P2-7 | ~~MCP 配置硬编码开发库~~ ✅ | `.mcp.json` | 已修正文档误标生产库→开发库，新增 .mcp.json.example 模板 |
 | P2-8 | ~~ThemeToggle 缺少 type="button"~~ ✅ | `ThemeToggle.tsx` | 已添加 type="button" |
 | P2-9 | ~~多处缺少 aria-label/role~~ ✅ | 多个组件 | 系统性补充无障碍属性（7 处 aria-label） |
 | P2-10 | ~~爬虫脚本数据结构不一致~~ ✅ | `crawl-sources.mjs` | 统一返回格式 { entries, source } |

@@ -26,6 +26,14 @@ interface RpcResult {
   error: { message: string; code?: string } | null;
 }
 
+// ── Stable test UUIDs for category_id ──────────────────────────────
+
+const CATEGORY_UUID_FRONTEND = "b1b2c3d4-e5f6-7890-abcd-ef1234567890";
+const CATEGORY_UUID_MOBILE = "b1b2c3d4-e5f6-7890-abcd-ef1234567891";
+const CATEGORY_UUID_AI = "b1b2c3d4-e5f6-7890-abcd-ef1234567892";
+const CATEGORY_UUID_DEVTOOLS = "b1b2c3d4-e5f6-7890-abcd-ef1234567893";
+const CATEGORY_UUID_LANGS = "b1b2c3d4-e5f6-7890-abcd-ef1234567894";
+
 // ── Sample data ──────────────────────────────────────────────────
 
 const SAMPLE_LINKS = [
@@ -35,7 +43,7 @@ const SAMPLE_LINKS = [
     url: "https://react.dev",
     description: "A JavaScript library for building user interfaces",
     icon: null,
-    category_id: "cat-1",
+    category_id: CATEGORY_UUID_FRONTEND,
     approved: true,
     paid: false,
     featured: true,
@@ -51,7 +59,7 @@ const SAMPLE_LINKS = [
     url: "https://reactnative.dev",
     description: "Build mobile apps with React",
     icon: null,
-    category_id: "cat-2",
+    category_id: CATEGORY_UUID_MOBILE,
     approved: true,
     paid: false,
     featured: false,
@@ -67,7 +75,7 @@ const SAMPLE_LINKS = [
     url: "https://vuejs.org",
     description: "Progressive JavaScript framework",
     icon: null,
-    category_id: "cat-1",
+    category_id: CATEGORY_UUID_FRONTEND,
     approved: true,
     paid: false,
     featured: false,
@@ -83,7 +91,7 @@ const SAMPLE_LINKS = [
     url: "https://platform.openai.com",
     description: "AI developer tools and API",
     icon: null,
-    category_id: "cat-3",
+    category_id: CATEGORY_UUID_AI,
     approved: true,
     paid: true,
     featured: true,
@@ -99,7 +107,7 @@ const SAMPLE_LINKS = [
     url: "https://code.visualstudio.com",
     description: "Code editor",
     icon: null,
-    category_id: "cat-4",
+    category_id: CATEGORY_UUID_DEVTOOLS,
     approved: true,
     paid: false,
     featured: false,
@@ -115,7 +123,7 @@ const SAMPLE_LINKS = [
     url: "https://go.dev",
     description: "The Go programming language",
     icon: null,
-    category_id: "cat-5",
+    category_id: CATEGORY_UUID_LANGS,
     approved: true,
     paid: false,
     featured: false,

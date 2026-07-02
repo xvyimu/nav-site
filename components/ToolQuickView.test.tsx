@@ -24,7 +24,7 @@ function makeLink(overrides: Partial<NavLink> = {}): NavLink {
     url: "https://figma.com",
     description: "Collaborative design tool",
     icon: null,
-    category_id: "design",
+    category_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     category_name: "设计工具",
     approved: true,
     paid: false,

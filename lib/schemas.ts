@@ -158,3 +158,45 @@ export const reviewSchema = z.object({
   rating: z.number().int().min(1, "评分最低 1 星").max(5, "评分最高 5 星"),
   comment: z.string().max(500, "评论不能超过 500 字符").nullish().default(null),
 });
+
+// ── 查询参数 Schema ────────────────────────────────────────────────
+
+/** 搜索查询参数 schema（用于 /api/search GET） */
+export const searchQuerySchema = z.object({
+  q: z.string().max(120).optional().default(""),
+  category: z.string().regex(/^[a-z0-9-]{1,50}$/).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  semantic: z.enum(["true", "false"]).optional(),
+});
+
+/** 工具列表查询参数 schema（用于 /api/tools GET） */
+export const toolsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  category: z.string().optional(),
+  search: z.string().optional(),
+  ids: z.string().optional(),
+});
+
+/** Favicon 查询参数 schema（用于 /api/favicon GET） */
+export const faviconDomainSchema = z
+  .string()
+  .min(1, "域名不能为空")
+  .regex(
+    /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/,
+    "域名格式不正确",
+  );
+
+/** 评价查询参数 schema（用于 /api/reviews GET） */
+export const reviewsQuerySchema = z.object({
+  link_id: z.string().uuid("link_id 格式不正确"),
+});
+
+/** Web Vitals 指标 schema（用于 /api/web-vitals POST） */
+export const webVitalMetricSchema = z.object({
+  id: z.string().min(1).max(100),
+  name: z.enum(["TTFB", "FCP", "LCP", "CLS", "INP", "FID"]),
+  value: z.number().finite(),
+  rating: z.enum(["good", "needs-improvement", "poor"]),
+  delta: z.number().finite(),
+  navigationType: z.string().max(50),
+});

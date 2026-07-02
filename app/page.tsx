@@ -22,7 +22,7 @@ import {
 export const revalidate = 60;
 
 // 数据获取超时（秒）：Supabase 不可达时降级返回空数据而非挂起
-const FETCH_TIMEOUT = 8000;
+const FETCH_TIMEOUT = 15000;
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://yuanjia1314.ccwu.cc";
 const siteName = "综合导航站";

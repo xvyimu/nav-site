@@ -10,6 +10,7 @@ import {
   removeUserFavorite,
   clearUserFavorites,
 } from "@/lib/repositories";
+import { createServiceRoleClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +79,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "linkIds 格式不正确" }, { status: 400 });
     }
 
-    const result = await addUserFavorites(session.user.id, parsed.data);
+    const supabase = await createServiceRoleClient();
+    const result = await addUserFavorites(supabase, session.user.id, parsed.data);
     await recordAttempt("favorites_rate_limits", ip, !("error" in result));
 
     if ("error" in result) {

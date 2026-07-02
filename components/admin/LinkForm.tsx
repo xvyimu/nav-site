@@ -16,7 +16,7 @@ export function LinkForm({ categories, editingLink, onSave, onCancel }: Props) {
     url: "",
     description: "",
     icon: "",
-    category_id: "",
+    category_id: null as string | null,
     approved: true,
     featured: false,
   });
@@ -31,7 +31,7 @@ export function LinkForm({ categories, editingLink, onSave, onCancel }: Props) {
         url: editingLink.url,
         description: editingLink.description || "",
         icon: editingLink.icon || "",
-        category_id: editingLink.category_id || "",
+        category_id: editingLink.category_id ?? null,
         approved: editingLink.approved,
         featured: editingLink.featured,
       });
@@ -44,7 +44,7 @@ export function LinkForm({ categories, editingLink, onSave, onCancel }: Props) {
       url: "",
       description: "",
       icon: "",
-      category_id: categories[0]?.id || "",
+      category_id: categories[0]?.id ?? null,
       approved: true,
       featured: false,
     });
@@ -93,7 +93,7 @@ export function LinkForm({ categories, editingLink, onSave, onCancel }: Props) {
             className="field-input" />
         </Field>
         <Field label="分类">
-          <select value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
+          <select value={form.category_id ?? ""} onChange={e => setForm(f => ({ ...f, category_id: e.target.value || null }))}
             className="field-input">
             <option value="">无分类</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}

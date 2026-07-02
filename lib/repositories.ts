@@ -172,36 +172,61 @@ interface GetApprovedLinksOpts {
  * @param options.offset - 可选，分页偏移量
  */
 async function getApprovedLinksImpl(options?: GetApprovedLinksOpts): Promise<NavLink[]> {
-  const supabase = await createClient();
-  const selectBasic = "*, nav_categories(name, slug)";
+  // Retry up to 3 times with backoff on transient failures (Supabase connection pool exhaustion)
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const supabase = await createClient();
+      const selectBasic = "*, nav_categories(name, slug)";
 
-  const buildQuery = (select: string) => {
-    let query = supabase
-    .from("nav_links")
-    .select(select)
-    .eq("approved", true)
-    .order("featured", { ascending: false })
-    .order("paid", { ascending: false })
-    .order("created_at", { ascending: false });
+      const buildQuery = (select: string) => {
+        let query = supabase
+        .from("nav_links")
+        .select(select)
+        .eq("approved", true)
+        .order("featured", { ascending: false })
+        .order("paid", { ascending: false })
+        .order("created_at", { ascending: false });
 
-    if (options?.limit) {
-      query = query.range(
-        options.offset ?? 0,
-        (options.offset ?? 0) + options.limit - 1
-      );
+        if (options?.limit) {
+          query = query.range(
+            options.offset ?? 0,
+            (options.offset ?? 0) + options.limit - 1
+          );
+        }
+
+        return query;
+      };
+
+      const { data, error } = await buildQuery(selectBasic);
+
+      if (error) {
+        logger.error("Failed to fetch links", { source: "repositories", attempt }, error);
+        lastError = new Error("Failed to fetch links");
+        if (attempt < 3) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+        continue;
+      }
+
+      const result = await attachTagsToLinks(supabase, ((data ?? []) as unknown as RawLinkRow[]).map(mapLinkRow));
+
+      // Empty result with no error is unlikely but possible under transient conditions; retry once
+      if (result.length === 0 && attempt < 2) {
+        logger.warn("getApprovedLinks returned empty", { attempt });
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
+      }
+
+      return result;
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
     }
-
-    return query;
-  };
-
-  const { data, error } = await buildQuery(selectBasic);
-
-  if (error) {
-    logger.error("Failed to fetch links", { source: "repositories" }, error);
-    throw new Error("Failed to fetch links");
   }
-
-  return attachTagsToLinks(supabase, ((data ?? []) as unknown as RawLinkRow[]).map(mapLinkRow));
+  throw lastError ?? new Error("getApprovedLinks failed after 3 attempts");
 }
 
 export const getApprovedLinks = cache(getApprovedLinksImpl);
@@ -545,18 +570,22 @@ async function fetchLinkWithTags(
 
 /**
  * 创建链接（admin）
+ *
+ * @param supabase - 可选，用于测试传入 mock 实例
  */
-export async function createLink(input: {
-  title: string;
-  url: string;
-  description: string | null;
-  icon: string;
-  category_id: string | null;
-  approved: boolean;
-  featured: boolean;
-  tag_ids?: string[];
-}): Promise<NavLink> {
-  const supabase = await createClient();
+export async function createLink(
+  supabase: SupabaseServerClient,
+  input: {
+    title: string;
+    url: string;
+    description: string | null;
+    icon: string;
+    category_id: string | null;
+    approved: boolean;
+    featured: boolean;
+    tag_ids?: string[];
+  }
+): Promise<NavLink> {
   const { data, error } = await supabase
     .from("nav_links")
     .insert({
@@ -880,10 +909,10 @@ export async function getUserFavorites(userId: string): Promise<string[]> {
 
 /** 批量添加收藏（去重）*/
 export async function addUserFavorites(
+  supabase: SupabaseServerClient,
   userId: string,
   linkIds: string[]
 ): Promise<{ added: number } | { error: string }> {
-  const supabase = createServiceRoleClient();
   const rows = linkIds.map((link_id) => ({ user_id: userId, link_id }));
   const { error } = await supabase
     .from("user_favorites")

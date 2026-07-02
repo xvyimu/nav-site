@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { faviconDomainSchema } from "@/lib/schemas";
 
 /**
  * Favicon 代理 API
@@ -50,10 +51,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing domain parameter" }, { status: 400 });
   }
 
-  // 验证域名格式
-  const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
-  if (!domainRegex.test(domain)) {
-    return NextResponse.json({ error: "Invalid domain" }, { status: 400 });
+  // Zod 域名格式校验（替换原手动正则）
+  const domainCheck = faviconDomainSchema.safeParse(domain);
+  if (!domainCheck.success) {
+    const firstError = domainCheck.error.flatten().formErrors[0] || "Invalid domain";
+    return NextResponse.json({ error: firstError }, { status: 400 });
   }
 
   const dispatcherOption = await getProxyDispatcher();

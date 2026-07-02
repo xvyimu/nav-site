@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { captureMessage, setMeasurement } from "@sentry/nextjs";
-import { z } from "zod";
+import { webVitalMetricSchema } from "@/lib/schemas";
 
 /**
  * Web Vitals 上报端点
@@ -15,15 +15,6 @@ import { z } from "zod";
  *
  * 详见 docs/superpowers/specs/2026-06-29-performance-optimization-design.md §3.1 管线 B
  */
-
-const metricSchema = z.object({
-  id: z.string().min(1).max(100),
-  name: z.enum(["TTFB", "FCP", "LCP", "CLS", "INP", "FID"]),
-  value: z.number().finite(),
-  rating: z.enum(["good", "needs-improvement", "poor"]),
-  delta: z.number().finite(),
-  navigationType: z.string().max(50),
-});
 
 export async function POST(request: Request) {
   // same-origin 检查（防跨站刷量）
@@ -46,7 +37,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  const parsed = metricSchema.safeParse(body);
+  const parsed = webVitalMetricSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid metric" }, { status: 400 });
   }

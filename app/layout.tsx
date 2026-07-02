@@ -14,7 +14,7 @@ import { escapeJsonForHtml } from "@/lib/utils";
 import { WebVitals } from "./_components/web-vitals";
 
 const ShortcutPanel = dynamic(() => import("@/components/ShortcutPanel").then((m) => m.ShortcutPanel));
-const Toaster = dynamic(() => import("@/components/ui/sonner").then((m) => m.Toaster));
+const ToasterWrapper = dynamic(() => import("@/components/ToasterWrapper").then((m) => m.ToasterWrapper));
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -69,7 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </Providers>
           <Analytics />
           <ShortcutPanel />
-          <Toaster position="top-center" />
+          <ToasterWrapper />
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{

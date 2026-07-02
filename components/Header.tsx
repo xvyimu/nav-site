@@ -2,16 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { signIn, signOut, useSession } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { Code2, Compass, Heart, LogIn, LogOut, Menu, Plus, Settings } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useFavoritesContext } from "@/components/FavoritesProvider";
 import { useShell } from "@/components/Shell";
+import { useLogout } from "@/hooks/useLogout";
 
 export function Header() {
   const { toggleSidebar } = useShell();
   const { count } = useFavoritesContext();
   const { data: session, status } = useSession();
+  const { logout, loading: loggingOut } = useLogout();
   const [mounted, setMounted] = useState(false);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -60,12 +62,13 @@ export function Header() {
           )}
           {mounted && isAuthenticated && (
             <button
-              onClick={() => signOut({ callbackUrl: "/" })}
-              className="hidden h-8 items-center gap-1.5 rounded-full px-3 text-xs font-mono uppercase text-white/70 transition hover:bg-white/10 hover:text-white sm:inline-flex"
+              onClick={logout}
+              disabled={loggingOut}
+              className="hidden h-8 items-center gap-1.5 rounded-full px-3 text-xs font-mono uppercase text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-50 sm:inline-flex"
               aria-label="退出登录"
             >
               <LogOut className="h-3.5 w-3.5" />
-              退出
+              {loggingOut ? "退出中..." : "退出"}
             </button>
           )}
           <ThemeToggle variant="cinematic" />
