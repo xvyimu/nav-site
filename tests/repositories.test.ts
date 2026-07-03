@@ -207,6 +207,26 @@ describe("repositories · 链接", () => {
     expect(result[0].title).toBe("ChatGPT");
   });
 
+  it("getApprovedLinks 标签表缺失时降级为空标签", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const db = freshMocks();
+    db.setResponse("nav_links", { data: [mockLinkRow], error: null });
+    db.setResponse("nav_links_tags", { data: null, error: { code: "PGRST205", message: "no table" } });
+
+    try {
+      const result = await getApprovedLinks();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].tags).toEqual([]);
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining("Optional tags tables unavailable"));
+      expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining("Tags tables unavailable"));
+    } finally {
+      infoSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+
   it("getApprovedLinks limit/offset → range", async () => {
     const db = freshMocks();
     db.setResponse("nav_links", { data: [mockLinkRow], error: null });

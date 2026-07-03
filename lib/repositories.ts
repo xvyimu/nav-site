@@ -64,7 +64,19 @@ interface RawLinkTagRow {
   tag_id: string;
 }
 
-let warnedMissingTagsTables = false;
+let reportedMissingTagsTables = false;
+
+function reportMissingTagsTablesOnce(code?: string) {
+  if (reportedMissingTagsTables) return;
+
+  logger.info("Optional tags tables unavailable; returning links without tags", {
+    source: "repositories",
+    code,
+    optionalFeature: "tags",
+    migration: "scripts/migration-tags.sql",
+  });
+  reportedMissingTagsTables = true;
+}
 
 async function attachTagsToLinks(
   supabase: SupabaseServerClient,
@@ -80,13 +92,7 @@ async function attachTagsToLinks(
 
   if (linkTagsError) {
     if (isMissingTagsJoinError(linkTagsError)) {
-      if (!warnedMissingTagsTables) {
-        logger.warn("Tags tables unavailable; returning links without tags", {
-          source: "repositories",
-          code: linkTagsError.code,
-        });
-        warnedMissingTagsTables = true;
-      }
+      reportMissingTagsTablesOnce(linkTagsError.code);
       return links;
     }
     logger.warn("Failed to fetch link tags; returning links without tags", {
@@ -107,13 +113,7 @@ async function attachTagsToLinks(
 
   if (tagsError) {
     if (isMissingTagsJoinError(tagsError)) {
-      if (!warnedMissingTagsTables) {
-        logger.warn("Tags table unavailable; returning links without tags", {
-          source: "repositories",
-          code: tagsError.code,
-        });
-        warnedMissingTagsTables = true;
-      }
+      reportMissingTagsTablesOnce(tagsError.code);
       return links;
     }
     logger.warn("Failed to fetch tags; returning links without tags", {
@@ -960,4 +960,3 @@ export async function clearUserFavorites(
   }
   return { ok: true, cleared: true };
 }
-
