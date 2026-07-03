@@ -138,6 +138,7 @@ const SAMPLE_LINKS = [
 const getApprovedLinks = vi.fn(async () => SAMPLE_LINKS);
 const rpc = vi.fn<() => Promise<RpcResult>>(async () => ({ data: [], error: null }));
 const createServiceRoleClient = vi.fn(() => ({ rpc }));
+const loggerWarn = vi.fn();
 
 vi.mock("@/lib/repositories", () => ({
   getApprovedLinks,
@@ -150,7 +151,7 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/logger", () => ({
   logger: {
     error: vi.fn(),
-    warn: vi.fn(),
+    warn: loggerWarn,
     info: vi.fn(),
     debug: vi.fn(),
   },
@@ -614,6 +615,32 @@ describe("Search optimizations (7 optimizations)", () => {
     // Should still get results from Fuse
     expect(body.results.length).toBeGreaterThan(0);
     expect(body.mode).toBe("semantic");
+  });
+
+  it("OPT#6: caches embed outages briefly and throttles warning logs", async () => {
+    fetchMock.mockRejectedValue(new Error("embed server down"));
+
+    const { GET } = await import("@/app/api/search/route");
+    const first = await GET(
+      new NextRequest("http://localhost/api/search?q=react&semantic=true&limit=5")
+    );
+    const second = await GET(
+      new NextRequest("http://localhost/api/search?q=react&semantic=true&limit=5")
+    );
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(createServiceRoleClient).not.toHaveBeenCalled();
+    expect(loggerWarn).toHaveBeenCalledTimes(1);
+    expect(loggerWarn).toHaveBeenCalledWith(
+      "Embed server request failed",
+      expect.objectContaining({
+        source: "api-search",
+        error: "embed server down",
+        retryAfterMs: expect.any(Number),
+      })
+    );
   });
 
   it("OPT#6: fallback to Fuse-only when RPC fails", async () => {

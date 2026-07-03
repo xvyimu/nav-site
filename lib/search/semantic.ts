@@ -16,10 +16,41 @@ import type { SearchResult, SemanticRow } from "./types";
 
 const DEFAULT_EMBED_SERVER_URL = "http://127.0.0.1:8003";
 const MIN_SEMANTIC_SIMILARITY = 0.35;
+const EMBED_REQUEST_TIMEOUT_MS = 5000;
+const EMBED_UNAVAILABLE_TTL_MS = 30_000;
+const EMBED_WARNING_THROTTLE_MS = 60_000;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+let unavailableEndpoint: string | null = null;
+let unavailableUntil = 0;
+const lastWarningAt = new Map<string, number>();
 
 function normalizeHostname(hostname: string): string {
   return hostname.replace(/^\[(.*)\]$/, "$1").toLowerCase();
+}
+
+function warnThrottled(key: string, message: string, context: Record<string, unknown>): void {
+  const now = Date.now();
+  const last = lastWarningAt.get(key);
+  if (last !== undefined && now - last < EMBED_WARNING_THROTTLE_MS) return;
+
+  lastWarningAt.set(key, now);
+  logger.warn(message, context);
+}
+
+function isTemporarilyUnavailable(endpoint: string): boolean {
+  return unavailableEndpoint === endpoint && Date.now() < unavailableUntil;
+}
+
+function markTemporarilyUnavailable(endpoint: string): void {
+  unavailableEndpoint = endpoint;
+  unavailableUntil = Date.now() + EMBED_UNAVAILABLE_TTL_MS;
+}
+
+function clearTemporarilyUnavailable(endpoint: string): void {
+  if (unavailableEndpoint !== endpoint) return;
+  unavailableEndpoint = null;
+  unavailableUntil = 0;
 }
 
 /**
@@ -37,12 +68,16 @@ export function getEmbedEndpoint(): string | null {
       (url.protocol !== "http:" && url.protocol !== "https:") ||
       !LOOPBACK_HOSTS.has(normalizeHostname(url.hostname))
     ) {
-      logger.warn("Ignoring non-loopback EMBED_SERVER_URL", { source: "api-search" });
+      warnThrottled("embed-config:non-loopback", "Ignoring non-loopback EMBED_SERVER_URL", {
+        source: "api-search",
+      });
       return null;
     }
     return new URL("/embed-query", url).toString();
   } catch {
-    logger.warn("Ignoring invalid EMBED_SERVER_URL", { source: "api-search" });
+    warnThrottled("embed-config:invalid", "Ignoring invalid EMBED_SERVER_URL", {
+      source: "api-search",
+    });
     return null;
   }
 }
@@ -56,31 +91,44 @@ export function getEmbedEndpoint(): string | null {
 export async function getEmbedding(text: string): Promise<number[] | null> {
   const endpoint = getEmbedEndpoint();
   if (!endpoint) return null;
+  if (isTemporarilyUnavailable(endpoint)) return null;
 
   try {
     const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(EMBED_REQUEST_TIMEOUT_MS),
     });
 
     if (!res.ok) {
-      logger.warn("Embed server error", { status: res.status, source: "api-search" });
+      markTemporarilyUnavailable(endpoint);
+      warnThrottled(`embed-server:${endpoint}:http`, "Embed server error", {
+        status: res.status,
+        source: "api-search",
+        retryAfterMs: EMBED_UNAVAILABLE_TTL_MS,
+      });
       return null;
     }
 
     const data = await res.json();
     if (!Array.isArray(data.embedding) || data.embedding.length === 0) {
-      logger.warn("Embed server returned invalid payload", { source: "api-search" });
+      markTemporarilyUnavailable(endpoint);
+      warnThrottled(`embed-server:${endpoint}:payload`, "Embed server returned invalid payload", {
+        source: "api-search",
+        retryAfterMs: EMBED_UNAVAILABLE_TTL_MS,
+      });
       return null;
     }
 
+    clearTemporarilyUnavailable(endpoint);
     return data.embedding as number[];
   } catch (e) {
-    logger.warn("Embed server request failed", {
+    markTemporarilyUnavailable(endpoint);
+    warnThrottled(`embed-server:${endpoint}:request`, "Embed server request failed", {
       source: "api-search",
       error: e instanceof Error ? e.message : String(e),
+      retryAfterMs: EMBED_UNAVAILABLE_TTL_MS,
     });
     return null;
   }
