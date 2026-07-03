@@ -91,6 +91,13 @@ pnpm typecheck
 pnpm analyze
 ```
 
+本地提交前可安装轻量密钥扫描 hook：
+
+```bash
+printf '#!/bin/sh\nnode scripts/pre-commit-secret-scan.mjs\n' > .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
 ## 项目结构
 
 ```
