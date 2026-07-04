@@ -6,20 +6,20 @@
 
 ## 当前结论
 
-**代码侧可以发布，但生产部署链路仍有 1 个红色项和 2 个黄色运维检查项。**
+**本地代码侧 launch gate 已通过，但生产部署链路仍有 1 个红色项和 2 个黄色运维检查项。**
 
-当前代码、测试、构建和本地安全头检查均已通过。红色项是 GitHub Actions 的 `netlify deploy --prod` 实际返回 `JSONHTTPError: Forbidden`，因此最新 `netlify.toml` 安全头配置尚未确认上线；工作流已改为部署失败即失败，避免假绿。黄色项有两个：生产 `/api/health` 显示 Sentry DSN 未配置；embedding 子检查为 `error`，说明生产运行环境暂时无法访问 `EMBED_SERVER_URL`。正式上线前需要修复 Netlify token/site 权限，补齐 `NEXT_PUBLIC_SENTRY_DSN`，并确认生产 embedding 服务可达，或明确接受语义搜索降级为文本/Fuse 搜索的行为。
+当前代码、测试、构建、本地 E2E 和本地安全检查均已通过。本轮 launch hardening 修复了 ResourceRating toast 动态加载阻塞评分 UI 的问题，刷新了已批准纸面视觉的 hero 快照，并收紧了移动端工具详情页 E2E locator。红色项仍是 GitHub Actions 的 `netlify deploy --prod` 实际返回 `JSONHTTPError: Forbidden`，因此最新生产部署仍需修复 Netlify token/site 权限后复验；黄色项有两个：生产 `/api/health` 显示 Sentry DSN 未配置；embedding 子检查为 `error`，说明生产运行环境暂时无法访问 `EMBED_SERVER_URL`。正式上线前需要修复 Netlify token/site 权限，补齐 `NEXT_PUBLIC_SENTRY_DSN`，并确认生产 embedding 服务可达，或明确接受语义搜索降级为文本/Fuse 搜索的行为。
 
 ## 已验证门禁
 
 | 门禁 | 状态 | 证据 |
 |---|---:|---|
-| Git 状态 | ✅ | `master` 与 `origin/master` 已同步，工作树 clean |
+| Git 状态 | ✅ | 本轮 launch hardening 提交后需保持工作树 clean |
 | Lint | ✅ | `pnpm lint` |
 | Typecheck | ✅ | `pnpm typecheck` |
-| 单元测试 | ✅ | `pnpm test` 结果已记录在 `docs/PROGRESS.md` |
-| 针对性 E2E | ✅ | 移动底栏/移动布局/分类切换 grep：`6 passed` |
-| 全量 E2E | ✅ | Playwright 全量：`52 passed` |
+| 单元测试 | ✅ | `pnpm test`：317 passed / 6 skipped |
+| 针对性 E2E | ✅ | ResourceRating 目标测试 `3 passed`；Figma 详情页 + hero visual 子集 `4 passed` |
+| 全量 E2E | ✅ | `pnpm exec playwright test --reporter=line`：52 passed |
 | 生产构建 | ✅ | `pnpm build` |
 | 依赖审计 | ✅ | `pnpm audit --audit-level moderate --registry=https://registry.npmjs.org`：无已知漏洞 |
 | 密钥扫描 | ✅ | `node scripts/pre-commit-secret-scan.mjs` |
@@ -31,7 +31,7 @@
 
 | 项目 | 状态 | 结果 |
 |---|---:|---|
-| GitHub Actions | ❌ | 最新验证：`quality`、`build`、`e2e` 通过；`deploy` 真实失败，日志显示 `netlify deploy --prod --site "$NETLIFY_SITE_ID"` 返回 `JSONHTTPError: Forbidden`；`link-check` 因依赖 deploy 被跳过 |
+| GitHub Actions | ❌ | 最近一次远端验证：`quality`、`build`、`e2e` 通过；`deploy` 真实失败，日志显示 `netlify deploy --prod --site "$NETLIFY_SITE_ID"` 返回 `JSONHTTPError: Forbidden`；本轮提交推送后需重新跑 Actions |
 | Lighthouse CI | ✅ | 最新 `master` run success |
 | 生产首页 | ✅ | `GET /` 返回 200 |
 | 生产搜索 API | ✅ | `/api/search?q=ai&limit=5` 返回 200，5 条结果 |
@@ -93,14 +93,14 @@
 使用 revert commit，不重写历史：
 
 ```powershell
-rtk git revert b79fdf70 --no-edit
+rtk git revert <release-commit> --no-edit
 rtk git -c http.proxy= -c https.proxy= push origin master
 ```
 
-如果视觉快照收尾提交也需要一起回滚：
+如果需要连续回滚多个发布提交：
 
 ```powershell
-rtk git revert ecdd68c8 --no-edit
+rtk git revert <newest-release-commit> <older-release-commit> --no-edit
 rtk git -c http.proxy= -c https.proxy= push origin master
 ```
 

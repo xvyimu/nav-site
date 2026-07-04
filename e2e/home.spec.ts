@@ -164,7 +164,7 @@ test.describe("工具详情页", () => {
 		await expect(page.locator('a:has-text("访问官网")').first()).toBeVisible();
 
 		// 稳定的辅助导航区域
-		await expect(page.locator('text=/浏览分类/')).toBeVisible();
+		await expect(page.getByRole("heading", { name: "浏览分类" }).first()).toBeVisible();
 	});
 });
 

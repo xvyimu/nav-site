@@ -714,7 +714,7 @@ Toaster 本身已是 dynamic import，真正移除 sonner 出首屏需将 `ui/so
 导入因此被隔离到动态客户端 chunk，不再由 layout 直接同步引用。
 
 **2026-07-04 Superpower follow-up**：`app/resources/_components/ResourceRating.tsx`
-也已移除静态 `import { toast } from "sonner"`，改为评分提交路径内按需动态导入。
+也已移除静态 `import { toast } from "sonner"`，改为评分提交路径内 fire-and-forget 动态导入。
 这不是首页初始 bundle 的核心瓶颈，但能避免资源详情路由把 toast 库作为同步依赖，并用
 `ResourceRating.test.tsx` 的静态边界测试防回退。
 
@@ -722,7 +722,7 @@ Toaster 本身已是 dynamic import，真正移除 sonner 出首屏需将 `ui/so
 - `components/ReviewSection.tsx`：删除 `import { toast } from "sonner"`，改为 `handleSubmit` 内 `const { toast } = await import("sonner")`
 - 4 处 toast 调用全部改为动态 import，一次 import 复用
 - `components/ToasterWrapper.tsx`：后续新增 dynamic wrapper，`ssr: false` 懒加载 `components/ui/sonner`
-- `app/resources/_components/ResourceRating.tsx`：评分成功/失败 toast 改为提交路径内 `await import("sonner")`
+- `app/resources/_components/ResourceRating.tsx`：评分成功/失败 toast 改为提交路径内 `void import("sonner")`，不阻塞评分 UI 状态更新
 
 ### before/after 数据
 
@@ -739,7 +739,7 @@ Toaster 本身已是 dynamic import，真正移除 sonner 出首屏需将 `ui/so
 
 `62261102` —— ReviewSection toast 动态 import。
 `81f4d27a` —— 新增 ToasterWrapper，layout 侧动态加载 sonner UI。
-2026-07-04 Superpower follow-up —— ResourceRating toast 动态 import + 静态边界测试。
+2026-07-04 Superpower follow-up —— ResourceRating toast fire-and-forget 动态 import + 静态边界测试。
 
 ---
 
@@ -864,7 +864,7 @@ motion/react 已完全从初始加载路径中移除，仅在动态 chunk（Mode
 |---|---|---|
 | @sentry/* | ~103.7 KB | P3 — H7 方案3（换 entry）破坏性，留存 |
 | lucide-react | 17.3 KB | P3 — 确认已按需 import |
-| sonner | 9.0 KB | P3 — H9 需 layout 侧改为 dynamic |
+| sonner | 9.0 KB | P3 — H9 layout 侧已动态隔离；需用最新 bundle analyzer 复测是否仍在目标路由同步 chunk 中 |
 
 即使全部削减（约 130 KB），首屏仍 ≈ 300 KB（框架地板 322 KB +
 应用代码 50.8 KB）。**250KB 目标需 Framework-level RSC 架构调整**

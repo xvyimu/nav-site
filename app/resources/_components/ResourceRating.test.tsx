@@ -54,7 +54,9 @@ describe("ResourceRating", () => {
     fireEvent.click(screen.getByRole("button", { name: "5 星" }));
 
     await screen.findByText("已记录（当前 8 次评分）。");
-    expect(toast.success).toHaveBeenCalledWith("感谢你的评分");
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith("感谢你的评分");
+    });
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "/api/resource-ratings",
@@ -92,6 +94,8 @@ describe("ResourceRating", () => {
     const source = readFileSync(join(process.cwd(), "app/resources/_components/ResourceRating.tsx"), "utf8");
 
     expect(source).not.toMatch(/import\s+\{\s*toast\s*\}\s+from\s+["']sonner["']/);
-    expect(source).toContain('await import("sonner")');
+    expect(source).toContain('import("sonner")');
+    expect(source).not.toMatch(/await\s+showToast\(/);
+    expect(source).toContain('void import("sonner")');
   });
 });

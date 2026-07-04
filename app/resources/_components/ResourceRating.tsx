@@ -6,13 +6,12 @@ interface ResourceRatingProps {
   pageId: string;
 }
 
-async function showToast(type: "success" | "error", message: string) {
-  try {
-    const { toast } = await import("sonner");
+function showToast(type: "success" | "error", message: string) {
+  void import("sonner").then(({ toast }) => {
     toast[type](message);
-  } catch {
+  }).catch(() => {
     // Toast delivery is non-critical; rating submission should keep its state.
-  }
+  });
 }
 
 export function ResourceRating({ pageId }: ResourceRatingProps) {
@@ -63,10 +62,10 @@ export function ResourceRating({ pageId }: ResourceRatingProps) {
       });
       const data = await res.json();
       if (!res.ok) {
-        await showToast("error", data.error || "提交失败");
+        showToast("error", data.error || "提交失败");
         return;
       }
-      await showToast("success", "感谢你的评分");
+      showToast("success", "感谢你的评分");
       setRating(value);
       setSubmitted(true);
       const latest = await loadCount();
@@ -76,7 +75,7 @@ export function ResourceRating({ pageId }: ResourceRatingProps) {
         setCount((c) => (c == null ? null : c + 1));
       }
     } catch {
-      await showToast("error", "网络错误，请重试");
+      showToast("error", "网络错误，请重试");
     } finally {
       setSubmitting(false);
     }
