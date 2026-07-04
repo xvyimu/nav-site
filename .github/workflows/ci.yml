@@ -165,8 +165,20 @@ jobs:
           set -euo pipefail
           : "${NETLIFY_AUTH_TOKEN:?NETLIFY_AUTH_TOKEN is not set}"
           : "${NETLIFY_SITE_ID:?NETLIFY_SITE_ID is not set}"
+          status="$(curl -sS -o /tmp/netlify-site.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${NETLIFY_AUTH_TOKEN}" \
+            "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE_ID}")"
+          if [ "$status" != "200" ]; then
+            echo "::error title=Netlify site access failed::Netlify API returned HTTP ${status} for configured NETLIFY_SITE_ID. Refresh NETLIFY_AUTH_TOKEN or update NETLIFY_SITE_ID to a site this token can access."
+            exit 1
+          fi
           npm install -g netlify-cli
-          netlify deploy --prod --site "$NETLIFY_SITE_ID"
+          deploy_json="$(mktemp)"
+          netlify deploy --prod --site "$NETLIFY_SITE_ID" --auth "$NETLIFY_AUTH_TOKEN" --json | tee "$deploy_json"
+          deploy_url="$(node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); console.log(data.deploy_url || data.deploy_ssl_url || data.url || data.ssl_url || '')" "$deploy_json" 2>/dev/null || true)"
+          if [ -n "$deploy_url" ]; then
+            echo "deploy-url=$deploy_url" >> "$GITHUB_OUTPUT"
+          fi
 
   link-check:
     name: 链接健康检测
