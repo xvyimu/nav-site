@@ -31,7 +31,7 @@
 
 | 项目 | 状态 | 结果 |
 |---|---:|---|
-| GitHub Actions | ⚠️ | `quality`、`build`、`e2e`、`link-check` 通过；deploy job 曾因 `continue-on-error` 假绿，日志显示 `netlify deploy --prod` 返回 `JSONHTTPError: Forbidden` |
+| GitHub Actions | ❌ | 最新验证：`quality`、`build`、`e2e` 通过；`deploy` 真实失败，日志显示 `netlify deploy --prod --site "$NETLIFY_SITE_ID"` 返回 `JSONHTTPError: Forbidden`；`link-check` 因依赖 deploy 被跳过 |
 | Lighthouse CI | ✅ | 最新 `master` run success |
 | 生产首页 | ✅ | `GET /` 返回 200 |
 | 生产搜索 API | ✅ | `/api/search?q=ai&limit=5` 返回 200，5 条结果 |
