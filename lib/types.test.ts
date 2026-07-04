@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { getLinkType, relativeTime } from "@/lib/types";
 
 describe("getLinkType", () => {
-  it("returns 'model' for model-ranking", () => {
-    expect(getLinkType("model-ranking")).toBe("model");
+  it("treats removed model-ranking slugs as neutral", () => {
+    expect(getLinkType("model-ranking")).toBe("neutral");
   });
   it("returns 'neutral' for unknown slugs", () => {
     expect(getLinkType("unknown")).toBe("neutral");

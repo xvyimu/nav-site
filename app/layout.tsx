@@ -46,15 +46,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#1a1b2e" },
+    { media: "(prefers-color-scheme: light)", color: "#07100f" },
+    { media: "(prefers-color-scheme: dark)", color: "#07100f" },
   ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <body className="min-h-full flex flex-col bg-[#07100f] text-foreground">
         <ThemeProvider>
           <WebVitals />
           <PanguSpacing />

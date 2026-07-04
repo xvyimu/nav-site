@@ -1,6 +1,7 @@
 "use client";
 
-import { Filter, Flame, Folder, Sparkles, Star, Tags } from "lucide-react";
+import { Filter, Flame, Folder, Sparkles, Star, Tags, type LucideIcon } from "lucide-react";
+import { AtlasPill } from "@/components/ui/atlas-pill";
 import type { NavLink } from "@/lib/types";
 import type { PopularityFilter, SearchFacets, SearchSuggestion } from "@/lib/search-experience";
 
@@ -72,25 +73,22 @@ export function SearchExperiencePanel({
     .slice(0, 3) as string[];
 
   return (
-    <div className="nav-glass space-y-3 rounded-2xl p-3 text-white">
+    <div className="nav-glass flex flex-col gap-3 rounded-2xl p-3 text-white">
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 text-xs font-mono uppercase text-white/62">
-          <Sparkles className="h-3.5 w-3.5 text-emerald-200" aria-hidden="true" />
+          <Sparkles className="size-3.5 text-emerald-200" aria-hidden="true" />
           {query ? "搜索建议" : "热门查询"}
         </span>
         {visibleSuggestions.length > 0 ? visibleSuggestions.map((suggestion) => (
-          <button
+          <AtlasPill
             key={`${suggestion.type}:${suggestion.value}`}
-            type="button"
             onClick={() => onSuggestion(suggestion.value)}
-            className="inline-flex h-7 items-center gap-1 rounded-full border border-white/12 bg-white/[0.06] px-2.5 text-xs text-white/82 transition-colors hover:border-emerald-200/45 hover:text-emerald-50"
+            labelPrefix={suggestionLabel(suggestion.type)}
+            count={suggestion.count}
+            compact
           >
-            <span className="text-white/45">{suggestionLabel(suggestion.type)}</span>
             {suggestion.label}
-            {suggestion.count !== undefined && (
-              <span className="tabular-nums text-white/42">{suggestion.count}</span>
-            )}
-          </button>
+          </AtlasPill>
         )) : (
           <span className="text-xs text-white/55">
             {loading ? "正在分析匹配项" : "暂无建议"}
@@ -100,7 +98,7 @@ export function SearchExperiencePanel({
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 text-xs font-mono uppercase text-white/62">
-          <Filter className="h-3.5 w-3.5" aria-hidden="true" />
+          <Filter className="size-3.5" aria-hidden="true" />
           筛选
         </span>
 
@@ -109,7 +107,7 @@ export function SearchExperiencePanel({
             key={category.value}
             active={activeCategory === category.value}
             onClick={() => onCategoryChange(activeCategory === category.value ? "all" : category.value)}
-            icon={<Folder className="h-3 w-3 shrink-0" aria-hidden="true" />}
+            icon={Folder}
             label={category.label}
             count={category.count}
           />
@@ -120,7 +118,7 @@ export function SearchExperiencePanel({
             key={tag.value}
             active={activeTags.includes(tag.value)}
             onClick={() => onToggleTag(tag.value)}
-            icon={<Tags className="h-3 w-3 shrink-0" aria-hidden="true" />}
+            icon={Tags}
             label={tag.label}
             count={tag.count}
           />
@@ -133,7 +131,7 @@ export function SearchExperiencePanel({
               key={rating.value}
               active={minRating === value}
               onClick={() => onMinRatingChange(minRating === value ? null : value)}
-              icon={<Star className="h-3 w-3" aria-hidden="true" />}
+              icon={Star}
               label={rating.label}
               count={rating.count}
             />
@@ -147,7 +145,7 @@ export function SearchExperiencePanel({
               key={item.value}
               active={popularity === value}
               onClick={() => onPopularityChange(popularity === value ? null : value)}
-              icon={<Flame className="h-3 w-3" aria-hidden="true" />}
+              icon={Flame}
               label={item.label}
               count={item.count}
             />
@@ -155,13 +153,13 @@ export function SearchExperiencePanel({
         })}
 
         {hasFilters && (
-          <button
-            type="button"
+          <AtlasPill
             onClick={onClearFilters}
-            className="h-7 rounded-full px-2.5 text-xs text-white/58 transition-colors hover:bg-white/10 hover:text-white"
+            className="border-transparent bg-transparent text-white/58 hover:bg-white/10 hover:text-white"
+            compact
           >
             清除
-          </button>
+          </AtlasPill>
         )}
       </div>
 
@@ -188,24 +186,20 @@ function FacetButton({
 }: {
   active: boolean;
   onClick: () => void;
-  icon: React.ReactNode;
+  icon: LucideIcon;
   label: string;
   count: number;
 }) {
   return (
-    <button
-      type="button"
+    <AtlasPill
       onClick={onClick}
-      className={`inline-flex h-7 max-w-full items-center gap-1 rounded-full border px-2.5 text-xs transition-colors ${
-        active
-          ? "border-emerald-200/45 bg-emerald-200/14 text-emerald-50"
-          : "border-white/12 bg-white/[0.06] text-white/76 hover:border-emerald-200/35 hover:text-white"
-      }`}
-      aria-pressed={active}
+      active={active}
+      icon={icon}
+      count={count}
+      compact
+      pressed
     >
-      {icon}
-      <span className="truncate">{label}</span>
-      <span className="tabular-nums text-white/42">{count}</span>
-    </button>
+      {label}
+    </AtlasPill>
   );
 }

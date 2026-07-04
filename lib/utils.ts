@@ -4,6 +4,35 @@
  * 提取跨模块复用的通用工具，避免重复定义。
  */
 
+type ClassValue = string | number | false | null | undefined | ClassDictionary | ClassArray;
+type ClassDictionary = Record<string, boolean | null | undefined>;
+type ClassArray = ClassValue[];
+
+export function cn(...inputs: ClassValue[]): string {
+  const classes: string[] = [];
+
+  for (const input of inputs) {
+    if (!input) continue;
+
+    if (typeof input === "string" || typeof input === "number") {
+      classes.push(String(input));
+      continue;
+    }
+
+    if (Array.isArray(input)) {
+      const value = cn(...input);
+      if (value) classes.push(value);
+      continue;
+    }
+
+    for (const [key, value] of Object.entries(input)) {
+      if (value) classes.push(key);
+    }
+  }
+
+  return classes.join(" ");
+}
+
 /**
  * 为 Promise 添加超时限制
  * 在超时时间内未 resolve/reject，则 reject 超时错误

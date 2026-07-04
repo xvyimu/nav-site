@@ -11,7 +11,7 @@
  *   客户端用 .includes() 替代 .has()——分类数 <20，性能无差异。
  */
 
-import type { Category, Tag, NavLink, ModelRanking } from "@/lib/types";
+import type { Category, Tag, NavLink } from "@/lib/types";
 import { SECTION_LABELS } from "@/lib/nav-config";
 import { getDescendantSlugs } from "@/lib/category-tree";
 
@@ -61,7 +61,7 @@ export function buildTabKeys(categories: Category[]) {
   return [
     { key: "all", label: "全部" },
     ...categories
-      .filter((c) => !c.parent_id)
+      .filter((c) => !c.parent_id && c.slug !== "model-ranking")
       .map((c) => ({ key: c.slug, label: SECTION_LABELS[c.slug] || c.name })),
   ];
 }
@@ -119,7 +119,7 @@ export function buildTabTree(
   return [
     { key: "all", label: "全部", count: links.length, children: [] },
     ...categories
-      .filter((c) => !c.parent_id)
+      .filter((c) => !c.parent_id && c.slug !== "model-ranking")
       .map(buildNode),
   ];
 }
@@ -137,20 +137,4 @@ export function buildAvailableTags(links: NavLink[]): Tag[] {
     }
   }
   return Array.from(tagMap.values()).sort((a, b) => a.name.localeCompare(b.name, "zh-Hans"));
-}
-
-/**
- * 简单文本匹配（替代 Fuse.js — 排行榜仅 ~29 条，精确匹配即可）
- *
- * 对应原 useLinksFilter.ts 顶层的 matchRankings 函数 (L95-104)。
- */
-export function matchRankings(rankings: ModelRanking[], q: string) {
-  if (!q) return rankings;
-  const query = q.toLowerCase();
-  return rankings.filter(
-    (r) =>
-      r.model_name.toLowerCase().includes(query) ||
-      (r.description && r.description.toLowerCase().includes(query)) ||
-      (r.source && r.source.toLowerCase().includes(query)),
-  );
 }

@@ -3,6 +3,7 @@
 import { type KeyboardEvent, type RefObject } from "react";
 import { ArrowDown, Compass, Layers3, Search, Sparkles } from "lucide-react";
 import { SearchBar } from "./SearchBar";
+import { AtlasPill } from "./ui/atlas-pill";
 
 interface HeroTab {
   key: string;
@@ -50,16 +51,16 @@ export function HomeHero({
             面向 AI、云端、设计、开源与运维构建者的精选图谱
           </div>
           <div className="ml-auto flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-mono uppercase text-white/80 backdrop-blur-md">
-            <Sparkles className="h-3.5 w-3.5 text-emerald-200" aria-hidden="true" />
+            <Sparkles className="size-3.5 text-emerald-200" aria-hidden="true" />
             混合检索
           </div>
         </div>
 
         <div className="grid items-end gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-          <div className="space-y-8">
-            <div className="space-y-2 text-white">
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-2 text-white">
               <p className="flex items-center gap-2 text-xs font-mono uppercase text-white/70">
-                <Compass className="h-3.5 w-3.5" aria-hidden="true" />
+                <Compass className="size-3.5" aria-hidden="true" />
                 导航图谱
               </p>
               <h1 className="nav-display max-w-6xl text-6xl leading-[0.96] text-white sm:text-7xl md:text-8xl lg:text-9xl">
@@ -86,12 +87,12 @@ export function HomeHero({
                 className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 text-sm font-medium text-white backdrop-blur-md transition hover:border-emerald-200/50 hover:bg-white/15 focus-visible:outline-white"
               >
                 探索图谱
-                <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                <ArrowDown className="size-4" aria-hidden="true" />
               </a>
             </div>
           </div>
 
-          <aside className="nav-glass space-y-5 p-4 text-white md:p-5" aria-label="图谱概览">
+          <aside className="nav-glass flex flex-col gap-5 p-4 text-white md:p-5" aria-label="图谱概览">
             <div className="grid grid-cols-3 gap-3">
               <Metric value={totalLinks} label="工具" />
               <Metric value={categoryCount} label="分组" />
@@ -102,26 +103,21 @@ export function HomeHero({
             </p>
             <div className="flex flex-wrap gap-2">
               {topTabs.slice(0, 5).map((tab) => (
-                <button
+                <AtlasPill
                   key={tab.key}
-                  type="button"
                   onClick={() => onCategorySelect(activeCategory === tab.key ? "all" : tab.key)}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-mono uppercase transition ${
-                    activeCategory === tab.key
-                      ? "border-emerald-200/60 bg-emerald-200/15 text-emerald-50"
-                      : "border-white/15 bg-white/[0.06] text-white/72 hover:border-white/35 hover:text-white"
-                  }`}
-                  aria-pressed={activeCategory === tab.key}
+                  active={activeCategory === tab.key}
+                  icon={Layers3}
+                  count={tab.count}
+                  pressed
                 >
-                  <Layers3 className="h-3 w-3" aria-hidden="true" />
                   {tab.label}
-                  <span className="tabular-nums text-white/45">{tab.count}</span>
-                </button>
+                </AtlasPill>
               ))}
             </div>
             <div className="flex items-center justify-between border-t border-white/10 pt-4 text-xs font-mono uppercase text-white/58">
               <span>Cmd / Ctrl + K</span>
-              <Search className="h-3.5 w-3.5" aria-hidden="true" />
+              <Search className="size-3.5" aria-hidden="true" />
             </div>
           </aside>
         </div>

@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { PackageOpen, Search, Trophy, Waves } from "lucide-react";
-import { type Category, type ModelRanking as ModelRankingType, type NavLink } from "@/lib/types";
+import { PackageOpen, Search, Waves } from "lucide-react";
+import { type Category, type NavLink } from "@/lib/types";
 import type { PrecomputedNavData } from "@/lib/nav-derived-data";
 import { CategorySection } from "./CategorySection";
 import { DualTrackSection } from "./DualTrackSection";
@@ -18,20 +18,13 @@ const MobileNav = dynamic(() => import("./MobileNav").then((m) => m.MobileNav), 
   loading: () => null,
 });
 
-const ModelRanking = dynamic(() => import("./ModelRanking").then((m) => m.ModelRanking), {
-  loading: () => <div className="h-32 rounded-lg bg-white/10 animate-pulse" />,
-  ssr: false,
-});
-
 export function Navigation({
   categories,
   links,
-  modelRankings = [],
   precomputed,
 }: {
   categories: Category[];
   links: NavLink[];
-  modelRankings?: ModelRankingType[];
   precomputed?: PrecomputedNavData;
 }) {
   const {
@@ -50,10 +43,10 @@ export function Navigation({
     inputRef, resultsRef, announceRef,
     tabKeys, tabTree, currentLabel,
     featured, latest, popular, linkSections,
-    showRankings, showLinks, filteredRankings,
+    showLinks,
     flatResults,
     handleSearchKeyDown, handleResultKeyDown,
-  } = useLinksFilter({ categories, links, modelRankings, precomputed });
+  } = useLinksFilter({ categories, links, precomputed });
   const [mounted, setMounted] = useState(false);
   const [previewLink, setPreviewLink] = useState<NavLink | null>(null);
 
@@ -73,12 +66,13 @@ export function Navigation({
     .filter((tab) => tab.key !== "all" && tab.count > 0)
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
+  const visibleCategoryCount = tabTree.filter((tab) => tab.key !== "all").length;
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-[#07100f]" data-nav-hydrated={mounted ? "true" : "false"}>
       <HomeHero
         totalLinks={links.length}
-        categoryCount={categories.length}
+        categoryCount={visibleCategoryCount}
         featuredCount={featured.length}
         topTabs={topHeroTabs}
         searchValue={rawSearch}
@@ -94,7 +88,7 @@ export function Navigation({
 
       <div
         id="atlas"
-        className="flex border-t border-white/10 bg-[linear-gradient(180deg,#07100f_0%,#0b1215_42%,#f8fafc_42%,#f8fafc_100%)] dark:bg-[linear-gradient(180deg,#07100f_0%,#101820_100%)]"
+        className="flex border-t border-white/10 bg-[linear-gradient(180deg,#07100f_0%,#0b1215_42%,#08110f_100%)]"
       >
         <Sidebar
           tabs={tabTree}
@@ -171,18 +165,6 @@ export function Navigation({
                   onPreview={openPreview}
                 />
               ))}
-
-              {showRankings && (
-                <section className="animate-fade-in-up">
-                  {activeCategory === "all" && (
-                    <h2 className="atlas-section-label text-emerald-100">
-                      <Trophy className="h-3.5 w-3.5" />
-                      模型排行榜
-                    </h2>
-                  )}
-                  <ModelRanking data={filteredRankings} />
-                </section>
-              )}
 
               {q && flatResults.length === 0 && zeroResultRecommendations.length > 0 && (
                 <CategorySection

@@ -8,7 +8,6 @@
 import {
   LayoutGrid,
   Zap,
-  Trophy,
   Bot,
   Cloud,
   Code2,
@@ -26,7 +25,6 @@ import {
 export const categoryIcons: Record<string, LucideIcon> = {
   all: LayoutGrid,
   "free-relay": Zap,
-  "model-ranking": Trophy,
   "ai-api": Bot,
   "cloud-vps": Cloud,
   "dev-tools": Code2,

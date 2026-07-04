@@ -4,7 +4,6 @@ import { type NavLink, type Category } from "@/lib/types";
 import { Navigation } from "@/components/Navigation";
 import { NavSkeleton } from "@/components/NavSkeleton";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { getModelRankings } from "@/lib/model-rankings";
 import { getCategories, getApprovedLinks } from "@/lib/repositories";
 import { escapeJsonForHtml } from "@/lib/utils";
 import { logger } from "@/lib/logger";
@@ -61,19 +60,14 @@ export default async function Home({
 
   const categoriesSignal = AbortSignal.timeout(FETCH_TIMEOUT);
   const linksSignal = AbortSignal.timeout(FETCH_TIMEOUT);
-  const rankingsSignal = AbortSignal.timeout(FETCH_TIMEOUT);
 
-  const [categories, links, rankings] = await Promise.all([
+  const [categories, links] = await Promise.all([
     getCategories({ signal: categoriesSignal }).catch(() => {
       logger.warn("getCategories timed out, using empty fallback");
       return [];
     }),
     getApprovedLinks({ signal: linksSignal }).catch(() => {
       logger.warn("getApprovedLinks timed out, using empty fallback");
-      return [];
-    }),
-    getModelRankings({ signal: rankingsSignal }).catch(() => {
-      logger.warn("getModelRankings timed out, using empty fallback");
       return [];
     }),
   ]);
@@ -94,7 +88,7 @@ export default async function Home({
   const collectionJsonLd = cat ? buildCollectionPageJsonLd(cat, categories) : null;
 
   return (
-    <div className="w-full">
+    <div className="w-full bg-[#07100f]">
       {collectionJsonLd && (
         <script
           type="application/ld+json"
@@ -106,7 +100,6 @@ export default async function Home({
           <Navigation
             categories={categories}
             links={links as NavLink[]}
-            modelRankings={rankings}
             precomputed={precomputed}
           />
         </Suspense>

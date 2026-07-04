@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useCallback, useEffect, type KeyboardEvent, type RefObject } from "react";
-import type { NavLink, Category, Tag, ModelRanking } from "@/lib/types";
+import type { NavLink, Category, Tag } from "@/lib/types";
 import { SECTION_LABELS } from "@/lib/nav-config";
 import { isSafeUrl } from "@/lib/utils";
 import { trackClick } from "@/lib/track-click";
@@ -13,7 +13,6 @@ import type {
 } from "@/lib/search-experience";
 import { buildSearchFacets, buildSearchSuggestions } from "@/lib/search-experience";
 import {
-  matchRankings,
   buildTabCounts as clientTabCounts,
   buildTabTree as clientTabTree,
   buildAvailableTags as clientAvailableTags,
@@ -62,7 +61,8 @@ interface ParsedUrlFilters {
 
 function parseFiltersFromUrl(sp: URLSearchParams): ParsedUrlFilters {
   const q = sp.get("q")?.trim() ?? "";
-  const cat = sp.get("cat")?.trim() || "all";
+  const catRaw = sp.get("cat")?.trim() || "all";
+  const cat = catRaw === "model-ranking" ? "all" : catRaw;
   const tags = sp
     .getAll("tag")
     .flatMap((v) => v.split(","))
@@ -325,7 +325,6 @@ function useServerSearch(params: ServerSearchParams): ServerSearchState {
 interface DerivedLinksParams {
   categories: Category[];
   links: NavLink[];
-  modelRankings: ModelRanking[];
   activeCategory: string;
   activeTags: string[];
   sortMode: SortMode;
@@ -341,8 +340,6 @@ interface DerivedLinksState {
   latest: NavLink[];
   popular: NavLink[];
   linkSections: { key: string; links: NavLink[]; label: string; accent: string }[];
-  filteredRankings: ModelRanking[];
-  showRankings: boolean;
   showLinks: boolean;
   flatResults: { type: "link"; link: NavLink }[];
   totalResults: number;
@@ -357,7 +354,7 @@ interface DerivedLinksState {
 
 function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
   const {
-    categories, links, modelRankings, activeCategory, activeTags,
+    categories, links, activeCategory, activeTags,
     sortMode, search, serverResults, precomputed,
   } = params;
 
@@ -389,7 +386,7 @@ function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
     () => precomputed?.tabKeys ?? [
       { key: "all", label: "全部" },
       ...categories
-        .filter((c) => !c.parent_id)
+        .filter((c) => !c.parent_id && c.slug !== "model-ranking")
         .map((c) => ({ key: c.slug, label: SECTION_LABELS[c.slug] || c.name })),
     ],
     [precomputed, categories],
@@ -533,14 +530,7 @@ function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
     [tabKeys, activeCategory],
   );
 
-  const filteredRankings = useMemo(
-    () => matchRankings(modelRankings, q),
-    [modelRankings, q],
-  );
-
-  const showRankings =
-    (activeCategory === "all" || activeCategory === "model-ranking") && filteredRankings.length > 0;
-  const showLinks = activeCategory !== "model-ranking";
+  const showLinks = true;
 
   const flatResults = useMemo(() => {
     const items: { type: "link"; link: NavLink }[] = [];
@@ -557,12 +547,12 @@ function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
     return items;
   }, [showLinks, featured, latest, popular, linkSections, activeCategory, q]);
 
-  const totalResults = flatResults.length + (showRankings ? filteredRankings.length : 0);
+  const totalResults = flatResults.length;
   const hasResults = totalResults > 0;
 
   return {
     q, filtered, featured, latest, popular, linkSections,
-    filteredRankings, showRankings, showLinks, flatResults,
+    showLinks, flatResults,
     totalResults, hasResults,
     tabKeys, tabCounts, tabTree, currentLabel, availableTags, descendantSlugsMap,
   };
@@ -703,12 +693,10 @@ function useKeyboardNav(params: KeyboardNavParams): KeyboardNavState {
 export function useLinksFilter({
   categories,
   links,
-  modelRankings,
   precomputed,
 }: {
   categories: Category[];
   links: NavLink[];
-  modelRankings: ModelRanking[];
   precomputed?: PrecomputedNavData;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -727,7 +715,7 @@ export function useLinksFilter({
     setSearch: filters.setSearch,
   });
   const derived = useDerivedLinks({
-    categories, links, modelRankings,
+    categories, links,
     activeCategory: filters.activeCategory,
     activeTags: filters.activeTags,
     sortMode: filters.sortMode,
@@ -799,9 +787,7 @@ export function useLinksFilter({
     latest: derived.latest,
     popular: derived.popular,
     linkSections: derived.linkSections,
-    showRankings: derived.showRankings,
     showLinks: derived.showLinks,
-    filteredRankings: derived.filteredRankings,
     flatResults: derived.flatResults,
     totalResults: derived.totalResults,
     hasResults: derived.hasResults,

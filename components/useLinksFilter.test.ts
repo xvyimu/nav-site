@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useLinksFilter } from "./useLinksFilter";
 import type { NavLink, Category } from "@/lib/types";
-import type { ModelRanking } from "@/lib/types";
 
 // ── Helpers ──
 
@@ -25,11 +24,6 @@ function makeLink(overrides: Partial<NavLink> & { id: string }): NavLink {
 const categories: Category[] = [
   { id: "c1", name: "云服务 & VPS", slug: "cloud-vps", description: null, icon: null, sort_order: 0, created_at: "2026-01-01T00:00:00Z" },
   { id: "c2", name: "Relay Station", slug: "free-relay", description: null, icon: null, sort_order: 1, created_at: "2026-01-01T00:00:00Z" },
-];
-
-const rankings: ModelRanking[] = [
-  { id: "r1", model_name: "GPT-4o", description: "OpenAI Flagship", source: "openai", rank: 1, score: "95", icon: "", url: null, category: "test" },
-  { id: "r2", model_name: "Claude 4", description: "Anthropic Flagship", source: "anthropic", rank: 2, score: "90", icon: "", url: null, category: "test" },
 ];
 
 // ── Tests ──
@@ -57,7 +51,7 @@ describe("useLinksFilter", () => {
       makeLink({ id: "l1", category_slug: "cloud-vps" }),
       makeLink({ id: "l2", category_slug: "free-relay" }),
     ];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
     expect(result.current.filtered).toHaveLength(2);
     expect(result.current.tabKeys).toHaveLength(3); // all + 2 categories
     expect(result.current.hasResults).toBe(true);
@@ -68,7 +62,7 @@ describe("useLinksFilter", () => {
       makeLink({ id: "l1", category_slug: "cloud-vps" }),
       makeLink({ id: "l2", category_slug: "free-relay" }),
     ];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
     act(() => result.current.setActiveCategory("cloud-vps"));
     expect(result.current.filtered).toHaveLength(1);
     expect(result.current.filtered[0].id).toBe("l1");
@@ -99,7 +93,7 @@ describe("useLinksFilter", () => {
         query: "chat",
       }),
     } as never);
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
     act(() => result.current.setRawSearch("chat"));
     await act(async () => { await vi.advanceTimersByTimeAsync(250); });
     expect(result.current.q).toBe("chat");
@@ -157,7 +151,7 @@ describe("useLinksFilter", () => {
         tags: [{ id: "t1", name: "API", slug: "api", created_at: "2026-01-01T00:00:00Z" }],
       }),
     ];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
 
     act(() => result.current.toggleTag("api"));
     act(() => result.current.setMinRatingFilter(4));
@@ -182,7 +176,7 @@ describe("useLinksFilter", () => {
       makeLink({ id: "l2", created_at: "2026-06-20T00:00:00Z", category_slug: "cloud-vps" }),
       makeLink({ id: "l3", created_at: "2026-06-01T00:00:00Z", category_slug: "cloud-vps" }),
     ];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
     act(() => result.current.setSortMode("newest"));
     expect(result.current.filtered[0].id).toBe("l2");
     expect(result.current.filtered[1].id).toBe("l1");
@@ -195,7 +189,7 @@ describe("useLinksFilter", () => {
       makeLink({ id: "l2", featured: false, category_slug: "cloud-vps" }),
       makeLink({ id: "l3", featured: true, category_slug: "cloud-vps" }),
     ];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
     expect(result.current.featured).toHaveLength(2);
     // featured links are returned in original order (no category-based sort)
     expect(result.current.featured[0].category_slug).toBe("free-relay");
@@ -207,18 +201,23 @@ describe("useLinksFilter", () => {
       makeLink({ id: "l1", featured: true, title: "Alpha", category_slug: "cloud-vps" }),
       makeLink({ id: "l2", featured: false, title: "Beta", category_slug: "cloud-vps" }),
     ];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
     act(() => result.current.setRawSearch("beta"));
     act(() => { vi.advanceTimersByTime(250); });
     expect(result.current.featured).toHaveLength(0);
   });
 
-  it("shows rankings on 'all' tab and hides on category tabs without model-ranking", () => {
+  it("normalizes the removed model-ranking category to all links", () => {
+    window.history.replaceState(null, "", "/?cat=model-ranking");
+    const categoriesWithRemovedRanking: Category[] = [
+      ...categories,
+      { id: "c3", name: "模型排行榜", slug: "model-ranking", description: null, icon: null, sort_order: 2, created_at: "2026-01-01T00:00:00Z" },
+    ];
     const links = [makeLink({ id: "l1", category_slug: "cloud-vps" })];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
-    expect(result.current.showRankings).toBe(true);
-    act(() => result.current.setActiveCategory("cloud-vps"));
-    expect(result.current.showRankings).toBe(false);
+    const { result } = renderHook(() => useLinksFilter({ categories: categoriesWithRemovedRanking, links }));
+    expect(result.current.activeCategory).toBe("all");
+    expect(result.current.tabKeys.some((tab) => tab.key === "model-ranking")).toBe(false);
+    expect(result.current.filtered).toHaveLength(1);
   });
 
   it("handles keyboard navigation", () => {
@@ -226,7 +225,7 @@ describe("useLinksFilter", () => {
       makeLink({ id: "l1", title: "Alpha", category_slug: "cloud-vps" }),
       makeLink({ id: "l2", title: "Beta", category_slug: "cloud-vps" }),
     ];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
     act(() => result.current.handleSearchKeyDown({ key: "ArrowDown", preventDefault: vi.fn() } as never));
     expect(result.current.focusedIndex).toBe(0);
     act(() => result.current.handleResultKeyDown({ key: "ArrowDown", preventDefault: vi.fn() } as never, 0));
@@ -235,7 +234,7 @@ describe("useLinksFilter", () => {
 
   it("resets focus when search or category changes", () => {
     const links = [makeLink({ id: "l1", category_slug: "cloud-vps" })];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
     act(() => result.current.setFocusedIndex(0));
     act(() => result.current.setActiveCategory("free-relay"));
     expect(result.current.focusedIndex).toBe(-1);
@@ -247,7 +246,7 @@ describe("useLinksFilter", () => {
       makeLink({ id: "l2", category_slug: "cloud-vps" }),
       makeLink({ id: "l3", category_slug: "free-relay" }),
     ];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
     const bigTech = result.current.tabCounts.find((t) => t.key === "cloud-vps");
     const relay = result.current.tabCounts.find((t) => t.key === "free-relay");
     expect(bigTech?.count).toBe(2);
@@ -259,7 +258,7 @@ describe("useLinksFilter", () => {
   it("从 URL 读取初始筛选状态", () => {
     window.history.replaceState(null, "", "/?cat=cloud-vps&tag=api&minRating=4&popularity=featured&semantic=false");
     const links = [makeLink({ id: "l1", category_slug: "cloud-vps" })];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
     expect(result.current.activeCategory).toBe("cloud-vps");
     expect(result.current.activeTags).toEqual(["api"]);
     expect(result.current.minRatingFilter).toBe(4);
@@ -269,7 +268,7 @@ describe("useLinksFilter", () => {
 
   it("切换分类时同步到 URL", () => {
     const links = [makeLink({ id: "l1", category_slug: "cloud-vps" })];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
     act(() => result.current.setActiveCategory("cloud-vps"));
     expect(window.location.search).toContain("cat=cloud-vps");
     act(() => result.current.toggleTag("api"));
@@ -280,7 +279,7 @@ describe("useLinksFilter", () => {
 
   it("popstate 事件触发状态回填", () => {
     const links = [makeLink({ id: "l1", category_slug: "cloud-vps" })];
-    const { result } = renderHook(() => useLinksFilter({ categories, links, modelRankings: rankings }));
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
     // 先切到 cloud-vps
     act(() => result.current.setActiveCategory("cloud-vps"));
     expect(result.current.activeCategory).toBe("cloud-vps");

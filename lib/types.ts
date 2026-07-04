@@ -52,8 +52,8 @@ export interface NavLinkWithCategory extends NavLink {
 }
 
 /** 判断链接类型 */
-export function getLinkType(slug: string | null): "official" | "relay" | "model" | "neutral" {
-  if (slug === "model-ranking") return "model";
+export function getLinkType(slug: string | null): "official" | "relay" | "neutral" {
+  void slug;
   return "neutral";
 }
 
@@ -141,7 +141,7 @@ export interface SearchMeta {
   };
 }
 
-// ── 模型排行榜 ──
+// ── 资源搜索 ──
 
 export interface ResourceItem {
   id: string;
@@ -159,14 +159,3 @@ export interface SearchResponse {
   results: ResourceItem[];
 }
 
-export interface ModelRanking {
-  id: string;
-  rank: number;
-  model_name: string;
-  source: string;
-  score: string | null;
-  description: string | null;
-  icon: string;
-  url: string | null;
-  category: string;
-}

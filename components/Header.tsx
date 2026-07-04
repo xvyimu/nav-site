@@ -23,7 +23,7 @@ export function Header() {
   const isAdmin = isAuthenticated && (session?.user as { role?: string } | undefined)?.role === "admin";
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 md:px-6">
+    <header className="fixed inset-x-0 top-0 z-50 bg-[#07100f] px-3 pt-3 md:px-6">
       <div className="mx-auto grid h-12 max-w-[1480px] grid-cols-[1fr_auto_1fr] items-center rounded-2xl border border-white/14 bg-[#07100f]/58 px-3 text-white shadow-[0_20px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl md:h-14 md:px-5">
         <div className="flex items-center gap-1.5">
           <button
