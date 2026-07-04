@@ -1,14 +1,14 @@
 # 发布检查清单
 
 > 最后更新：2026-07-04
-> Release candidate：当前 `master` HEAD（以 `git log -1 --oneline` 为准）
+> Release candidate：`200db981 fix: clear launch gate regressions`
 > 目标分支：`master`
 
 ## 当前结论
 
-**本地代码侧 launch gate 已通过，但生产部署链路仍有 1 个红色项和 2 个黄色运维检查项。**
+**本地与远端质量门禁已通过，但生产部署链路仍有 1 个红色项和 2 个黄色运维检查项。**
 
-当前代码、测试、构建、本地 E2E 和本地安全检查均已通过。本轮 launch hardening 修复了 ResourceRating toast 动态加载阻塞评分 UI 的问题，刷新了已批准纸面视觉的 hero 快照，并收紧了移动端工具详情页 E2E locator。红色项仍是 GitHub Actions 的 `netlify deploy --prod` 实际返回 `JSONHTTPError: Forbidden`，因此最新生产部署仍需修复 Netlify token/site 权限后复验；黄色项有两个：生产 `/api/health` 显示 Sentry DSN 未配置；embedding 子检查为 `error`，说明生产运行环境暂时无法访问 `EMBED_SERVER_URL`。正式上线前需要修复 Netlify token/site 权限，补齐 `NEXT_PUBLIC_SENTRY_DSN`，并确认生产 embedding 服务可达，或明确接受语义搜索降级为文本/Fuse 搜索的行为。
+当前代码、测试、构建、本地 E2E、本地安全检查、GitHub Actions 质量检查、远端生产构建、远端 E2E 和 Lighthouse CI 均已通过。本轮 launch hardening 修复了 ResourceRating toast 动态加载阻塞评分 UI 的问题，刷新了已批准纸面视觉的 hero 快照，并收紧了移动端工具详情页 E2E locator。红色项仍是 GitHub Actions 的 `netlify deploy --prod` 实际返回 `JSONHTTPError: Forbidden`，因此最新生产部署仍需修复 Netlify token/site 权限后复验；黄色项有两个：生产 `/api/health` 显示 Sentry DSN 未配置；embedding 子检查为 `error`，说明生产运行环境暂时无法访问 `EMBED_SERVER_URL`。正式上线前需要修复 Netlify token/site 权限，补齐 `NEXT_PUBLIC_SENTRY_DSN`，并确认生产 embedding 服务可达，或明确接受语义搜索降级为文本/Fuse 搜索的行为。
 
 ## 已验证门禁
 
@@ -23,6 +23,8 @@
 | 生产构建 | ✅ | `pnpm build` |
 | 依赖审计 | ✅ | `pnpm audit --audit-level moderate --registry=https://registry.npmjs.org`：无已知漏洞 |
 | 密钥扫描 | ✅ | `node scripts/pre-commit-secret-scan.mjs` |
+| 远端质量检查 | ✅ | GitHub Actions run `28705557395`：质量检查、生产构建、E2E 测试均 success |
+| Lighthouse CI | ✅ | GitHub Actions run `28705557390` success |
 | 生产健康检查 | ✅ | 本地 `next start -p 3264`；`/api/health` 返回 HTTP 200、`status=healthy` |
 | 安全响应头 | ✅ | CSP、HSTS、`X-Frame-Options=DENY`、`X-Content-Type-Options=nosniff`、`Referrer-Policy=strict-origin-when-cross-origin` |
 | 调试输出扫描 | ✅ | 无生产 `console.log`；保留的 `console.warn/error` 均为 logger、错误边界、fetch 失败上报或性能阈值告警 |
@@ -31,8 +33,8 @@
 
 | 项目 | 状态 | 结果 |
 |---|---:|---|
-| GitHub Actions | ❌ | 最近一次远端验证：`quality`、`build`、`e2e` 通过；`deploy` 真实失败，日志显示 `netlify deploy --prod --site "$NETLIFY_SITE_ID"` 返回 `JSONHTTPError: Forbidden`；本轮提交推送后需重新跑 Actions |
-| Lighthouse CI | ✅ | 最新 `master` run success |
+| GitHub Actions | ❌ | `28705557395`：`quality`、`build`、`e2e` 通过；`deploy` 真实失败，job `85130893612` 日志显示 `netlify deploy --prod --site "$NETLIFY_SITE_ID"` 返回 `JSONHTTPError: Forbidden`；`link-check` 因部署失败被 skipped |
+| Lighthouse CI | ✅ | `28705557390`：latest `master` run success |
 | 生产首页 | ✅ | `GET /` 返回 200 |
 | 生产搜索 API | ✅ | `/api/search?q=ai&limit=5` 返回 200，5 条结果 |
 | 工具详情页 | ✅ | `/tool/figma` 返回 200，包含 Figma 与访问官网入口 |
@@ -59,8 +61,8 @@
    - `NEXT_PUBLIC_SENTRY_DSN`
    - 可选：`EMBED_SERVER_URL`
 3. 修复 Netlify 部署凭据或站点权限：
-   - `NETLIFY_AUTH_TOKEN` 需能访问目标站点。
-   - `NETLIFY_SITE_ID` 可配置为 GitHub secret 或 repository variable。
+   - 当前 `NETLIFY_SITE_ID` 为 `a7e3787f-3c6d-4179-919d-1dc1efa83c52`。
+   - `NETLIFY_AUTH_TOKEN` 需能访问该目标站点，或将 `NETLIFY_SITE_ID` 调整为 token 所属账号可访问的站点。
    - 重新跑 deploy 后复验生产安全头。
 4. 配置 `NEXT_PUBLIC_SENTRY_DSN`，让生产 `/api/health` 的 Sentry 检查从 `skipped` 变为 `ok`。
 5. 如果需要完整语义搜索能力，确认生产运行环境能访问 `EMBED_SERVER_URL`。
