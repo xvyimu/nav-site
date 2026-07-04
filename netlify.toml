@@ -4,6 +4,18 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# 全站安全响应头。保持与 next.config.ts 的 securityHeaders 一致，避免
+# Netlify 生产环境落回平台默认 X-Frame-Options / Referrer-Policy。
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.google.com https://www.google-analytics.com; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; connect-src 'self' https://*.supabase.co https://*.ingest.us.sentry.io https://www.google-analytics.com https://region1.google-analytics.com; object-src 'none'; upgrade-insecure-requests"
+
 # PWA manifest
 [[headers]]
   for = "/manifest.webmanifest"

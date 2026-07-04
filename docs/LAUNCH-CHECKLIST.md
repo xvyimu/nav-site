@@ -1,20 +1,20 @@
 # 发布检查清单
 
 > 最后更新：2026-07-04
-> Release candidate：`b79fdf70 fix: improve mobile nav readability`
+> Release candidate：当前 `master` HEAD（以 `git log -1 --oneline` 为准）
 > 目标分支：`master`
 
 ## 当前结论
 
-**代码侧可以发布，但有 1 个黄色运维检查项。**
+**代码侧可以发布，但有 2 个黄色运维检查项。**
 
-当前代码、测试、构建、安全头和健康检查均已通过。唯一黄色项是 embedding 子检查：本地生产模式访问 `/api/health` 返回 HTTP 200 且整体 `healthy`，但 `checks.embedding.status` 为 `error`，原因是本机验证时 `EMBED_SERVER_URL` 对应的 8003 embedding 微服务未运行。正式上线前需要确认生产环境的 embedding 服务可达，或明确接受语义搜索降级为文本/Fuse 搜索的行为。
+当前代码、测试、构建、安全头和健康检查均已通过。黄色项有两个：生产 `/api/health` 显示 Sentry DSN 未配置；embedding 子检查为 `error`，说明生产运行环境暂时无法访问 `EMBED_SERVER_URL`。正式上线前需要补齐 `NEXT_PUBLIC_SENTRY_DSN`，并确认生产 embedding 服务可达，或明确接受语义搜索降级为文本/Fuse 搜索的行为。
 
 ## 已验证门禁
 
 | 门禁 | 状态 | 证据 |
 |---|---:|---|
-| Git 状态 | ✅ | `master` 与 `origin/master` 均为 `b79fdf70`，工作树 clean |
+| Git 状态 | ✅ | `master` 与 `origin/master` 已同步，工作树 clean |
 | Lint | ✅ | `pnpm lint` |
 | Typecheck | ✅ | `pnpm typecheck` |
 | 单元测试 | ✅ | `pnpm test` 结果已记录在 `docs/PROGRESS.md` |
@@ -26,6 +26,20 @@
 | 生产健康检查 | ✅ | 本地 `next start -p 3264`；`/api/health` 返回 HTTP 200、`status=healthy` |
 | 安全响应头 | ✅ | CSP、HSTS、`X-Frame-Options=DENY`、`X-Content-Type-Options=nosniff`、`Referrer-Policy=strict-origin-when-cross-origin` |
 | 调试输出扫描 | ✅ | 无生产 `console.log`；保留的 `console.warn/error` 均为 logger、错误边界、fetch 失败上报或性能阈值告警 |
+
+## 生产验证记录
+
+| 项目 | 状态 | 结果 |
+|---|---:|---|
+| GitHub Actions | ✅ | `quality`、`build`、`e2e`、`deploy`、`link-check` 全部 success |
+| Lighthouse CI | ✅ | 最新 `master` run success |
+| 生产首页 | ✅ | `GET /` 返回 200 |
+| 生产搜索 API | ✅ | `/api/search?q=ai&limit=5` 返回 200，5 条结果 |
+| 工具详情页 | ✅ | `/tool/figma` 返回 200，包含 Figma 与访问官网入口 |
+| Sitemap | ✅ | `/sitemap.xml` 返回 200，包含 `/tool/figma` |
+| Robots | ✅ | `/robots.txt` 返回 200，包含 `User-Agent` |
+| 生产健康检查 | ⚠️ | `/api/health` 返回 200/healthy；`database/env` ok；`sentry` skipped；`embedding` error |
+| 生产安全头 | ✅ | 已在 `netlify.toml` 加全站安全头，强制与 `next.config.ts` 对齐 |
 
 ## 发布前步骤
 
@@ -44,15 +58,16 @@
    - `SUPABASE_SERVICE_ROLE_KEY` 或 `SUPABASE_SERVICE_ROLE_KEY_PROD`
    - `NEXT_PUBLIC_SENTRY_DSN`
    - 可选：`EMBED_SERVER_URL`
-3. 如果需要完整语义搜索能力，确认生产运行环境能访问 `EMBED_SERVER_URL`。
-4. 打开生产站点做冒烟测试：
+3. 配置 `NEXT_PUBLIC_SENTRY_DSN`，让生产 `/api/health` 的 Sentry 检查从 `skipped` 变为 `ok`。
+4. 如果需要完整语义搜索能力，确认生产运行环境能访问 `EMBED_SERVER_URL`。
+5. 打开生产站点做冒烟测试：
    - 首页可加载。
    - 搜索可返回结果。
    - 移动端 320px 和 390px 下底栏标签可读、无横向溢出。
    - `/api/health` 返回 200。
    - `/api/search?q=ai&limit=5` 返回 JSON。
    - `/tool/figma` 可渲染。
-5. 发布后检查 Sentry：
+6. 发布后检查 Sentry：
    - 无新增错误类型。
    - Web Vitals 事件有上报。
    - API failure 没有明显 spike。
