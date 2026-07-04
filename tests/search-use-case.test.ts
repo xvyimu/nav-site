@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SearchApiBody, SearchParams, SearchSuccessBody } from "@/lib/search/types";
+import type {
+  SearchApiBody,
+  SearchParams,
+  SearchSuccessBody,
+  SemanticRow,
+} from "@/lib/search/types";
 
 const sampleLinks = [
   {
@@ -43,7 +48,9 @@ const sampleLinks = [
 ];
 
 const getApprovedLinks = vi.fn(async () => sampleLinks);
-const rpc = vi.fn(async () => ({ data: [], error: null }));
+const rpc = vi.fn<() => Promise<{ data: SemanticRow[] | null; error: { message: string } | null }>>(
+  async () => ({ data: [], error: null })
+);
 const createServiceRoleClient = vi.fn(() => ({ rpc }));
 const loggerInfo = vi.fn();
 
@@ -212,6 +219,54 @@ describe("executeSearch", () => {
     expect(fetchMock).toHaveBeenCalled();
     expect(createServiceRoleClient).toHaveBeenCalled();
     expect(body.results.length).toBeGreaterThan(0);
+  });
+
+  it("excludes semantic candidates that fail active filters", async () => {
+    process.env.EMBED_SERVER_URL = "http://127.0.0.1:8003";
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ embedding: Array(512).fill(0.1) }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    rpc.mockResolvedValueOnce({
+      data: [
+        {
+          id: "550e8400-e29b-41d4-a716-446655440099",
+          title: "Cloud VPS",
+          url: "https://vps.example.com",
+          description: "Cloud server hosting",
+          icon: null,
+          category_name: "Cloud",
+          category_slug: "cloud-vps",
+          similarity: 0.92,
+          featured: false,
+          paid: false,
+          click_count: 0,
+        },
+      ],
+      error: null,
+    });
+    const { executeSearch } = await importUseCase();
+
+    const result = await executeSearch({
+      params: makeParams({
+        q: "cloud",
+        semantic: true,
+        filters: {
+          category: undefined,
+          tagSlugs: ["api"],
+          minRating: null,
+          popularity: null,
+        },
+      }),
+      requestId: "req-filtered-semantic",
+      startedAt: Date.now(),
+    });
+    const body = expectSuccessBody(result.body);
+
+    expect(result.status).toBe(200);
+    expect(body.mode).toBe("semantic");
+    expect(body.results.map((item) => item.id)).not.toContain("550e8400-e29b-41d4-a716-446655440099");
   });
 
   it("logs search telemetry without raw query text", async () => {

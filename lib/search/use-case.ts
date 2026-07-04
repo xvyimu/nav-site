@@ -81,7 +81,7 @@ export async function executeSearch({
           semanticResults = await searchSemantic(embedding, limit, category, linksById);
           semanticResults = semanticResults.filter((result) => {
             const link = linksById.get(result.id);
-            return link ? applySearchFilters([link], filters).length > 0 : true;
+            return link ? applySearchFilters([link], filters).length > 0 : false;
           });
           if (semanticResults.length === 0) fallbackReason = "semantic_empty";
         } else {
