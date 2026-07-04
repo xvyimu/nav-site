@@ -141,7 +141,7 @@ jobs:
           retention-days: 7
 
   deploy:
-    name: 部署到 Netlify
+    name: 等待 Netlify 部署
     runs-on: ubuntu-latest
     needs: [quality, build, e2e]
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
@@ -152,33 +152,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 部署到 Netlify
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 等待 Netlify Git 部署
         id: deploy
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID || vars.NETLIFY_SITE_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SOURCE_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SOURCE_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY: ${{ secrets.NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY }}
-          RESOURCE_LIBRARY_SERVICE_ROLE_KEY: ${{ secrets.RESOURCE_LIBRARY_SERVICE_ROLE_KEY }}
         run: |
           set -euo pipefail
           : "${NETLIFY_AUTH_TOKEN:?NETLIFY_AUTH_TOKEN is not set}"
           : "${NETLIFY_SITE_ID:?NETLIFY_SITE_ID is not set}"
-          status="$(curl -sS -o /tmp/netlify-site.json -w "%{http_code}" \
-            -H "Authorization: Bearer ${NETLIFY_AUTH_TOKEN}" \
-            "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE_ID}")"
-          if [ "$status" != "200" ]; then
-            echo "::error title=Netlify site access failed::Netlify API returned HTTP ${status} for configured NETLIFY_SITE_ID. Refresh NETLIFY_AUTH_TOKEN or update NETLIFY_SITE_ID to a site this token can access."
-            exit 1
-          fi
-          npm install -g netlify-cli
-          deploy_json="$(mktemp)"
-          netlify deploy --prod --site "$NETLIFY_SITE_ID" --auth "$NETLIFY_AUTH_TOKEN" --json | tee "$deploy_json"
-          deploy_url="$(node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); console.log(data.deploy_url || data.deploy_ssl_url || data.url || data.ssl_url || '')" "$deploy_json" 2>/dev/null || true)"
-          if [ -n "$deploy_url" ]; then
-            echo "deploy-url=$deploy_url" >> "$GITHUB_OUTPUT"
-          fi
+          node scripts/wait-netlify-deploy.mjs
 
   link-check:
     name: 链接健康检测
