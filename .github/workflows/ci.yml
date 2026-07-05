@@ -156,17 +156,11 @@ jobs:
 
       - name: 同步到 Netlify 生产分支
         id: mirror
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mirror_time="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           echo "mirror-time=$mirror_time" >> "$GITHUB_OUTPUT"
-          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" >/dev/null 2>&1; then
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/heads/main" -f sha="${GITHUB_SHA}" -F force=false >/dev/null
-          else
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/heads/main" -f sha="${GITHUB_SHA}" >/dev/null
-          fi
+          git push --porcelain origin "${GITHUB_SHA}:refs/heads/main"
 
       - uses: actions/setup-node@v4
         with:
