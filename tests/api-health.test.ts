@@ -38,6 +38,7 @@ describe("/api/health", () => {
   });
 
   it("reports embedding health when the local embed service is reachable", async () => {
+    process.env.EMBED_SERVER_URL = "http://127.0.0.1:8003";
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -53,10 +54,11 @@ describe("/api/health", () => {
     expect(response.status).toBe(200);
     expect(body.checks.database.status).toBe("ok");
     expect(body.checks.embedding.status).toBe("ok");
-    expect(body.checks.embedding.detail).toBe("embed service reachable");
+    expect(body.checks.embedding.detail).toBe("optional embed service reachable");
   });
 
   it("keeps the app healthy but marks embedding as error when the embed service is down", async () => {
+    process.env.EMBED_SERVER_URL = "http://127.0.0.1:8003";
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -72,8 +74,22 @@ describe("/api/health", () => {
     expect(response.status).toBe(200);
     expect(body.status).toBe("healthy");
     expect(body.checks.embedding.status).toBe("error");
-    expect(body.checks.embedding.detail).toBe("embed service returned 503");
+    expect(body.checks.embedding.detail).toBe("optional embed service returned 503; semantic search will fall back");
     expect(loggerWarn).not.toHaveBeenCalled();
+  });
+
+  it("skips embedding health when EMBED_SERVER_URL is not configured", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { GET } = await import("@/app/api/health/route");
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.checks.embedding.status).toBe("skipped");
+    expect(body.checks.embedding.detail).toBe("not configured or non-loopback EMBED_SERVER_URL");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("skips embedding health for non-loopback embed URLs", async () => {

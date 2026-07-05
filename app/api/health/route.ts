@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
-const DEFAULT_EMBED_SERVER_URL = "http://127.0.0.1:8003";
 const EMBED_HEALTH_TIMEOUT_MS = 1500;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -11,7 +10,8 @@ function normalizeHostname(hostname: string): string {
 }
 
 function getEmbedHealthEndpoint(): string | null {
-  const raw = process.env.EMBED_SERVER_URL ?? DEFAULT_EMBED_SERVER_URL;
+  const raw = process.env.EMBED_SERVER_URL;
+  if (!raw) return null;
 
   try {
     const url = new URL(raw);
@@ -102,13 +102,17 @@ export async function GET() {
       checks.embedding = {
         status: response.ok ? "ok" : "error",
         latency_ms: Date.now() - embedStart,
-        detail: response.ok ? "embed service reachable" : `embed service returned ${response.status}`,
+        detail: response.ok
+          ? "optional embed service reachable"
+          : `optional embed service returned ${response.status}; semantic search will fall back`,
       };
     } catch (e) {
       checks.embedding = {
         status: "error",
         latency_ms: Date.now() - embedStart,
-        detail: e instanceof Error ? e.message : "embed service unavailable",
+        detail: e instanceof Error
+          ? `optional embed service unavailable: ${e.message}`
+          : "optional embed service unavailable; semantic search will fall back",
       };
     }
   }
