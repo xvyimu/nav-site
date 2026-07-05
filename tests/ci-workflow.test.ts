@@ -24,6 +24,8 @@ describe("CI workflow launch behavior", () => {
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain('cron: "17 */6 * * *"');
     expect(workflow).toContain("node scripts/probe-production.mjs");
+    expect(workflow).toContain("Close recovered outage issue");
+    expect(workflow).toContain("state: 'closed'");
     expect(workflow).not.toContain("NETLIFY_AUTH_TOKEN");
     expect(workflow).not.toContain("labels: ['production-monitor', 'automated']");
   });

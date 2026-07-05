@@ -40,7 +40,7 @@
 | Lighthouse CI | 通过 | 最近一次 `master` push 对应 Lighthouse run 为 success |
 | Netlify 分支同步 | 通过 | CI deploy job 会将 `master` 镜像到 Netlify 监听的 `main` 分支 |
 | 手动部署触发 | 已接入 | `CI 检查 + Netlify 部署` 支持 `workflow_dispatch`；Netlify 额度恢复后，代码已推送时可手动跑完整质量链路、deploy 和 link-check |
-| 生产 smoke monitor | 已接入 | `Production smoke monitor` 支持 `workflow_dispatch` 和每 6 小时定时运行 `node scripts/probe-production.mjs`；失败时上传日志并创建/更新 GitHub Issue |
+| 生产 smoke monitor | 已接入 | `Production smoke monitor` 支持 `workflow_dispatch` 和每 6 小时定时运行 `node scripts/probe-production.mjs`；失败时上传日志并创建/更新 GitHub Issue，恢复后自动评论并关闭故障 Issue |
 | Deploy 后生产探针 | 已接入 | deploy job 输出 `deploy-url` 后，`link-check` 会先运行 `pnpm run verify:production:latest -- --base-url <deploy-url> --expect-commit "$GITHUB_SHA"` |
 | 发布版本识别 | 已接入 | 构建前生成 `/build-info.json`；部署后探针使用 `--expect-commit "$GITHUB_SHA"` 校验线上版本确为本次发布；`/api/health` 也会尽量暴露运行时可见的版本元数据 |
 | Netlify deploy preflight | 预期阻塞 | deploy job 在 preflight 阶段失败：`Netlify account credit usage exceeded`，且不触发新 build |
