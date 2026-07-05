@@ -76,6 +76,7 @@ describe("scripts/wait-netlify-deploy", () => {
     const match = findMatchingDeploy(deploys, {
       targetSha: "abcdef1234567890",
       targetBranch: "main",
+      targetDeployId: undefined,
       createdAfter: Date.parse("2026-07-05T02:00:00Z"),
     });
 
@@ -102,10 +103,76 @@ describe("scripts/wait-netlify-deploy", () => {
     const match = findMatchingDeploy(deploys, {
       targetSha: "abcdef1234567890",
       targetBranch: "main",
+      targetDeployId: undefined,
       createdAfter: Number.NaN,
     });
 
     expect(match?.id).toBe("right-branch");
+  });
+
+  it("matches deploys by explicit deploy id before commit fallbacks", async () => {
+    const { findMatchingDeploy } = await importDeployModule();
+    const deploys: Deploy[] = [
+      {
+        id: "fallback-created-at",
+        branch: "main",
+        created_at: "2026-07-05T02:01:00Z",
+      },
+      {
+        id: "target-deploy",
+        branch: "main",
+        created_at: "2026-07-05T02:00:30Z",
+      },
+    ];
+
+    const match = findMatchingDeploy(deploys, {
+      targetSha: "abcdef1234567890",
+      targetBranch: "main",
+      targetDeployId: "target-deploy",
+      createdAfter: Date.parse("2026-07-05T02:00:00Z"),
+    });
+
+    expect(match?.id).toBe("target-deploy");
+  });
+
+  it("triggers a Netlify build for the target branch", async () => {
+    const { triggerNetlifyBuild } = await importDeployModule();
+    const logger = { log: vi.fn(), error: vi.fn() };
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        id: "build-1",
+        deploy_id: "deploy-1",
+        sha: "abcdef1234567890",
+      }),
+    }));
+
+    const build = await triggerNetlifyBuild({
+      config: {
+        token: "test-token",
+        siteId: "site-id",
+        targetSha: "abcdef1234567890",
+        targetBranch: "main",
+        buildTitle: "CI deploy abcdef1",
+        clearCache: false,
+      },
+      fetchImpl: asFetch(fetchImpl),
+      logger: asConsole(logger),
+    });
+
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [URL, RequestInit];
+    const requestUrl = url;
+    expect(requestUrl.pathname).toBe("/api/v1/sites/site-id/builds");
+    expect(requestUrl.searchParams.get("branch")).toBe("main");
+    expect(requestUrl.searchParams.get("title")).toBe("CI deploy abcdef1");
+    expect(init).toMatchObject({
+      method: "POST",
+      headers: {
+        Authorization: "Bearer test-token",
+        "User-Agent": "nav-site-ci",
+      },
+    });
+    expect(build.deploy_id).toBe("deploy-1");
   });
 
   it("waits once, writes the deploy URL, and returns the ready deploy", async () => {

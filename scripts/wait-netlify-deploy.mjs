@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 const DEFAULT_TIMEOUT_MS = 8 * 60 * 1000;
 const DEFAULT_INTERVAL_MS = 10 * 1000;
 const FAILED_STATES = new Set(["error", "failed", "rejected", "skipped", "canceled", "cancelled"]);
+const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -17,6 +18,10 @@ function parsePositiveNumber(value, fallback) {
   if (value === undefined || value === null || value === "") return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseBoolean(value) {
+  return TRUE_VALUES.has(normalize(value));
 }
 
 export function candidateValues(deploy) {
@@ -53,12 +58,24 @@ export function matchesBranch(deploy, targetBranch) {
   return deploy.branch === targetBranch;
 }
 
+export function matchesDeployId(deploy, targetDeployId) {
+  if (!targetDeployId) return false;
+  return deploy.id === targetDeployId;
+}
+
 export function matchesCreatedAfter(deploy, createdAfter) {
   if (!Number.isFinite(createdAfter) || !deploy.created_at) return false;
   return Date.parse(deploy.created_at) >= createdAfter;
 }
 
-export function findMatchingDeploy(deploys, { targetSha, targetBranch, createdAfter }) {
+export function findMatchingDeploy(deploys, { targetSha, targetBranch, targetDeployId, createdAfter }) {
+  const targetDeploy = targetDeployId
+    ? deploys.find(
+        (deploy) => matchesBranch(deploy, targetBranch) && matchesDeployId(deploy, targetDeployId)
+      )
+    : undefined;
+  if (targetDeploy) return targetDeploy;
+
   return deploys.find(
     (deploy) =>
       matchesBranch(deploy, targetBranch) &&
@@ -103,10 +120,46 @@ export function readConfigFromEnv(env = process.env) {
     siteId,
     targetSha,
     targetBranch,
+    targetDeployId: env.NETLIFY_DEPLOY_ID,
+    triggerBuild: parseBoolean(env.NETLIFY_TRIGGER_BUILD),
+    buildTitle: env.NETLIFY_BUILD_TITLE,
+    clearCache: parseBoolean(env.NETLIFY_BUILD_CLEAR_CACHE),
     createdAfter,
     timeoutMs: parsePositiveNumber(env.NETLIFY_DEPLOY_POLL_TIMEOUT_MS, DEFAULT_TIMEOUT_MS),
     intervalMs: parsePositiveNumber(env.NETLIFY_DEPLOY_POLL_INTERVAL_MS, DEFAULT_INTERVAL_MS),
   };
+}
+
+function authHeaders(token) {
+  return {
+    Authorization: `Bearer ${token}`,
+    "User-Agent": "nav-site-ci",
+  };
+}
+
+export async function triggerNetlifyBuild({ config, fetchImpl = fetch, logger = console }) {
+  const url = new URL(`https://api.netlify.com/api/v1/sites/${encodeURIComponent(config.siteId)}/builds`);
+  if (config.targetBranch) url.searchParams.set("branch", config.targetBranch);
+  if (config.clearCache) url.searchParams.set("clear_cache", "true");
+  url.searchParams.set(
+    "title",
+    config.buildTitle || `GitHub Actions ${config.targetSha.slice(0, 7)}`
+  );
+
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: authHeaders(config.token),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Netlify build trigger failed with HTTP ${response.status}`);
+  }
+
+  const build = await response.json();
+  logger.log(
+    `[netlify] triggered build: id=${build.id ?? "unknown"}, deploy_id=${build.deploy_id ?? "unknown"}, sha=${build.sha ?? "unknown"}`
+  );
+  return build;
 }
 
 export async function listDeploys({ config, fetchImpl = fetch }) {
@@ -114,10 +167,7 @@ export async function listDeploys({ config, fetchImpl = fetch }) {
   url.searchParams.set("per_page", "50");
 
   const response = await fetchImpl(url, {
-    headers: {
-      Authorization: `Bearer ${config.token}`,
-      "User-Agent": "nav-site-ci",
-    },
+    headers: authHeaders(config.token),
   });
 
   if (!response.ok) {
@@ -151,7 +201,7 @@ export async function waitForNetlifyDeploy({
     const deploy = findMatchingDeploy(deploys, config);
 
     if (!deploy) {
-      logger.log(`[netlify] waiting for Git deploy for ${config.targetBranch ?? "unknown-branch"}@${targetShortSha}`);
+      logger.log(`[netlify] waiting for deploy for ${config.targetBranch ?? "unknown-branch"}@${targetShortSha}`);
       await sleepImpl(config.intervalMs);
       continue;
     }
@@ -171,11 +221,15 @@ export async function waitForNetlifyDeploy({
     await sleepImpl(config.intervalMs);
   }
 
-  throw new Error(`Timed out waiting for Netlify Git deploy for ${config.targetBranch ?? "unknown-branch"}@${targetShortSha}`);
+  throw new Error(`Timed out waiting for Netlify deploy for ${config.targetBranch ?? "unknown-branch"}@${targetShortSha}`);
 }
 
 export async function main({ env = process.env, fetchImpl = fetch, logger = console } = {}) {
   const config = readConfigFromEnv(env);
+  if (config.triggerBuild) {
+    const build = await triggerNetlifyBuild({ config, fetchImpl, logger });
+    config.targetDeployId = build.deploy_id || config.targetDeployId;
+  }
   return waitForNetlifyDeploy({ config, fetchImpl, logger });
 }
 
