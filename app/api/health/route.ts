@@ -1,27 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { describeEmbedSkipReason, resolveLoopbackEmbedEndpoint } from "@/lib/embedding-runtime";
 import { logger } from "@/lib/logger";
 
 const EMBED_HEALTH_TIMEOUT_MS = 1500;
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
-function normalizeHostname(hostname: string): string {
-  return hostname.replace(/^\[(.*)\]$/, "$1").toLowerCase();
-}
-
-function getEmbedHealthEndpoint(): string | null {
-  const raw = process.env.EMBED_SERVER_URL;
-  if (!raw) return null;
-
-  try {
-    const url = new URL(raw);
-    if ((url.protocol !== "http:" && url.protocol !== "https:") || !LOOPBACK_HOSTS.has(normalizeHostname(url.hostname))) {
-      return null;
-    }
-    return new URL("/health", url).toString();
-  } catch {
-    return null;
-  }
+function getEmbedHealthEndpoint() {
+  return resolveLoopbackEmbedEndpoint({
+    raw: process.env.EMBED_SERVER_URL,
+    path: "/health",
+  });
 }
 
 export async function GET() {
@@ -87,12 +75,12 @@ export async function GET() {
   };
 
   const embedStart = Date.now();
-  const embedEndpoint = getEmbedHealthEndpoint();
-  if (!embedEndpoint) {
+  const { endpoint: embedEndpoint, reason: embedSkipReason } = getEmbedHealthEndpoint();
+  if (embedEndpoint === null) {
     checks.embedding = {
       status: "skipped",
       latency_ms: Date.now() - embedStart,
-      detail: "not configured or non-loopback EMBED_SERVER_URL",
+      detail: describeEmbedSkipReason(embedSkipReason),
     };
   } else {
     try {

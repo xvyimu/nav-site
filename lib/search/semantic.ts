@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { describeEmbedSkipReason, resolveLoopbackEmbedEndpoint } from "@/lib/embedding-runtime";
 import { logger } from "@/lib/logger";
 import type { NavLink } from "@/lib/types";
 import type { SearchResult, SemanticRow } from "./types";
@@ -19,15 +20,10 @@ const MIN_SEMANTIC_SIMILARITY = 0.35;
 const EMBED_REQUEST_TIMEOUT_MS = 5000;
 const EMBED_UNAVAILABLE_TTL_MS = 30_000;
 const EMBED_WARNING_THROTTLE_MS = 60_000;
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 let unavailableEndpoint: string | null = null;
 let unavailableUntil = 0;
 const lastWarningAt = new Map<string, number>();
-
-function normalizeHostname(hostname: string): string {
-  return hostname.replace(/^\[(.*)\]$/, "$1").toLowerCase();
-}
 
 function warnThrottled(key: string, message: string, context: Record<string, unknown>): void {
   const now = Date.now();
@@ -60,26 +56,22 @@ function clearTemporarilyUnavailable(endpoint: string): void {
  * 避免被环境变量误导去打外部地址。
  */
 export function getEmbedEndpoint(): string | null {
-  const raw = process.env.EMBED_SERVER_URL ?? DEFAULT_EMBED_SERVER_URL;
+  const { endpoint, reason } = resolveLoopbackEmbedEndpoint({
+    raw: process.env.EMBED_SERVER_URL,
+    fallback: DEFAULT_EMBED_SERVER_URL,
+    path: "/embed-query",
+  });
 
-  try {
-    const url = new URL(raw);
-    if (
-      (url.protocol !== "http:" && url.protocol !== "https:") ||
-      !LOOPBACK_HOSTS.has(normalizeHostname(url.hostname))
-    ) {
-      warnThrottled("embed-config:non-loopback", "Ignoring non-loopback EMBED_SERVER_URL", {
-        source: "api-search",
-      });
-      return null;
-    }
-    return new URL("/embed-query", url).toString();
-  } catch {
-    warnThrottled("embed-config:invalid", "Ignoring invalid EMBED_SERVER_URL", {
+  if (endpoint !== null) return endpoint;
+
+  if (reason !== "missing") {
+    warnThrottled(`embed-config:${reason}`, "Ignoring EMBED_SERVER_URL", {
       source: "api-search",
+      reason: describeEmbedSkipReason(reason),
     });
-    return null;
   }
+
+  return null;
 }
 
 /**

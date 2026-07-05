@@ -35,6 +35,11 @@ describe("/api/health", () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     delete process.env.EMBED_SERVER_URL;
+    delete process.env.EMBED_SERVER_LOOPBACK_ENABLED;
+    delete process.env.NETLIFY;
+    delete process.env.VERCEL;
+    delete process.env.AWS_LAMBDA_FUNCTION_NAME;
+    delete process.env.AWS_EXECUTION_ENV;
   });
 
   it("reports embedding health when the local embed service is reachable", async () => {
@@ -88,7 +93,7 @@ describe("/api/health", () => {
 
     expect(response.status).toBe(200);
     expect(body.checks.embedding.status).toBe("skipped");
-    expect(body.checks.embedding.detail).toBe("not configured or non-loopback EMBED_SERVER_URL");
+    expect(body.checks.embedding.detail).toBe("not configured");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -104,6 +109,41 @@ describe("/api/health", () => {
     expect(response.status).toBe(200);
     expect(body.checks.embedding.status).toBe("skipped");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("skips loopback embedding health in serverless runtimes by default", async () => {
+    process.env.EMBED_SERVER_URL = "http://127.0.0.1:8003";
+    process.env.NETLIFY = "true";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { GET } = await import("@/app/api/health/route");
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.checks.embedding.status).toBe("skipped");
+    expect(body.checks.embedding.detail).toBe("loopback EMBED_SERVER_URL disabled in serverless runtime");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("allows explicit loopback embedding health checks in serverless runtimes", async () => {
+    process.env.EMBED_SERVER_URL = "http://127.0.0.1:8003";
+    process.env.NETLIFY = "true";
+    process.env.EMBED_SERVER_LOOPBACK_ENABLED = "true";
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { GET } = await import("@/app/api/health/route");
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.checks.embedding.status).toBe("ok");
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8003/health", expect.any(Object));
   });
 
   it("allows IPv6 loopback embed URLs", async () => {

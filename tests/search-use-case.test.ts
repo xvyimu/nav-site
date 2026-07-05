@@ -103,6 +103,8 @@ describe("executeSearch", () => {
     vi.resetModules();
     vi.clearAllMocks();
     delete process.env.EMBED_SERVER_URL;
+    delete process.env.EMBED_SERVER_LOOPBACK_ENABLED;
+    delete process.env.NETLIFY;
   });
 
   afterEach(() => {
@@ -192,6 +194,27 @@ describe("executeSearch", () => {
     expect(body.mode).toBe("semantic");
     expect(body.fallbackReason).toBe("embedding_unavailable");
     expect(body.results.length).toBeGreaterThan(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(createServiceRoleClient).not.toHaveBeenCalled();
+  });
+
+  it("does not call loopback embedding services from serverless runtimes", async () => {
+    process.env.EMBED_SERVER_URL = "http://127.0.0.1:8003";
+    process.env.NETLIFY = "true";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { executeSearch } = await importUseCase();
+
+    const result = await executeSearch({
+      params: makeParams({ q: "openai", semantic: true }),
+      requestId: "req-serverless-loopback",
+      startedAt: Date.now(),
+    });
+    const body = expectSuccessBody(result.body);
+
+    expect(result.status).toBe(200);
+    expect(body.mode).toBe("semantic");
+    expect(body.fallbackReason).toBe("embedding_unavailable");
     expect(fetchMock).not.toHaveBeenCalled();
     expect(createServiceRoleClient).not.toHaveBeenCalled();
   });

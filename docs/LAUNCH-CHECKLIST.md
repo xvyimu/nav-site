@@ -16,7 +16,7 @@
 |---|---:|---|
 | Dependabot / npm audit | 通过 | `pnpm audit --registry=https://registry.npmjs.org --audit-level moderate`：No known vulnerabilities found |
 | Netlify credit preflight | 通过 | 默认检查窗口扩展到 24 小时；额度已耗尽时阻断 deploy trigger，避免重复创建失败 build |
-| embedding 健康检查 | 通过 | 未配置 `EMBED_SERVER_URL` 时 `/api/health` 标记 `embedding=skipped`；显式配置后才探测本地服务，服务不可用时整体仍保持 200/healthy 并提示语义搜索降级 |
+| embedding 健康检查 | 通过 | 未配置 `EMBED_SERVER_URL` 时 `/api/health` 标记 `embedding=skipped`；Netlify/Serverless 运行时即使残留 loopback `EMBED_SERVER_URL` 也默认跳过，除非显式设置 `EMBED_SERVER_LOOPBACK_ENABLED=true`；本地/自托管显式配置后才探测本地服务 |
 | Supabase timeout 降级 | 通过 | 首页数据读取使用 `AbortSignal.timeout(15000)`；Supabase 短时不可达时降级为空数据而不是挂起构建/请求 |
 | migration apply 兜底 | 通过 | `pnpm db:reviews:apply` 支持 `DATABASE_URL`/`SUPABASE_DB_URL`，优先 Supabase CLI，失败后回退 `psql`；无 DB URL 时可用 linked Supabase 项目 |
 
@@ -25,12 +25,12 @@
 | 项目 | 状态 | 证据 |
 |---|---:|---|
 | Git 状态 | 通过 | 发布代码基线已推送 `origin/master`；本地 `.planning/` 为未跟踪工作目录，不纳入发布 |
-| 本地定向测试 | 通过 | `pnpm test tests/api-health.test.ts tests/wait-netlify-deploy.test.ts`：14 passed |
-| 本地全量测试 | 通过 | `pnpm test`：327 passed / 6 skipped |
+| 本地定向测试 | 通过 | `pnpm test tests/api-health.test.ts tests/search-use-case.test.ts tests/probe-production.test.ts`：19 passed |
+| 本地全量测试 | 通过 | `pnpm test`：334 passed / 6 skipped |
 | Typecheck | 通过 | `pnpm run typecheck` |
 | Lint | 通过 | `pnpm run lint` |
 | Build | 通过 | `pnpm run build` |
-| 生产探针脚本 | 通过 | `pnpm run verify:production` 验证当前生产可访问；最新代码部署后用 `pnpm run verify:production:latest` 额外确认 `embedding=skipped` |
+| 生产探针脚本 | 通过 | `pnpm run verify:production` 验证当前生产可访问；本地模拟 `NETLIFY=true` + loopback `EMBED_SERVER_URL` 后，`pnpm run verify:production:latest -- --base-url http://localhost:3264` 已确认 `embedding=skipped` |
 | GitHub Actions quality/build/E2E | 通过 | 最近一次 `master` push run 中 quality/build/E2E 均为 success；用 `rtk gh run list --repo xvyimu/nav-site --branch master --limit 4` 复验 |
 | Lighthouse CI | 通过 | 最近一次 `master` push 对应 Lighthouse run 为 success |
 | Netlify 分支同步 | 通过 | CI deploy job 会将 `master` 镜像到 Netlify 监听的 `main` 分支 |
@@ -43,7 +43,7 @@
 | 项目 | 状态 | 结果 |
 |---|---:|---|
 | 主站首页 | 通过 | `https://nav-site.netlify.app/` 返回 HTTP 200 |
-| 生产健康检查 | 部分通过 | 当前已部署版本 `/api/health` 返回 HTTP 200，`status=healthy`；`database/env` ok，`sentry` skipped，`embedding` 可能 error。最新代码部署后，未配置 `EMBED_SERVER_URL` 时应变为 `embedding=skipped` |
+| 生产健康检查 | 部分通过 | 当前已部署版本 `/api/health` 返回 HTTP 200，`status=healthy`；`database/env` ok，`sentry` skipped，`embedding` 可能 error。最新代码部署后，Netlify/Serverless 上的 loopback embedding 会变为 `skipped` |
 | 安全响应头 | 通过 | CSP、HSTS、`X-Frame-Options=DENY`、`X-Content-Type-Options=nosniff`、`Referrer-Policy=strict-origin-when-cross-origin` 已生效 |
 | 分支别名 | 异常 | `https://main--nav-site.netlify.app` 当前返回 404，不能作为健康检查来源 |
 | 自定义域名 DNS | 待确认 | `toolifyhub.top` 当前有 Cloudflare 解析；`www.toolifyhub.top` 在公共 DNS 查询中为 NXDOMAIN，不能作为上线验收入口 |
@@ -56,7 +56,7 @@
 3. 确认 deploy job 成功，并继续跑到 `link-check`。
 4. 复验生产主站：
    - `/` 返回 200。
-   - `/api/health` 返回 200；未配置 `EMBED_SERVER_URL` 时 `checks.embedding.status=skipped`。
+   - `/api/health` 返回 200；未配置 `EMBED_SERVER_URL`，或在 Netlify/Serverless 上残留 loopback `EMBED_SERVER_URL` 时，`checks.embedding.status=skipped`。
    - `/api/search?q=ai&limit=5` 返回 JSON。
    - `/tool/figma` 可渲染。
    - `/sitemap.xml` 和 `/robots.txt` 可访问。
@@ -64,8 +64,9 @@
    - 若启用自定义域名，先确认 apex 和 `www` 都已正确解析到目标生产站点。
 5. 处理或接受黄色运行项：
    - `NEXT_PUBLIC_SENTRY_DSN` 未配置时，Sentry 健康检查保持 `skipped`。
-   - `EMBED_SERVER_URL` 是可选配置；未配置时语义搜索会走降级链路，文本/Fuse 搜索仍应可用。
-   - 若显式配置 `EMBED_SERVER_URL`，需要保持本地 embedding 服务可达。
+   - `EMBED_SERVER_URL` 是可选配置；未配置或 serverless loopback 被禁用时语义搜索会走降级链路，文本/Fuse 搜索仍应可用。
+   - 若在本地/自托管环境显式配置 `EMBED_SERVER_URL`，需要保持本地 embedding 服务可达。
+   - 若确实要在 serverless 环境探测 loopback embedding，需同时设置 `EMBED_SERVER_LOOPBACK_ENABLED=true`。
 
 ## 凭据与备用平台
 
