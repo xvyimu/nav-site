@@ -1,94 +1,66 @@
 # 发布检查清单
 
-> 最后更新：2026-07-04
-> Release candidate：`200db981 fix: clear launch gate regressions`
+> 最后更新：2026-07-05
+> 当前 release candidate：`59458237 ci: let netlify build use production branch`
 > 目标分支：`master`
 
 ## 当前结论
 
-**本地与远端质量门禁已通过，但生产部署链路仍有 1 个红色项和 2 个黄色运维检查项。**
+代码质量链路已经通过，生产主站仍可访问，但最新 commit 尚未成功部署到 Netlify。
 
-当前代码、测试、构建、本地 E2E、本地安全检查、GitHub Actions 质量检查、远端生产构建、远端 E2E 和 Lighthouse CI 均已通过。本轮 launch hardening 修复了 ResourceRating toast 动态加载阻塞评分 UI 的问题，刷新了已批准纸面视觉的 hero 快照，并收紧了移动端工具详情页 E2E locator。红色项仍是 GitHub Actions 的 `netlify deploy --prod` 实际返回 `JSONHTTPError: Forbidden`，因此最新生产部署仍需修复 Netlify token/site 权限后复验；黄色项有两个：生产 `/api/health` 显示 Sentry DSN 未配置；embedding 子检查为 `error`，说明生产运行环境暂时无法访问 `EMBED_SERVER_URL`。正式上线前需要修复 Netlify token/site 权限，补齐 `NEXT_PUBLIC_SENTRY_DSN`，并确认生产 embedding 服务可达，或明确接受语义搜索降级为文本/Fuse 搜索的行为。
+当前唯一红色上线阻塞是 Netlify 账号额度：GitHub Actions deploy job 已能成功同步 `master` 到 `main`，也能通过 Netlify API 创建 build，但 Netlify 立即返回 `Skipped due to account credit usage exceeded`。这不是代码、token 权限或 CI 脚本错误；需要在 Netlify 侧恢复账号 credit/账单额度后重新运行 deploy。
 
-## 已验证门禁
+## 最新证据
 
-| 门禁 | 状态 | 证据 |
+| 项目 | 状态 | 证据 |
 |---|---:|---|
-| Git 状态 | ✅ | 本轮 launch hardening 提交后需保持工作树 clean |
-| Lint | ✅ | `pnpm lint` |
-| Typecheck | ✅ | `pnpm typecheck` |
-| 单元测试 | ✅ | `pnpm test`：317 passed / 6 skipped |
-| 针对性 E2E | ✅ | ResourceRating 目标测试 `3 passed`；Figma 详情页 + hero visual 子集 `4 passed` |
-| 全量 E2E | ✅ | `pnpm exec playwright test --reporter=line`：52 passed |
-| 生产构建 | ✅ | `pnpm build` |
-| 依赖审计 | ✅ | `pnpm audit --audit-level moderate --registry=https://registry.npmjs.org`：无已知漏洞 |
-| 密钥扫描 | ✅ | `node scripts/pre-commit-secret-scan.mjs` |
-| 远端质量检查 | ✅ | GitHub Actions run `28705557395`：质量检查、生产构建、E2E 测试均 success |
-| Lighthouse CI | ✅ | GitHub Actions run `28705557390` success |
-| 生产健康检查 | ✅ | 本地 `next start -p 3264`；`/api/health` 返回 HTTP 200、`status=healthy` |
-| 安全响应头 | ✅ | CSP、HSTS、`X-Frame-Options=DENY`、`X-Content-Type-Options=nosniff`、`Referrer-Policy=strict-origin-when-cross-origin` |
-| 调试输出扫描 | ✅ | 无生产 `console.log`；保留的 `console.warn/error` 均为 logger、错误边界、fetch 失败上报或性能阈值告警 |
+| Git 状态 | 通过 | 工作区仅有本地 `.planning/` 未跟踪文件，发布代码已推送 `origin/master` |
+| 本地目标测试 | 通过 | `pnpm test tests/wait-netlify-deploy.test.ts`：8 passed |
+| 本地全量测试 | 通过 | `pnpm test`：325 passed / 6 skipped |
+| Typecheck | 通过 | `pnpm run typecheck` |
+| Lint | 通过 | `pnpm run lint` |
+| Workflow YAML | 通过 | PyYAML 可解析 `.github/workflows/ci.yml` |
+| GitHub Actions quality | 通过 | run `28732970140`：quality success |
+| GitHub Actions build | 通过 | run `28732970140`：build success |
+| GitHub Actions E2E | 通过 | run `28732970140`：50 passed / 2 skipped |
+| Lighthouse CI | 通过 | run `28732970128` success |
+| Netlify 分支同步 | 通过 | deploy job 将 `main` 更新到 `59458237` |
+| Netlify build API | 通过触发，失败于平台额度 | build/deploy 创建成功后 `state=error`，details=`Skipped due to account credit usage exceeded` |
+| Link check | 未运行 | 依赖 deploy；deploy 因 Netlify credit 失败而 skipped |
 
-## 生产验证记录
+## 生产现状
 
 | 项目 | 状态 | 结果 |
 |---|---:|---|
-| GitHub Actions | ❌ | `28705557395`：`quality`、`build`、`e2e` 通过；`deploy` 真实失败，job `85130893612` 日志显示 `netlify deploy --prod --site "$NETLIFY_SITE_ID"` 返回 `JSONHTTPError: Forbidden`；`link-check` 因部署失败被 skipped |
-| Lighthouse CI | ✅ | `28705557390`：latest `master` run success |
-| 生产首页 | ✅ | `GET /` 返回 200 |
-| 生产搜索 API | ✅ | `/api/search?q=ai&limit=5` 返回 200，5 条结果 |
-| 工具详情页 | ✅ | `/tool/figma` 返回 200，包含 Figma 与访问官网入口 |
-| Sitemap | ✅ | `/sitemap.xml` 返回 200，包含 `/tool/figma` |
-| Robots | ✅ | `/robots.txt` 返回 200，包含 `User-Agent` |
-| 生产健康检查 | ⚠️ | `/api/health` 返回 200/healthy；`database/env` ok；`sentry` skipped；`embedding` error |
-| 生产安全头 | ⚠️ | `netlify.toml` 已加全站安全头；生产 HEAD 仍为 `X-Frame-Options=SAMEORIGIN`、`Referrer-Policy=same-origin`，需待 Netlify 部署权限修复并重新部署后复验 |
+| 主站首页 | 通过 | `https://nav-site.netlify.app/` 返回 HTTP 200 |
+| 生产健康检查 | 部分通过 | `/api/health` 返回 HTTP 200，`status=healthy`；`database/env` ok，`sentry` skipped，`embedding` error |
+| 安全响应头 | 通过 | CSP、HSTS、`X-Frame-Options=DENY`、`X-Content-Type-Options=nosniff`、`Referrer-Policy=strict-origin-when-cross-origin` 已生效 |
+| 分支别名 | 异常 | `https://main--nav-site.netlify.app` 当前返回 404，不能作为健康检查来源 |
+| 最新代码部署 | 未完成 | Netlify account credit 用尽导致最新 commit 未发布 |
 
-## 发布前步骤
+## 上线前必须完成
 
-1. 确认最新 `master` push 的 GitHub Actions 已完成：
-   - `quality`
-   - `build`
-   - `e2e`
-   - `deploy`（必须真实成功，不能依赖 `continue-on-error`）
-   - `link-check`
-2. 确认 Netlify 或生产部署环境已配置必要环境变量：
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `NEXT_PUBLIC_SITE_URL`
-   - `AUTH_SECRET`
-   - `ADMIN_PASSWORD`
-   - `SUPABASE_SERVICE_ROLE_KEY` 或 `SUPABASE_SERVICE_ROLE_KEY_PROD`
-   - `NEXT_PUBLIC_SENTRY_DSN`
-   - 可选：`EMBED_SERVER_URL`
-3. 修复 Netlify 部署凭据或站点权限：
-   - 当前 `NETLIFY_SITE_ID` 为 `a7e3787f-3c6d-4179-919d-1dc1efa83c52`。
-   - `NETLIFY_AUTH_TOKEN` 需能访问该目标站点，或将 `NETLIFY_SITE_ID` 调整为 token 所属账号可访问的站点。
-   - 重新跑 deploy 后复验生产安全头。
-4. 配置 `NEXT_PUBLIC_SENTRY_DSN`，让生产 `/api/health` 的 Sentry 检查从 `skipped` 变为 `ok`。
-5. 如果需要完整语义搜索能力，确认生产运行环境能访问 `EMBED_SERVER_URL`。
-6. 打开生产站点做冒烟测试：
-   - 首页可加载。
-   - 搜索可返回结果。
-   - 移动端 320px 和 390px 下底栏标签可读、无横向溢出。
+1. 恢复 Netlify account credit/账单额度。
+2. 重新运行 GitHub Actions `CI 检查 + Netlify 部署` 的 failed deploy job，或重新 push 一个空变更触发完整流水线。
+3. 确认 deploy job 成功，并继续跑到 `link-check`。
+4. 复验生产主站：
+   - `/` 返回 200。
    - `/api/health` 返回 200。
    - `/api/search?q=ai&limit=5` 返回 JSON。
    - `/tool/figma` 可渲染。
-7. 发布后检查 Sentry：
-   - 无新增错误类型。
-   - Web Vitals 事件有上报。
-   - API failure 没有明显 spike。
+   - `/sitemap.xml` 和 `/robots.txt` 可访问。
+5. 处理或接受黄色运行项：
+   - `NEXT_PUBLIC_SENTRY_DSN` 未配置时，Sentry 健康检查保持 `skipped`。
+   - `EMBED_SERVER_URL` 不可达时，语义搜索降级，文本/Fuse 搜索仍应可用。
 
-## 首小时监控
+## 凭据与备用平台
 
-发布后一小时至少观察以下指标：
+GitHub 当前只配置了 Netlify 与 Supabase 相关 secret/variable：
 
-| 区域 | 绿色 | 暂停观察 | 回滚 |
-|---|---|---|---|
-| 错误率 | 无新增 Sentry 错误类型 | 少量新 client/API 错误 | 新错误影响核心搜索或导航 |
-| API 延迟 | 接近发布前基线 | P95 高于基线 20% 以上 | P95 高于基线 50% 以上 |
-| 健康检查 | 200 healthy | 仅 embedding warning 且 fallback 正常 | database/env 检查失败 |
-| 搜索 | 文本搜索和 fallback 正常 | 仅语义搜索不可用 | 搜索接口失败或大范围空结果 |
-| 移动体验 | 无横向溢出 | 轻微视觉问题 | 底栏或搜索阻断核心移动流程 |
+- secret：`NETLIFY_AUTH_TOKEN`、`SOURCE_SUPABASE_URL`、`SOURCE_SUPABASE_ANON_KEY`、`TARGET_SUPABASE_URL`、`TARGET_SUPABASE_ANON_KEY`
+- variable：`NETLIFY_SITE_ID`
+
+当前没有 Vercel、Cloudflare Pages 或 Wrangler 相关凭据，无法直接切换备用生产部署平台。若要启用备用平台，至少需要先配置对应 token、project/account id 和生产环境变量。
 
 ## 回滚方案
 
@@ -96,26 +68,13 @@
 
 ```powershell
 rtk git revert <release-commit> --no-edit
-rtk git -c http.proxy= -c https.proxy= push origin master
+rtk git push origin master
 ```
 
-如果需要连续回滚多个发布提交：
+回滚后复验：
 
-```powershell
-rtk git revert <newest-release-commit> <older-release-commit> --no-edit
-rtk git -c http.proxy= -c https.proxy= push origin master
-```
-
-回滚后：
-
-1. 确认 Netlify 重新部署完成。
-2. 验证 `/api/health`。
-3. 冒烟测试首页、搜索、移动底栏。
-4. 检查 Sentry 错误率是否回落。
-5. 记录事故和后续修复项。
-
-## 已知非阻塞风险
-
-- Embedding 服务独立于 Next.js 应用运行；不可用时语义搜索质量会下降，但文本/Fuse 搜索应继续可用。
-- GitHub OAuth App 配置仍依赖外部账号操作。
-- 真实 Core Web Vitals 需要 Sentry 生产数据积累；本地 Playwright 和构建检查不能替代真实用户遥测。
+1. GitHub Actions quality/build/e2e 通过。
+2. Netlify deploy 完成。
+3. `/api/health` 返回 200。
+4. 首页、搜索、工具详情页可用。
+5. Sentry 或日志中无新增错误类型。

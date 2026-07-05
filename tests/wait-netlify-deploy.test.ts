@@ -13,6 +13,9 @@ type Deploy = {
   review_id?: string;
   created_at?: string;
   deploy_ssl_url?: string;
+  error_message?: string;
+  failure_reason?: string;
+  message?: string;
 };
 
 async function importDeployModule() {
@@ -174,6 +177,46 @@ describe("scripts/wait-netlify-deploy", () => {
       },
     });
     expect(build.deploy_id).toBe("deploy-1");
+  });
+
+  it("fails fast before triggering a build when recent Netlify credits are exhausted", async () => {
+    const { main } = await importDeployModule();
+    const logger = { log: vi.fn(), error: vi.fn() };
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => [
+        {
+          id: "credit-blocked",
+          state: "error",
+          branch: "main",
+          created_at: "2026-07-05T02:01:00Z",
+          error_message: "Skipped due to account credit usage exceeded",
+        },
+      ],
+    }));
+
+    await expect(
+      main({
+        env: {
+          NETLIFY_AUTH_TOKEN: "test-token",
+          NETLIFY_SITE_ID: "site-id",
+          NETLIFY_TRIGGER_BUILD: "true",
+          NETLIFY_DEPLOY_BRANCH: "main",
+          NETLIFY_CREDIT_BLOCK_PREFLIGHT_WINDOW_MS: "99999999999",
+          GITHUB_SHA: "abcdef1234567890",
+        } as unknown as NodeJS.ProcessEnv,
+        fetchImpl: asFetch(fetchImpl),
+        logger: asConsole(logger),
+      })
+    ).rejects.toThrow("Netlify account credit usage exceeded");
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const fetchCalls = fetchImpl.mock.calls as unknown as Array<[URL, RequestInit?]>;
+    const firstInit = fetchCalls[0]?.[1];
+    expect(firstInit?.method).not.toBe("POST");
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("account credit preflight blocked deploy trigger")
+    );
   });
 
   it("waits once, writes the deploy URL, and returns the ready deploy", async () => {

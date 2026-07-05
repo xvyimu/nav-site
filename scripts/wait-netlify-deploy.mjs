@@ -3,8 +3,10 @@ import { pathToFileURL } from "node:url";
 
 const DEFAULT_TIMEOUT_MS = 8 * 60 * 1000;
 const DEFAULT_INTERVAL_MS = 10 * 1000;
+const DEFAULT_CREDIT_BLOCK_PREFLIGHT_WINDOW_MS = 30 * 60 * 1000;
 const FAILED_STATES = new Set(["error", "failed", "rejected", "skipped", "canceled", "cancelled"]);
 const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
+const CREDIT_USAGE_EXCEEDED_PATTERN = /account credit usage exceeded/i;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -92,6 +94,25 @@ export function deployDetails(deploy) {
     .join("; ");
 }
 
+export function isAccountCreditUsageExceeded(deploy) {
+  return CREDIT_USAGE_EXCEEDED_PATTERN.test(deployDetails(deploy));
+}
+
+export function isRecentDeploy(deploy, nowMs, windowMs) {
+  if (!deploy.created_at) return false;
+  const createdAt = Date.parse(deploy.created_at);
+  return Number.isFinite(createdAt) && nowMs - createdAt <= windowMs;
+}
+
+export function findRecentAccountCreditBlockedDeploy(
+  deploys,
+  { nowMs = Date.now(), windowMs = DEFAULT_CREDIT_BLOCK_PREFLIGHT_WINDOW_MS } = {}
+) {
+  return deploys.find(
+    (deploy) => isAccountCreditUsageExceeded(deploy) && isRecentDeploy(deploy, nowMs, windowMs)
+  );
+}
+
 export function summarizeDeploy(deploy) {
   const commit = candidateValues(deploy)[0]?.slice(0, 7) || "unknown";
   const branch = deploy.branch || "unknown";
@@ -128,6 +149,11 @@ export function readConfigFromEnv(env = process.env) {
     targetBranch,
     targetDeployId: env.NETLIFY_DEPLOY_ID,
     triggerBuild: parseBoolean(env.NETLIFY_TRIGGER_BUILD),
+    creditBlockPreflight: !parseBoolean(env.NETLIFY_SKIP_CREDIT_BLOCK_PREFLIGHT),
+    creditBlockPreflightWindowMs: parsePositiveNumber(
+      env.NETLIFY_CREDIT_BLOCK_PREFLIGHT_WINDOW_MS,
+      DEFAULT_CREDIT_BLOCK_PREFLIGHT_WINDOW_MS
+    ),
     buildBranch: env.NETLIFY_BUILD_BRANCH,
     buildTitle: env.NETLIFY_BUILD_TITLE,
     clearCache: parseBoolean(env.NETLIFY_BUILD_CLEAR_CACHE),
@@ -184,6 +210,27 @@ export async function listDeploys({ config, fetchImpl = fetch }) {
   return response.json();
 }
 
+export async function assertNetlifyCreditsAvailable({
+  config,
+  fetchImpl = fetch,
+  logger = console,
+  now = Date.now,
+}) {
+  const deploys = await listDeploys({ config, fetchImpl });
+  const blockedDeploy = findRecentAccountCreditBlockedDeploy(deploys, {
+    nowMs: now(),
+    windowMs: config.creditBlockPreflightWindowMs,
+  });
+
+  if (!blockedDeploy) return;
+
+  const summary = summarizeDeploy(blockedDeploy);
+  logger.error?.(`[netlify] account credit preflight blocked deploy trigger: ${summary}`);
+  throw new Error(
+    "Netlify account credit usage exceeded. Resolve Netlify billing/credits before retrying deploy."
+  );
+}
+
 export function writeDeployUrl(url, outputPath = process.env.GITHUB_OUTPUT, appendFile = appendFileSync) {
   if (!url || !outputPath) return;
   appendFile(outputPath, `deploy-url=${url}\n`);
@@ -237,6 +284,9 @@ export async function waitForNetlifyDeploy({
 export async function main({ env = process.env, fetchImpl = fetch, logger = console } = {}) {
   const config = readConfigFromEnv(env);
   if (config.triggerBuild) {
+    if (config.creditBlockPreflight) {
+      await assertNetlifyCreditsAvailable({ config, fetchImpl, logger });
+    }
     const build = await triggerNetlifyBuild({ config, fetchImpl, logger });
     config.targetDeployId = build.deploy_id || config.targetDeployId;
   }
