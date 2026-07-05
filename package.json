@@ -25,6 +25,7 @@
     "db:reviews:verify": "node scripts/verify-reviews-migration.mjs",
     "verify:production": "node scripts/probe-production.mjs",
     "verify:production:latest": "node scripts/probe-production.mjs --expect-embedding-skipped",
+    "verify:launch-readiness": "node scripts/check-launch-readiness.mjs",
     "typecheck": "tsc --noEmit --incremental false"
   },
   "dependencies": {

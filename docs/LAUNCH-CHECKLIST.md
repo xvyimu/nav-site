@@ -8,7 +8,7 @@
 
 代码质量链路已经通过，生产主站仍可访问，但最新代码尚未成功部署到 Netlify。
 
-当前唯一红色上线阻塞是 Netlify 账号额度：GitHub Actions 的 quality/build/E2E 均已通过；deploy job 在 Netlify credit preflight 阶段停止，没有再 POST 创建新的 Netlify build。该阻塞不是代码、token 权限或 CI 脚本错误；需要在 Netlify 侧恢复账号 credit/账单额度后重新运行 deploy。
+当前红色上线阻塞是 Netlify 账号额度：GitHub Actions 的 quality/build/E2E 均已通过；deploy job 在 Netlify credit preflight 阶段停止，没有再 POST 创建新的 Netlify build。该阻塞不是代码、token 权限或 CI 脚本错误；需要在 Netlify 侧恢复账号 credit/账单额度后推送本地收尾提交并重新运行 deploy。
 
 ## 已完成的稳定性收尾
 
@@ -20,19 +20,21 @@
 | Supabase timeout 降级 | 通过 | 首页数据读取使用 `AbortSignal.timeout(15000)`；Supabase 短时不可达时降级为空数据而不是挂起构建/请求 |
 | migration apply 兜底 | 通过 | `pnpm db:reviews:apply` 支持 `DATABASE_URL`/`SUPABASE_DB_URL`，优先 Supabase CLI，失败后回退 `psql`；无 DB URL 时可用 linked Supabase 项目 |
 | 生产探针抗抖动 | 通过 | `scripts/probe-production.mjs` 默认对网络错误、408/425/429/5xx 做 1 次轻量重试；commit mismatch、404、健康语义不符等真实失败不会被重试掩盖 |
+| 上线就绪门禁 | 通过 | `pnpm run verify:launch-readiness` 汇总本地 git 状态、当前生产 smoke、最新 commit 部署状态；当前会因本地收尾提交未推送与最新代码未部署而失败，这是预期阻塞信号 |
 
 ## 最新证据
 
 | 项目 | 状态 | 证据 |
 |---|---:|---|
-| Git 状态 | 通过 | 发布代码基线已推送 `origin/master`；本地 `.planning/` 为未跟踪工作目录，不纳入发布 |
+| Git 状态 | 待推送 | 本地 `master` 有上线收尾提交尚未推送；`.planning/` 为未跟踪工作目录，不纳入发布 |
 | 本地定向测试 | 通过 | `pnpm test tests/api-health.test.ts tests/search-use-case.test.ts tests/probe-production.test.ts`：19 passed |
-| 本地全量测试 | 通过 | `pnpm test`：334 passed / 6 skipped |
+| 本地全量测试 | 通过 | `pnpm test`：341 passed / 6 skipped |
 | Typecheck | 通过 | `pnpm run typecheck` |
 | Lint | 通过 | `pnpm run lint` |
 | Build | 通过 | `pnpm run build` |
 | 生产探针脚本 | 通过 | `pnpm run verify:production` 验证当前生产可访问；本地模拟 `NETLIFY=true` + loopback `EMBED_SERVER_URL` 后，`pnpm run verify:production:latest -- --base-url http://localhost:3264` 已确认 `embedding=skipped` |
-| 生产探针重试测试 | 通过 | `pnpm test tests/probe-production.test.ts` 覆盖瞬时 `fetch failed` 后重试成功、旧部署 `build-info` 404 不重试的场景；`pnpm test` 全量 338 passed / 6 skipped |
+| 生产探针重试测试 | 通过 | `pnpm test tests/probe-production.test.ts` 覆盖瞬时 `fetch failed` 后重试成功、旧部署 `build-info` 404 不重试的场景 |
+| 上线就绪门禁测试 | 通过 | `pnpm test tests/check-launch-readiness.test.ts` 覆盖 git ahead/dirty 解析、最新部署阻塞、跳过网络不误判 ready |
 | GitHub Actions quality/build/E2E | 通过 | 最近一次 `master` push run 中 quality/build/E2E 均为 success；用 `rtk gh run list --repo xvyimu/nav-site --branch master --limit 4` 复验 |
 | Lighthouse CI | 通过 | 最近一次 `master` push 对应 Lighthouse run 为 success |
 | Netlify 分支同步 | 通过 | CI deploy job 会将 `master` 镜像到 Netlify 监听的 `main` 分支 |
@@ -55,7 +57,7 @@
 ## 上线前必须完成
 
 1. 恢复 Netlify account credit/账单额度。
-2. 重新运行 GitHub Actions `CI 检查 + Netlify 部署` 的 failed deploy job，或重新 push 一个空变更触发完整流水线。
+2. 推送本地上线收尾提交到 `origin/master`，触发完整流水线。
 3. 确认 deploy job 成功，并继续跑到 `link-check`。
 4. 复验生产主站：
    - `/` 返回 200。
@@ -65,6 +67,7 @@
    - `/tool/figma` 可渲染。
    - `/sitemap.xml` 和 `/robots.txt` 可访问。
    - 或直接运行 `pnpm run verify:production:latest -- --expect-commit <commit-sha>`；如需调整网络抖动容忍度，可追加 `--retries <n>` 或设置 `PRODUCTION_PROBE_RETRIES`。
+   - 发布前后可运行 `pnpm run verify:launch-readiness` 汇总本地/生产/部署版本状态。
    - 若启用自定义域名，先确认 apex 和 `www` 都已正确解析到目标生产站点。
 5. 处理或接受黄色运行项：
    - `NEXT_PUBLIC_SENTRY_DSN` 未配置时，Sentry 健康检查保持 `skipped`。
