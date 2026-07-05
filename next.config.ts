@@ -74,7 +74,7 @@ export default withBundleAnalyzer(
   withSentryConfig(nextConfig, {
     org: "yuanjia-m0",
     project: "javascript-nextjs",
-    silent: !process.env.CI,
+    silent: !process.env.CI || !hasSentryAuthToken,
     widenClientFileUpload: true,
     release: { create: hasSentryAuthToken },
     sourcemaps: { disable: !hasSentryAuthToken },
