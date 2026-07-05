@@ -70,9 +70,7 @@ export function matchesCreatedAfter(deploy, createdAfter) {
 
 export function findMatchingDeploy(deploys, { targetSha, targetBranch, targetDeployId, createdAfter }) {
   const targetDeploy = targetDeployId
-    ? deploys.find(
-        (deploy) => matchesBranch(deploy, targetBranch) && matchesDeployId(deploy, targetDeployId)
-      )
+    ? deploys.find((deploy) => matchesDeployId(deploy, targetDeployId))
     : undefined;
   if (targetDeploy) return targetDeploy;
 
@@ -87,11 +85,19 @@ export function deployUrl(deploy) {
   return deploy.deploy_ssl_url || deploy.ssl_url || deploy.deploy_url || deploy.url || "";
 }
 
+export function deployDetails(deploy) {
+  return [deploy.error_message, deploy.failure_reason, deploy.message]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .filter(Boolean)
+    .join("; ");
+}
+
 export function summarizeDeploy(deploy) {
   const commit = candidateValues(deploy)[0]?.slice(0, 7) || "unknown";
   const branch = deploy.branch || "unknown";
   const url = deployUrl(deploy) || "no-url";
-  return `${deploy.id}: state=${deploy.state}, branch=${branch}, commit=${commit}, created_at=${deploy.created_at}, url=${url}`;
+  const details = deployDetails(deploy);
+  return `${deploy.id}: state=${deploy.state}, branch=${branch}, commit=${commit}, created_at=${deploy.created_at}, url=${url}${details ? `, details=${details}` : ""}`;
 }
 
 export function readConfigFromEnv(env = process.env) {
@@ -122,6 +128,7 @@ export function readConfigFromEnv(env = process.env) {
     targetBranch,
     targetDeployId: env.NETLIFY_DEPLOY_ID,
     triggerBuild: parseBoolean(env.NETLIFY_TRIGGER_BUILD),
+    buildBranch: env.NETLIFY_BUILD_BRANCH,
     buildTitle: env.NETLIFY_BUILD_TITLE,
     clearCache: parseBoolean(env.NETLIFY_BUILD_CLEAR_CACHE),
     createdAfter,
@@ -139,7 +146,7 @@ function authHeaders(token) {
 
 export async function triggerNetlifyBuild({ config, fetchImpl = fetch, logger = console }) {
   const url = new URL(`https://api.netlify.com/api/v1/sites/${encodeURIComponent(config.siteId)}/builds`);
-  if (config.targetBranch) url.searchParams.set("branch", config.targetBranch);
+  if (config.buildBranch) url.searchParams.set("branch", config.buildBranch);
   if (config.clearCache) url.searchParams.set("clear_cache", "true");
   url.searchParams.set(
     "title",
@@ -215,7 +222,10 @@ export async function waitForNetlifyDeploy({
     }
 
     if (FAILED_STATES.has(deploy.state)) {
-      throw new Error(`Netlify deploy ${deploy.id} finished with state=${deploy.state}`);
+      const details = deployDetails(deploy);
+      throw new Error(
+        `Netlify deploy ${deploy.id} finished with state=${deploy.state}${details ? `: ${details}` : ""}`
+      );
     }
 
     await sleepImpl(config.intervalMs);

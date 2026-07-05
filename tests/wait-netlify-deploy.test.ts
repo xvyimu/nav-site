@@ -120,7 +120,7 @@ describe("scripts/wait-netlify-deploy", () => {
       },
       {
         id: "target-deploy",
-        branch: "main",
+        branch: "production-branch",
         created_at: "2026-07-05T02:00:30Z",
       },
     ];
@@ -153,6 +153,7 @@ describe("scripts/wait-netlify-deploy", () => {
         siteId: "site-id",
         targetSha: "abcdef1234567890",
         targetBranch: "main",
+        buildBranch: "main",
         buildTitle: "CI deploy abcdef1",
         clearCache: false,
       },
