@@ -53,7 +53,8 @@ test.describe("首页", () => {
 
 		await searchInput.fill("openai");
 		await expect(searchInput).toHaveValue("openai");
-		await expect(page.locator("main")).toContainText(/OpenAI|openai|没有找到/, { timeout: 15000 });
+		await expect(page.getByRole("status")).toContainText(/找到 \d+ 个结果/, { timeout: 15000 });
+		await expect(page.locator("main")).toContainText(/OpenAI|openai|推荐工具|没有找到/, { timeout: 15000 });
 	});
 
 	test("分类导航存在并可切换", async ({ page, isMobile }) => {
