@@ -32,4 +32,23 @@ describe("CI workflow launch behavior", () => {
     expect(workflow).not.toContain("NETLIFY_AUTH_TOKEN");
     expect(workflow).not.toContain("labels: ['production-monitor', 'automated']");
   });
+
+  it("keeps the resource library service role out of build and Lighthouse jobs", () => {
+    const ci = readWorkflow("ci.yml");
+    const lighthouse = readWorkflow("lighthouse.yml");
+    const buildSteps = [
+      ...ci.matchAll(/- name: 生产构建\s+run: pnpm run build\s+env:[\s\S]*?(?=\n\s+- name:)/g),
+    ].map((match) => match[0]);
+    const serviceRoleEnvLines = ci.match(/^\s+RESOURCE_LIBRARY_SERVICE_ROLE_KEY:/gm) ?? [];
+
+    expect(buildSteps).toHaveLength(2);
+    expect(serviceRoleEnvLines).toHaveLength(1);
+    for (const step of buildSteps) {
+      expect(step).not.toContain("RESOURCE_LIBRARY_SERVICE_ROLE_KEY");
+      expect(step).not.toContain("NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY");
+    }
+    expect(ci).not.toContain("NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY");
+    expect(lighthouse).not.toContain("RESOURCE_LIBRARY_SERVICE_ROLE_KEY");
+    expect(lighthouse).not.toContain("NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY");
+  });
 });

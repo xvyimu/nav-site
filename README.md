@@ -51,7 +51,7 @@ pnpm start
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key（服务端绕过 RLS） | 是 |
 | `SUPABASE_SERVICE_ROLE_KEY_PROD` | 生产库 service role key（优先于 `SUPABASE_SERVICE_ROLE_KEY`） | 否 |
 | `EMBED_SERVER_URL` | 本地 embedding 服务地址（默认 `http://127.0.0.1:8003`） | 否 |
-| `NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY` | Resource Library Edge Function public API key | 否 |
+| `RESOURCE_LIBRARY_API_KEY` | Resource Library Edge Function API key（仅服务端使用） | 否 |
 | `RESOURCE_LIBRARY_SERVICE_ROLE_KEY` | Resource Library service role key（仅服务端使用） | 否 |
 | `GITHUB_ID` | GitHub OAuth App ID（用户登录） | 否 |
 | `GITHUB_SECRET` | GitHub OAuth App Secret | 否 |

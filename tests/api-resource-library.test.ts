@@ -63,6 +63,7 @@ describe("resource library API routes", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it("normalizes browse results and adds a short cache header", async () => {
@@ -126,11 +127,152 @@ describe("resource library API routes", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("s-maxage=300");
     expect(body).toEqual({ available: false, reason: "rpc_unavailable" });
     expect(body).not.toHaveProperty("error");
     expect(mocks.loggerWarn).toHaveBeenCalledWith(
       "Resource vector search RPC unavailable",
       expect.objectContaining({ source: "resource-search-status", code: "PGRST202" })
+    );
+  });
+
+  it("rejects invalid resource search requests before calling the upstream API", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("RESOURCE_LIBRARY_API_KEY", "server-search-key");
+
+    const { POST } = await importRoute<typeof import("@/app/api/resource-search/route")>(
+      "@/app/api/resource-search/route"
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/resource-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "   ", mode: "fts", limit: 50 }),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a generic 503 when the resource search API key is missing", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { POST } = await importRoute<typeof import("@/app/api/resource-search/route")>(
+      "@/app/api/resource-search/route"
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/resource-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "design", mode: "fts", limit: 10 }),
+      })
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "资源搜索服务未配置" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("proxies resource search through the server without exposing the upstream key", async () => {
+    vi.stubEnv("RESOURCE_LIBRARY_API_KEY", "server-search-key");
+    const upstreamResults = [
+      {
+        id: "0194b64d-5cb6-7330-a273-1ab8f926e169",
+        title: "Design Example",
+        url: "https://example.com/design",
+        domain: "example.com",
+        summary: null,
+        category: null,
+        tags: ["design"],
+        crawled_at: null,
+        rank: 0.9,
+      },
+    ];
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ results: upstreamResults }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { POST } = await importRoute<typeof import("@/app/api/resource-search/route")>(
+      "@/app/api/resource-search/route"
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/resource-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "  design  ", mode: "fts", limit: 25 }),
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(body).toEqual({
+      results: [
+        {
+          id: "0194b64d-5cb6-7330-a273-1ab8f926e169",
+          title: "Design Example",
+          url: "https://example.com/design",
+          domain: "example.com",
+          summary: "",
+          category: "Other",
+          tags: ["design"],
+          crawled_at: "",
+          rank: 0.9,
+        },
+      ],
+    });
+    expect(JSON.stringify(body)).not.toContain("server-search-key");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://ihnmfsfbfnctgkhxmghk.supabase.co/functions/v1/search-api-v3",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+          apikey: "server-search-key",
+        }),
+        body: JSON.stringify({ query: "design", mode: "fts", limit: 25 }),
+        signal: expect.any(AbortSignal),
+      })
+    );
+  });
+
+  it("does not leak upstream resource search failure details", async () => {
+    vi.stubEnv("RESOURCE_LIBRARY_API_KEY", "server-search-key");
+    const fetchMock = vi.fn(async () =>
+      new Response("upstream failure with server-search-key", { status: 500 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { POST } = await importRoute<typeof import("@/app/api/resource-search/route")>(
+      "@/app/api/resource-search/route"
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/resource-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "design", mode: "fts", limit: 10 }),
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(body).toEqual({ error: "资源搜索失败" });
+    expect(JSON.stringify(body)).not.toContain("server-search-key");
+    expect(mocks.loggerWarn).toHaveBeenCalledWith(
+      "Resource search upstream request failed",
+      expect.objectContaining({ source: "resource-search", status: 500 })
     );
   });
 

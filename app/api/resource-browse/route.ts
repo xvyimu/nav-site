@@ -5,7 +5,7 @@ import { z } from "zod";
 
 // 资源库浏览 API
 // 用 service_role 直读 rl 项目 pages 表全量，绕过 Edge Function 的 query-required / limit=50 的限制。
-// 搜索场景仍走 search-api-v3；浏览（首屏、分类浏览）走本路由。
+// 搜索场景走 /api/resource-search 代理；浏览（首屏、分类浏览）走本路由。
 
 const RL_URL = "https://ihnmfsfbfnctgkhxmghk.supabase.co";
 const RL_SERVICE_ROLE = process.env.RESOURCE_LIBRARY_SERVICE_ROLE_KEY || "";

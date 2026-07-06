@@ -7,12 +7,20 @@ import { withTimeout } from "@/lib/utils";
 const RL_URL = "https://ihnmfsfbfnctgkhxmghk.supabase.co";
 const RL_SERVICE_ROLE = process.env.RESOURCE_LIBRARY_SERVICE_ROLE_KEY || "";
 const PROBE_TIMEOUT_MS = 5000;
+const STATUS_CACHE_CONTROL =
+  "public, max-age=60, s-maxage=300, stale-while-revalidate=600";
 
 export const dynamic = "force-dynamic";
 
+function statusResponse(body: { available: boolean; reason?: string }) {
+  return NextResponse.json(body, {
+    headers: { "Cache-Control": STATUS_CACHE_CONTROL },
+  });
+}
+
 export async function GET() {
   if (!RL_SERVICE_ROLE) {
-    return NextResponse.json({ available: false, reason: "missing_key" });
+    return statusResponse({ available: false, reason: "missing_key" });
   }
 
   try {
@@ -36,14 +44,14 @@ export async function GET() {
         source: "resource-search-status",
         code: error.code,
       });
-      return NextResponse.json({ available: false, reason: "rpc_unavailable" });
+      return statusResponse({ available: false, reason: "rpc_unavailable" });
     }
-    return NextResponse.json({ available: true });
+    return statusResponse({ available: true });
   } catch (e) {
     logger.warn("Resource vector search probe failed", {
       source: "resource-search-status",
       error: e instanceof Error ? e.message : String(e),
     });
-    return NextResponse.json({ available: false, reason: "probe_failed" });
+    return statusResponse({ available: false, reason: "probe_failed" });
   }
 }

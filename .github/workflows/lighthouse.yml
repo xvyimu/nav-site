@@ -32,16 +32,11 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SOURCE_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SOURCE_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY: ${{ secrets.NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY }}
-          RESOURCE_LIBRARY_SERVICE_ROLE_KEY: ${{ secrets.RESOURCE_LIBRARY_SERVICE_ROLE_KEY }}
 
       - name: 启动生产服务器
         run: |
           pnpm start -p 3264 &
           sleep 10
-        env:
-          NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY: ${{ secrets.NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY }}
-          RESOURCE_LIBRARY_SERVICE_ROLE_KEY: ${{ secrets.RESOURCE_LIBRARY_SERVICE_ROLE_KEY }}
 
       - name: 健康检查
         run: |

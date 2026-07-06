@@ -5,10 +5,6 @@ import Link from "next/link";
 import { Loader2, Search, Sparkles, X } from "lucide-react";
 import type { ResourceItem } from "@/lib/types";
 
-const SEARCH_API =
-  "https://ihnmfsfbfnctgkhxmghk.supabase.co/functions/v1/search-api-v3";
-const API_KEY = process.env.NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY || "";
-
 // 轻量防抖 hook（字符串参数版本，规避泛型重载问题）
 function useDebounce(fn: (val: string) => void, ms: number) {
   const tid = useRef<number>(0);
@@ -62,7 +58,7 @@ export function ResourcesClient() {
     }
   }, []);
 
-  // ── 搜索（有 query）→ 走 Edge Function ──
+  // ── 搜索（有 query）→ 走站内代理，避免浏览器直连外部 Function / key ──
   const fetchResults = useCallback(
     async (q: string) => {
       const requestId = ++requestSeq.current;
@@ -73,11 +69,10 @@ export function ResourcesClient() {
       };
       setLoading(true);
       try {
-        const res = await fetch(SEARCH_API, {
+        const res = await fetch("/api/resource-search", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: API_KEY,
           },
           body: JSON.stringify(body),
         });

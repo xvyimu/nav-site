@@ -70,8 +70,6 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SOURCE_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SOURCE_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY: ${{ secrets.NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY }}
-          RESOURCE_LIBRARY_SERVICE_ROLE_KEY: ${{ secrets.RESOURCE_LIBRARY_SERVICE_ROLE_KEY }}
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v7
@@ -106,8 +104,6 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SOURCE_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SOURCE_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY: ${{ secrets.NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY }}
-          RESOURCE_LIBRARY_SERVICE_ROLE_KEY: ${{ secrets.RESOURCE_LIBRARY_SERVICE_ROLE_KEY }}
 
       - name: 安装 Playwright 浏览器
         run: npx playwright install --with-deps chromium
@@ -119,7 +115,7 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SOURCE_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SOURCE_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY: ${{ secrets.NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY }}
+          RESOURCE_LIBRARY_API_KEY: ${{ secrets.RESOURCE_LIBRARY_API_KEY }}
           RESOURCE_LIBRARY_SERVICE_ROLE_KEY: ${{ secrets.RESOURCE_LIBRARY_SERVICE_ROLE_KEY }}
 
       - name: 健康检查
