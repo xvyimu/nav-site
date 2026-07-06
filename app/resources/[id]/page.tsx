@@ -1,16 +1,17 @@
 import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { ResourceRating } from "../_components/ResourceRating";
 import { isSafeUrl } from "@/lib/utils";
+import {
+  RESOURCE_LIBRARY_SAFE_PAGE_COLUMNS,
+  createResourceLibraryReadClient,
+} from "@/lib/resource-library/client";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const RL_URL = "https://ihnmfsfbfnctgkhxmghk.supabase.co";
-const RL_SERVICE_ROLE = process.env.RESOURCE_LIBRARY_SERVICE_ROLE_KEY || "";
 const DETAIL_TIMEOUT_MS = 5000;
 const resourceIdSchema = z.string().uuid();
 
@@ -31,17 +32,15 @@ export default async function ResourceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  if (!RL_SERVICE_ROLE) notFound();
   if (!resourceIdSchema.safeParse(id).success) notFound();
+  const read = createResourceLibraryReadClient();
+  if (!read) notFound();
 
-  const supabase = createClient(RL_URL, RL_SERVICE_ROLE, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
   let pageResult: { data: unknown };
   try {
-    pageResult = await supabase
-      .from("pages")
-      .select("id,title,url,domain,summary,category,tags,crawled_at")
+    pageResult = await read.client
+      .from(read.pagesSource)
+      .select(RESOURCE_LIBRARY_SAFE_PAGE_COLUMNS)
       .eq("id", id)
       .abortSignal(AbortSignal.timeout(DETAIL_TIMEOUT_MS))
       .maybeSingle();

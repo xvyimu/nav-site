@@ -48,9 +48,23 @@ function query(response: QueryResponse) {
   };
 }
 
-async function importRoute<T>(path: string): Promise<T> {
+interface ImportRouteEnv {
+  anonKey?: string;
+  publicPagesSource?: string;
+  publicRatingStatsRpc?: string;
+  serviceRole?: string;
+}
+
+async function importRoute<T>(path: string, env: ImportRouteEnv = {}): Promise<T> {
   vi.resetModules();
-  vi.stubEnv("RESOURCE_LIBRARY_SERVICE_ROLE_KEY", "test-service-role");
+  vi.stubEnv("RESOURCE_LIBRARY_SERVICE_ROLE_KEY", env.serviceRole ?? "test-service-role");
+  if (env.anonKey !== undefined) vi.stubEnv("RESOURCE_LIBRARY_ANON_KEY", env.anonKey);
+  if (env.publicPagesSource !== undefined) {
+    vi.stubEnv("RESOURCE_LIBRARY_PUBLIC_PAGES_SOURCE", env.publicPagesSource);
+  }
+  if (env.publicRatingStatsRpc !== undefined) {
+    vi.stubEnv("RESOURCE_LIBRARY_PUBLIC_RATING_STATS_RPC", env.publicRatingStatsRpc);
+  }
   return import(path) as Promise<T>;
 }
 
@@ -107,6 +121,27 @@ describe("resource library API routes", () => {
       },
     ]);
     expect(pages.abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+
+  it("uses the resource library anon key and public pages source for browse when configured", async () => {
+    const pages = query({ data: [], error: null });
+    const from = vi.fn(() => pages);
+    mocks.createClient.mockReturnValue({ from });
+
+    const { GET } = await importRoute<typeof import("@/app/api/resource-browse/route")>(
+      "@/app/api/resource-browse/route",
+      { anonKey: "test-anon-key", publicPagesSource: "public_pages" }
+    );
+
+    const response = await GET(new Request("http://localhost/api/resource-browse?limit=1"));
+
+    expect(response.status).toBe(200);
+    expect(mocks.createClient).toHaveBeenCalledWith(
+      "https://ihnmfsfbfnctgkhxmghk.supabase.co",
+      "test-anon-key",
+      expect.any(Object)
+    );
+    expect(from).toHaveBeenCalledWith("public_pages");
   });
 
   it("does not expose vector RPC error details to the client", async () => {
@@ -315,7 +350,38 @@ describe("resource library API routes", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("s-maxage=60");
     expect(await response.json()).toEqual({ count: 2 });
+    expect(stats.abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+
+  it("uses the public rating stats RPC before service role for rating stats when anon is configured", async () => {
+    const stats = query({ data: 3, error: null });
+    const rpc = vi.fn(() => stats);
+    mocks.createClient.mockReturnValue({ rpc });
+
+    const { GET } = await importRoute<typeof import("@/app/api/resource-ratings/route")>(
+      "@/app/api/resource-ratings/route",
+      { anonKey: "test-anon-key", publicRatingStatsRpc: "get_public_resource_rating_count" }
+    );
+
+    const response = await GET(
+      new Request(
+        "http://localhost/api/resource-ratings?page_id=0194b64d-5cb6-7330-a273-1ab8f926e169"
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("s-maxage=60");
+    expect(await response.json()).toEqual({ count: 3 });
+    expect(mocks.createClient).toHaveBeenCalledWith(
+      "https://ihnmfsfbfnctgkhxmghk.supabase.co",
+      "test-anon-key",
+      expect.any(Object)
+    );
+    expect(rpc).toHaveBeenCalledWith("get_public_resource_rating_count", {
+      target_page_id: "0194b64d-5cb6-7330-a273-1ab8f926e169",
+    });
     expect(stats.abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
 
@@ -368,6 +434,45 @@ describe("resource library API routes", () => {
     expect(html).toContain('href="#"');
     expect(html).not.toContain("javascript:alert");
     expect(page.abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+
+  it("uses the resource library anon key and public pages source for detail pages when configured", async () => {
+    const page = query({
+      data: {
+        id: "0194b64d-5cb6-7330-a273-1ab8f926e169",
+        title: "Safe",
+        url: "https://example.com",
+        domain: "example.com",
+        summary: null,
+        category: null,
+        tags: null,
+        crawled_at: null,
+      },
+      error: null,
+    });
+    const from = vi.fn(() => page);
+    mocks.createClient.mockReturnValue({ from });
+
+    const [mod, server] = await Promise.all([
+      importRoute<typeof import("@/app/resources/[id]/page")>(
+        "@/app/resources/[id]/page",
+        { anonKey: "test-anon-key", publicPagesSource: "public_pages" }
+      ),
+      import("react-dom/server"),
+    ]);
+
+    const element = await mod.default({
+      params: Promise.resolve({ id: "0194b64d-5cb6-7330-a273-1ab8f926e169" }),
+    });
+    const html = server.renderToStaticMarkup(element);
+
+    expect(html).toContain("Safe");
+    expect(mocks.createClient).toHaveBeenCalledWith(
+      "https://ihnmfsfbfnctgkhxmghk.supabase.co",
+      "test-anon-key",
+      expect.any(Object)
+    );
+    expect(from).toHaveBeenCalledWith("public_pages");
   });
 
   it("accepts a valid rating after rate-limit and page existence checks", async () => {

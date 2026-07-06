@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
+import {
+  RESOURCE_LIBRARY_SAFE_PAGE_COLUMNS,
+  createResourceLibraryReadClient,
+} from "@/lib/resource-library/client";
 
 // 资源库浏览 API
-// 用 service_role 直读 rl 项目 pages 表全量，绕过 Edge Function 的 query-required / limit=50 的限制。
+// 优先用资源库 anon key 读取公开 view；未配置时才退回 service_role。
 // 搜索场景走 /api/resource-search 代理；浏览（首屏、分类浏览）走本路由。
 
-const RL_URL = "https://ihnmfsfbfnctgkhxmghk.supabase.co";
-const RL_SERVICE_ROLE = process.env.RESOURCE_LIBRARY_SERVICE_ROLE_KEY || "";
 const BROWSE_TIMEOUT_MS = 5000;
 const BROWSE_CACHE_CONTROL =
   "public, max-age=60, s-maxage=300, stale-while-revalidate=600";
@@ -21,7 +22,8 @@ const browseSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  if (!RL_SERVICE_ROLE) {
+  const read = createResourceLibraryReadClient();
+  if (!read) {
     return NextResponse.json({ error: "资源浏览服务未配置" }, { status: 503 });
   }
 
@@ -39,13 +41,9 @@ export async function GET(request: Request) {
     }
     const { category, limit } = parsed.data;
 
-    const supabase = createClient(RL_URL, RL_SERVICE_ROLE, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
-    let q = supabase
-      .from("pages")
-      .select("id,title,url,domain,summary,category,tags,crawled_at")
+    let q = read.client
+      .from(read.pagesSource)
+      .select(RESOURCE_LIBRARY_SAFE_PAGE_COLUMNS)
       .order("crawled_at", { ascending: false })
       .limit(limit);
 

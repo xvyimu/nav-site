@@ -52,7 +52,10 @@ pnpm start
 | `SUPABASE_SERVICE_ROLE_KEY_PROD` | 生产库 service role key（优先于 `SUPABASE_SERVICE_ROLE_KEY`） | 否 |
 | `EMBED_SERVER_URL` | 本地 embedding 服务地址（默认 `http://127.0.0.1:8003`） | 否 |
 | `RESOURCE_LIBRARY_API_KEY` | Resource Library Edge Function API key（仅服务端使用） | 否 |
-| `RESOURCE_LIBRARY_SERVICE_ROLE_KEY` | Resource Library service role key（仅服务端使用） | 否 |
+| `RESOURCE_LIBRARY_ANON_KEY` | Resource Library anon key（公开读路径优先使用） | 否 |
+| `RESOURCE_LIBRARY_PUBLIC_PAGES_SOURCE` | Resource Library 公开页面 view/table（默认 `public_pages`） | 否 |
+| `RESOURCE_LIBRARY_PUBLIC_RATING_STATS_RPC` | Resource Library 公开评分统计 RPC（默认 `get_public_resource_rating_count`） | 否 |
+| `RESOURCE_LIBRARY_SERVICE_ROLE_KEY` | Resource Library service role key（公开读 fallback + 评分提交，仅服务端使用） | 否 |
 | `GITHUB_ID` | GitHub OAuth App ID（用户登录） | 否 |
 | `GITHUB_SECRET` | GitHub OAuth App Secret | 否 |
 | `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN | 否 |
@@ -153,6 +156,7 @@ nav-site/
 │   ├── useLinksFilter.ts       # 搜索/过滤 Hook
 │   ├── slugify.ts              # URL slug 生成
 │   ├── rate-limit.ts           # 速率限制
+│   ├── resource-library/        # 外部资源库 Supabase 边界
 │   ├── logger.ts               # 结构化日志
 │   └── ...
 ├── scripts/                    # 运维脚本
@@ -166,6 +170,7 @@ nav-site/
 │   ├── migration-slug.sql      # slug 列迁移
 │   ├── migration-user-favorites.sql  # 收藏表迁移
 │   ├── migration-reviews.sql   # 评价系统迁移
+│   ├── migration-resource-library-public-read.sql # 资源库公开读边界（在 rl 项目执行）
 │   ├── migration-pgvector.sql  # 语义搜索迁移（可选）
 │   └── rls-audit.sql           # RLS 审计
 ├── tests/                      # 单元测试
@@ -222,6 +227,8 @@ push/PR → quality (lint + tsc + test+coverage)
 
 所有公开读取和后台写入通过 `lib/repositories.ts` 统一抽象。公开读保持 anon + RLS；后台管理写入收口到 `createServiceRoleClient()`，由 admin 路由鉴权后执行，避免把 service role 暴露到客户端或公开 API。
 
+外部资源库（`/resources`）通过 `lib/resource-library/client.ts` 单独收口：浏览和详情优先使用 `RESOURCE_LIBRARY_ANON_KEY` 读取公开 view/table，评分统计优先使用公开 RPC；未配置公开读环境时才回退到服务端 `RESOURCE_LIBRARY_SERVICE_ROLE_KEY`。评分提交仍由服务端 service role 受控写入。
+
 ### 程序化 SEO
 
 每个收录的工具自动生成 `/tool/[slug]` 详情页，包含 JSON-LD `SoftwareApplication` 结构化数据，便于搜索引擎和 AI 引擎理解。
@@ -267,6 +274,10 @@ push/PR → quality (lint + tsc + test+coverage)
 -- 先在 Supabase Dashboard 启用 vector 扩展
 -- 然后运行 scripts/migration-pgvector.sql
 -- 本地 embedding 服务：python scripts/embed-server.py
+
+-- 6. 资源库公开读边界（在 Resource Library / rl 项目执行）
+-- 运行 scripts/migration-resource-library-public-read.sql
+-- 然后在部署环境配置 RESOURCE_LIBRARY_ANON_KEY
 ```
 
 ## 内容管理

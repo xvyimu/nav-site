@@ -2,14 +2,18 @@ import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { getClientIp } from "@/lib/utils";
 import { z } from "zod";
+import {
+  createResourceLibraryPublicRatingStatsClient,
+  createResourceLibraryServiceClient,
+} from "@/lib/resource-library/client";
 
 // 资源库评分提交 API
 // 数据写入 rl Supabase 项目（ihnmfsfbfnctgkhxmghk）的 ratings 表
 // 走 nav-site 自有 service_role 连接，绕过 rl 项目的 RLS
 
-const RL_URL = "https://ihnmfsfbfnctgkhxmghk.supabase.co";
-const RL_SERVICE_ROLE = process.env.RESOURCE_LIBRARY_SERVICE_ROLE_KEY || "";
 const RATING_TIMEOUT_MS = 5000;
+const RATING_STATS_CACHE_CONTROL =
+  "public, max-age=30, s-maxage=60, stale-while-revalidate=300";
 
 export const dynamic = "force-dynamic";
 
@@ -23,14 +27,23 @@ const ratingStatsSchema = z.object({
   page_id: z.string().uuid("资源 ID 格式不正确"),
 });
 
-export async function POST(request: Request) {
-  if (!RL_SERVICE_ROLE) {
-    logger.error("RESOURCE_LIBRARY_SERVICE_ROLE_KEY not configured", {
-      source: "resource-ratings",
-    });
-    return NextResponse.json({ error: "评分服务未配置" }, { status: 503 });
+function parseRatingCount(data: unknown): number {
+  if (typeof data === "number" && Number.isFinite(data)) return data;
+  if (data && typeof data === "object") {
+    const count = (data as { count?: unknown }).count;
+    if (typeof count === "number" && Number.isFinite(count)) return count;
   }
+  return 0;
+}
 
+function ratingStatsResponse(count: number) {
+  return NextResponse.json(
+    { count },
+    { headers: { "Cache-Control": RATING_STATS_CACHE_CONTROL } }
+  );
+}
+
+export async function POST(request: Request) {
   try {
     let body: unknown;
     try {
@@ -50,12 +63,13 @@ export async function POST(request: Request) {
 
     const { page_id, query_text, rating } = parsed.data;
     const ip = getClientIp(request);
-
-    // 动态导入 supabase-js，避免在模块顶层加载
-    const { createClient } = await import("@supabase/supabase-js");
-    const supabase = createClient(RL_URL, RL_SERVICE_ROLE, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabase = createResourceLibraryServiceClient();
+    if (!supabase) {
+      logger.error("RESOURCE_LIBRARY_SERVICE_ROLE_KEY not configured", {
+        source: "resource-ratings",
+      });
+      return NextResponse.json({ error: "评分服务未配置" }, { status: 503 });
+    }
 
     // ── 速率限制：每 IP 每 15 分钟最多 10 次评分 ──
     const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
@@ -119,10 +133,6 @@ export async function POST(request: Request) {
  * GET /api/resource-ratings?page_id=xxx
  */
 export async function GET(request: Request) {
-  if (!RL_SERVICE_ROLE) {
-    return NextResponse.json({ error: "评分服务未配置" }, { status: 503 });
-  }
-
   try {
     const { searchParams } = new URL(request.url);
     const parsed = ratingStatsSchema.safeParse({
@@ -136,10 +146,33 @@ export async function GET(request: Request) {
     }
     const { page_id: pageId } = parsed.data;
 
-    const { createClient } = await import("@supabase/supabase-js");
-    const supabase = createClient(RL_URL, RL_SERVICE_ROLE, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const publicStats = createResourceLibraryPublicRatingStatsClient();
+    if (publicStats) {
+      try {
+        const { data, error } = await publicStats.client
+          .rpc(publicStats.rpcName, { target_page_id: pageId })
+          .abortSignal(AbortSignal.timeout(RATING_TIMEOUT_MS));
+
+        if (!error) {
+          return ratingStatsResponse(parseRatingCount(data));
+        }
+
+        logger.warn("Resource public rating stats RPC failed", {
+          source: "resource-ratings",
+          code: error.code,
+        });
+      } catch (e) {
+        logger.warn("Resource public rating stats RPC threw", {
+          source: "resource-ratings",
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    const supabase = createResourceLibraryServiceClient();
+    if (!supabase) {
+      return NextResponse.json({ error: "评分服务未配置" }, { status: 503 });
+    }
 
     const { count, error } = await supabase
       .from("ratings")
@@ -151,7 +184,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "获取评分失败" }, { status: 500 });
     }
 
-    return NextResponse.json({ count: count ?? 0 });
+    return ratingStatsResponse(count ?? 0);
   } catch {
     return NextResponse.json({ error: "服务器错误" }, { status: 500 });
   }
