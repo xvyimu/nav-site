@@ -1,6 +1,6 @@
 # 发布检查清单
 
-> 最后更新：2026-07-05
+> 最后更新：2026-07-06
 > 当前 release line：`master`
 > 目标分支：`master`
 
@@ -8,7 +8,9 @@
 
 代码质量链路已经通过，生产主站仍可访问，但最新代码尚未成功部署到 Netlify。
 
-当前红色上线阻塞是 Netlify 账号额度：GitHub Actions 的 quality/build/E2E 均已通过；deploy job 在 Netlify credit preflight 阶段停止，没有再 POST 创建新的 Netlify build。该阻塞不是代码、token 权限或 CI 脚本错误；需要在 Netlify 侧恢复账号 credit/账单额度后重新运行 deploy。
+当前红色上线阻塞是 Netlify 账号额度：GitHub Actions 的 quality/build/E2E 均已通过；deploy job 在 Netlify credit preflight 阶段停止，没有再 POST 创建新的 Netlify build。该阻塞不是代码、token 权限或 CI 脚本错误；需要在 Netlify 侧恢复账号 credit/账单额度后手动运行生产部署。
+
+永久发布策略已经收敛为：`master` push 只跑 quality/build/E2E，不再自动镜像到 Netlify 生产分支，也不再自动消耗 Netlify deploy credits。生产部署只通过 GitHub Actions 的 `workflow_dispatch` 手动触发。
 
 ## 已完成的稳定性收尾
 
@@ -16,6 +18,7 @@
 |---|---:|---|
 | Dependabot / npm audit | 通过 | `pnpm audit --registry=https://registry.npmjs.org --audit-level moderate`：No known vulnerabilities found |
 | Netlify credit preflight | 通过 | 默认检查窗口扩展到 24 小时；额度已耗尽时阻断 deploy trigger，避免重复创建失败 build |
+| 生产部署手动门禁 | 通过 | `master` push 只验证代码；Netlify 生产部署、分支镜像和 deploy 后 link-check 仅在手动运行 `CI 检查 / 手动 Netlify 部署` 时执行 |
 | embedding 健康检查 | 通过 | 未配置 `EMBED_SERVER_URL` 时 `/api/health` 标记 `embedding=skipped`；Netlify/Serverless 运行时即使残留 loopback `EMBED_SERVER_URL` 也默认跳过，除非显式设置 `EMBED_SERVER_LOOPBACK_ENABLED=true`；本地/自托管显式配置后才探测本地服务 |
 | Supabase timeout 降级 | 通过 | 首页数据读取使用 `AbortSignal.timeout(15000)`；Supabase 短时不可达时降级为空数据而不是挂起构建/请求 |
 | migration apply 兜底 | 通过 | `pnpm db:reviews:apply` 支持 `DATABASE_URL`/`SUPABASE_DB_URL`，优先 Supabase CLI，失败后回退 `psql`；无 DB URL 时可用 linked Supabase 项目 |
@@ -38,8 +41,8 @@
 | CI workflow 测试 | 通过 | `pnpm test tests/ci-workflow.test.ts` 覆盖手动部署触发与生产 smoke monitor |
 | GitHub Actions quality/build/E2E | 通过 | 最近一次 `master` push run 中 quality/build/E2E 均为 success；用 `rtk gh run list --repo xvyimu/nav-site --branch master --limit 4` 复验 |
 | Lighthouse CI | 通过 | 最近一次 `master` push 对应 Lighthouse run 为 success |
-| Netlify 分支同步 | 通过 | CI deploy job 会将 `master` 镜像到 Netlify 监听的 `main` 分支 |
-| 手动部署触发 | 已接入 | `CI 检查 + Netlify 部署` 支持 `workflow_dispatch`；Netlify 额度恢复后，代码已推送时可手动跑完整质量链路、deploy 和 link-check |
+| Netlify 分支同步 | 通过 | 手动 deploy job 会将 `master` 镜像到 Netlify 监听的 `main` 分支 |
+| 手动部署触发 | 已接入 | `CI 检查 / 手动 Netlify 部署` 支持 `workflow_dispatch`；Netlify 额度恢复后，代码已推送时可手动跑完整质量链路、deploy 和 link-check |
 | 生产 smoke monitor | 已接入 | `Production smoke monitor` 支持 `workflow_dispatch` 和每 6 小时定时运行 `node scripts/probe-production.mjs`；失败时上传日志并创建/更新 GitHub Issue，恢复后自动评论并关闭故障 Issue |
 | Deploy 后生产探针 | 已接入 | deploy job 输出 `deploy-url` 后，`link-check` 会先运行 `pnpm run verify:production:latest -- --base-url <deploy-url> --expect-commit "$GITHUB_SHA"` |
 | 发布版本识别 | 已接入 | 构建前生成 `/build-info.json`；部署后探针使用 `--expect-commit "$GITHUB_SHA"` 校验线上版本确为本次发布；`/api/health` 也会尽量暴露运行时可见的版本元数据 |
@@ -60,8 +63,8 @@
 ## 上线前必须完成
 
 1. 恢复 Netlify account credit/账单额度。
-2. 确认本地提交已推送到 `origin/master` 并触发完整流水线；若代码已经推送但 deploy 曾因额度失败，也可在 GitHub Actions 手动运行 `CI 检查 + Netlify 部署`。
-3. 确认 deploy job 成功，并继续跑到 `link-check`。
+2. 确认本地提交已推送到 `origin/master`；push 只要求 quality/build/E2E 通过。
+3. 在 GitHub Actions 手动运行 `CI 检查 / 手动 Netlify 部署`，确认 deploy job 成功，并继续跑到 `link-check`。
 4. 复验生产主站：
    - `/` 返回 200。
    - `/api/health` 返回 200；未配置 `EMBED_SERVER_URL`，或在 Netlify/Serverless 上残留 loopback `EMBED_SERVER_URL` 时，`checks.embedding.status=skipped`。
@@ -99,7 +102,7 @@ rtk git push origin master
 回滚后复验：
 
 1. GitHub Actions quality/build/e2e 通过。
-2. Netlify deploy 完成。
+2. 手动运行 `CI 检查 / 手动 Netlify 部署`，确认 Netlify deploy 完成。
 3. `/api/health` 返回 200。
 4. 首页、搜索、工具详情页可用。
 5. Sentry 或日志中无新增错误类型。

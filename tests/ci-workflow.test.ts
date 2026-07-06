@@ -9,12 +9,15 @@ function readWorkflow(fileName: string) {
 }
 
 describe("CI workflow launch behavior", () => {
-  it("allows a manual production deployment run after external blockers are cleared", () => {
+  it("gates production deployment behind a manual workflow dispatch", () => {
     const workflow = readWorkflow("ci.yml");
+    const manualDeployCondition =
+      "github.ref == 'refs/heads/master' && github.event_name == 'workflow_dispatch'";
 
     expect(workflow).toContain("workflow_dispatch:");
-    expect(workflow).toContain(
-      "github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')"
+    expect(workflow.split(manualDeployCondition).length - 1).toBe(2);
+    expect(workflow).not.toContain(
+      "github.event_name == 'push' || github.event_name == 'workflow_dispatch'"
     );
   });
 
