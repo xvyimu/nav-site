@@ -144,18 +144,20 @@ describe("resource library API routes", () => {
     expect(from).toHaveBeenCalledWith("public_pages");
   });
 
-  it("does not expose vector RPC error details to the client", async () => {
+  it("does not expose health probe error details to the client", async () => {
+    const probeError = {
+      code: "PGRST202",
+      message: "function public.resource_search_health does not exist",
+    };
     mocks.createClient.mockReturnValue({
       rpc: vi.fn(() => ({
-        error: {
-          code: "PGRST202",
-          message: "function public.search_pages_vector does not exist",
-        },
+        abortSignal: vi.fn(() => ({ error: probeError })),
       })),
     });
 
     const { GET } = await importRoute<typeof import("@/app/api/resource-search-status/route")>(
-      "@/app/api/resource-search-status/route"
+      "@/app/api/resource-search-status/route",
+      { anonKey: "test-anon-key" }
     );
 
     const response = await GET();
@@ -166,7 +168,7 @@ describe("resource library API routes", () => {
     expect(body).toEqual({ available: false, reason: "rpc_unavailable" });
     expect(body).not.toHaveProperty("error");
     expect(mocks.loggerWarn).toHaveBeenCalledWith(
-      "Resource vector search RPC unavailable",
+      "Resource search health RPC unavailable",
       expect.objectContaining({ source: "resource-search-status", code: "PGRST202" })
     );
   });
