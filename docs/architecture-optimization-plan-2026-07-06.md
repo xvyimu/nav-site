@@ -1,8 +1,15 @@
 # nav-site 架构优化方案
 
-Status: Proposed
+Status: Accepted
 Date: 2026-07-06
-Scope: 现有导航站架构优化；确认前不做代码实现
+Scope: 现有导航站架构优化；已按低风险阶段落地
+
+Implementation status:
+
+- Phase 1: reviews/favorites repository modules implemented.
+- Phase 2: links/categories/tags/admin/submissions repository modules implemented.
+- Phase 3: `SearchAdapters` seam implemented and ADR-004 accepted.
+- Phase 4: navigation URL state, server search, derived IA, and keyboard hooks split behind the `useLinksFilter` facade.
 
 ## 1. 背景
 
@@ -203,4 +210,3 @@ interface SearchAdapters {
 4. `lib/repositories.ts` 维持原有导出。
 5. 跑 targeted tests、全量 test、typecheck、lint、build。
 6. 交付一份变更说明，说明没有改数据库 schema、没有改 API response。
-

@@ -19,7 +19,11 @@ Rollout order:
 1. `lib/repositories/shared.ts` for common errors and row mapping helpers.
 2. `lib/repositories/reviews.ts` for tool reviews and review rate limits.
 3. `lib/repositories/favorites.ts` for user favorites.
-4. Later slices: links, categories, tags, admin links, submissions.
+4. `lib/repositories/links.ts` for public link reads and tool detail helpers.
+5. `lib/repositories/categories.ts` for public and admin category operations.
+6. `lib/repositories/tags.ts` for tag CRUD and link-tag joins.
+7. `lib/repositories/admin-links.ts` for admin link CRUD.
+8. `lib/repositories/submissions.ts` for public submit and click lookup helpers.
 
 Callers keep importing from `@/lib/repositories` during the rollout. Domain tests may import the new modules directly to make each module interface explicit.
 
@@ -33,7 +37,7 @@ Callers keep importing from `@/lib/repositories` during the rollout. Domain test
 
 - Positive: reviews and favorites gain separate locality for privacy, migration, and service role behavior.
 - Positive: tests can target domain interfaces instead of one broad MockDB surface.
-- Negative: facade and domain modules coexist during rollout.
+- Negative: facade and domain modules coexist by design, but the facade is now re-export only.
 - Risk: duplicated helpers during migration. Shared behavior should move to `shared.ts` only when a second domain needs it.
 
 ## Revisit triggers
