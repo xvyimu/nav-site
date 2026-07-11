@@ -19,6 +19,8 @@
     "analyze": "ANALYZE=true next build --webpack",
     "audit:security": "pnpm audit --registry=https://registry.npmjs.org --audit-level moderate",
     "bulk:add": "node scripts/bulk-add.mjs",
+    "resource:ingest": "node scripts/resource-ingest/run.mjs",
+    "resource:ingest:dry-run": "node scripts/resource-ingest/run.mjs --source devto --limit 20",
     "check:links": "node scripts/check-links.mjs --report",
     "db:reviews:apply": "node scripts/apply-reviews-migration.mjs",
     "db:reviews:apply:dry-run": "node scripts/apply-reviews-migration.mjs --dry-run",

@@ -1,0 +1,32 @@
+[
+  {
+    "type_of": "article",
+    "id": 1,
+    "title": "Fixture: Building a small RAG pipeline",
+    "description": "A short fixture article about retrieval-augmented generation for dry-run tests.",
+    "url": "https://dev.to/fixture-user/building-a-small-rag-pipeline-abcd",
+    "canonical_url": "https://dev.to/fixture-user/building-a-small-rag-pipeline-abcd",
+    "tag_list": ["ai", "rag", "python"],
+    "body_markdown": "# RAG\n\nUse embeddings + FTS. This is fixture content only."
+  },
+  {
+    "type_of": "article",
+    "id": 2,
+    "title": "Fixture: Next.js App Router notes",
+    "description": "Frontend notes for dry-run.",
+    "url": "https://dev.to/fixture-user/nextjs-app-router-notes-efgh?utm_source=test",
+    "canonical_url": "https://dev.to/fixture-user/nextjs-app-router-notes-efgh?utm_source=test",
+    "tag_list": ["javascript", "nextjs"],
+    "body_markdown": "App Router notes."
+  },
+  {
+    "type_of": "article",
+    "id": 3,
+    "title": "Fixture: Building a small RAG pipeline",
+    "description": "Duplicate title/url should be skipped in-batch.",
+    "url": "https://dev.to/fixture-user/building-a-small-rag-pipeline-abcd",
+    "canonical_url": "https://dev.to/fixture-user/building-a-small-rag-pipeline-abcd",
+    "tag_list": ["ai"],
+    "body_markdown": "dup"
+  }
+]
