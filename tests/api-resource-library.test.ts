@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   loggerWarn: vi.fn(),
   loggerError: vi.fn(),
+  getEmbedding: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
@@ -20,6 +21,10 @@ vi.mock("@/lib/logger", () => ({
     info: vi.fn(),
     debug: vi.fn(),
   },
+}));
+
+vi.mock("@/lib/search/semantic", () => ({
+  getEmbedding: mocks.getEmbedding,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -53,6 +58,7 @@ interface ImportRouteEnv {
   publicPagesSource?: string;
   publicRatingStatsRpc?: string;
   serviceRole?: string;
+  embedServerUrl?: string;
 }
 
 async function importRoute<T>(path: string, env: ImportRouteEnv = {}): Promise<T> {
@@ -65,7 +71,20 @@ async function importRoute<T>(path: string, env: ImportRouteEnv = {}): Promise<T
   if (env.publicRatingStatsRpc !== undefined) {
     vi.stubEnv("RESOURCE_LIBRARY_PUBLIC_RATING_STATS_RPC", env.publicRatingStatsRpc);
   }
+  if (env.embedServerUrl !== undefined) {
+    vi.stubEnv("EMBED_SERVER_URL", env.embedServerUrl);
+  }
   return import(path) as Promise<T>;
+}
+
+function makeEmbedding(dim = 512): number[] {
+  return Array.from({ length: dim }, (_, i) => (i === 0 ? 1 : 0));
+}
+
+function requestBodyFromFetchMock(fetchMock: ReturnType<typeof vi.fn>, index = 0): unknown {
+  const calls = fetchMock.mock.calls as unknown as Array<[unknown, RequestInit?]>;
+  const init = calls[index]?.[1];
+  return JSON.parse(String(init?.body ?? "{}"));
 }
 
 describe("resource library API routes", () => {
@@ -73,6 +92,7 @@ describe("resource library API routes", () => {
     mocks.createClient.mockReset();
     mocks.loggerWarn.mockReset();
     mocks.loggerError.mockReset();
+    mocks.getEmbedding.mockReset();
   });
 
   afterEach(() => {
@@ -155,9 +175,14 @@ describe("resource library API routes", () => {
       })),
     });
 
+    const fetchMock = vi.fn(async () => {
+      throw new Error("embed unreachable");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
     const { GET } = await importRoute<typeof import("@/app/api/resource-search-status/route")>(
       "@/app/api/resource-search-status/route",
-      { anonKey: "test-anon-key" }
+      { anonKey: "test-anon-key", embedServerUrl: "http://127.0.0.1:8003" }
     );
 
     const response = await GET();
@@ -165,12 +190,46 @@ describe("resource library API routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toContain("s-maxage=300");
-    expect(body).toEqual({ available: false, reason: "rpc_unavailable" });
+    expect(body.available).toBe(false);
+    expect(body.rpc).toBe(false);
+    expect(body.vector).toBe(false);
     expect(body).not.toHaveProperty("error");
     expect(mocks.loggerWarn).toHaveBeenCalledWith(
       "Resource search health RPC unavailable",
       expect.objectContaining({ source: "resource-search-status", code: "PGRST202" })
     );
+  });
+
+  it("reports vector available only when both RPC and embed health succeed", async () => {
+    mocks.createClient.mockReturnValue({
+      rpc: vi.fn(() => ({
+        abortSignal: vi.fn(() => ({ error: null })),
+      })),
+    });
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/health")) {
+        return new Response(JSON.stringify({ status: "ok", dim: 512, model: "BAAI/bge-small-zh-v1.5" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { GET } = await importRoute<typeof import("@/app/api/resource-search-status/route")>(
+      "@/app/api/resource-search-status/route",
+      { anonKey: "test-anon-key", embedServerUrl: "http://127.0.0.1:8003" }
+    );
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ available: true, vector: true, rpc: true });
+    expect(fetchMock).toHaveBeenCalled();
   });
 
   it("rejects invalid resource search requests before calling the upstream API", async () => {
@@ -267,6 +326,7 @@ describe("resource library API routes", () => {
           rank: 0.9,
         },
       ],
+      mode: "fts",
     });
     expect(JSON.stringify(body)).not.toContain("server-search-key");
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -282,6 +342,125 @@ describe("resource library API routes", () => {
         signal: expect.any(AbortSignal),
       })
     );
+  });
+
+  it("embeds the query and proxies vector search with query_embedding", async () => {
+    vi.stubEnv("RESOURCE_LIBRARY_API_KEY", "server-search-key");
+    const embedding = makeEmbedding(512);
+    mocks.getEmbedding.mockResolvedValue(embedding);
+
+    const upstreamResults = [
+      {
+        id: "0194b64d-5cb6-7330-a273-1ab8f926e169",
+        title: "Semantic Hit",
+        url: "https://example.com/semantic",
+        domain: "example.com",
+        summary: "about design systems",
+        category: "Design",
+        tags: ["ui"],
+        crawled_at: "2026-07-01T00:00:00Z",
+        similarity: 0.87,
+      },
+    ];
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ results: upstreamResults, mode: "vector" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { POST } = await importRoute<typeof import("@/app/api/resource-search/route")>(
+      "@/app/api/resource-search/route"
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/resource-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "好看的设计系统", mode: "vector", limit: 10 }),
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.mode).toBe("vector");
+    expect(body.results).toEqual([
+      {
+        id: "0194b64d-5cb6-7330-a273-1ab8f926e169",
+        title: "Semantic Hit",
+        url: "https://example.com/semantic",
+        domain: "example.com",
+        summary: "about design systems",
+        category: "Design",
+        tags: ["ui"],
+        crawled_at: "2026-07-01T00:00:00Z",
+        rank: 0.87,
+      },
+    ]);
+    expect(mocks.getEmbedding).toHaveBeenCalledWith("好看的设计系统");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(requestBodyFromFetchMock(fetchMock)).toEqual({
+      query: "好看的设计系统",
+      mode: "vector",
+      limit: 10,
+      query_embedding: embedding,
+    });
+  });
+
+  it("falls back to FTS when vector mode cannot obtain a valid embedding", async () => {
+    vi.stubEnv("RESOURCE_LIBRARY_API_KEY", "server-search-key");
+    mocks.getEmbedding.mockResolvedValue(null);
+
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          results: [
+            {
+              id: "0194b64d-5cb6-7330-a273-1ab8f926e169",
+              title: "FTS Fallback",
+              url: "https://example.com/fts",
+              domain: "example.com",
+              summary: "",
+              category: "Other",
+              tags: [],
+              crawled_at: "",
+              rank: 0.5,
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { POST } = await importRoute<typeof import("@/app/api/resource-search/route")>(
+      "@/app/api/resource-search/route"
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/resource-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "design", mode: "vector", limit: 10 }),
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.mode).toBe("fts");
+    expect(body.results[0].title).toBe("FTS Fallback");
+    expect(mocks.loggerWarn).toHaveBeenCalledWith(
+      "Resource vector embed unavailable, falling back to FTS",
+      expect.objectContaining({ source: "resource-search" })
+    );
+    const upstreamBody = requestBodyFromFetchMock(fetchMock);
+    expect(upstreamBody).toEqual({
+      query: "design",
+      mode: "fts",
+      limit: 10,
+    });
+    expect(upstreamBody).not.toHaveProperty("query_embedding");
   });
 
   it("does not leak upstream resource search failure details", async () => {

@@ -26,15 +26,25 @@ interface CategoryOption {
   label: string;
 }
 
+type SearchMode = "fts" | "vector";
+
 export function ResourcesClient() {
   const [query, setQuery] = useState("");
+  const [searchMode, setSearchMode] = useState<SearchMode>("fts");
   const [vectorAvailable, setVectorAvailable] = useState<boolean | null>(null);
+  const [activeMode, setActiveMode] = useState<SearchMode>("fts");
   const [results, setResults] = useState<ResourceItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const initialLoad = useRef(true);
   const requestSeq = useRef(0);
+  // 用 ref 避免防抖闭包拿到过期的 mode（在 effect 中同步，不在 render 写 ref）
+  const searchModeRef = useRef<SearchMode>("fts");
+
+  useEffect(() => {
+    searchModeRef.current = searchMode;
+  }, [searchMode]);
 
   // ── 浏览全量（空 query）→ 走自有 proxy 绕过 Edge Function 的 query-required 限制 ──
   const browse = useCallback(async () => {
@@ -48,6 +58,7 @@ export function ResourcesClient() {
       if (requestId !== requestSeq.current) return;
       setResults(items);
       setTotal(items.length);
+      setActiveMode("fts");
     } catch (e) {
       if (requestId !== requestSeq.current) return;
       console.error("资源库浏览失败:", e);
@@ -58,43 +69,45 @@ export function ResourcesClient() {
     }
   }, []);
 
-  // ── 搜索（有 query）→ 走站内代理，避免浏览器直连外部 Function / key ──
-  const fetchResults = useCallback(
-    async (q: string) => {
-      const requestId = ++requestSeq.current;
-      const body: Record<string, unknown> = {
-        mode: "fts",
-        query: q,
-        limit: 50,
-      };
-      setLoading(true);
-      try {
-        const res = await fetch("/api/resource-search", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const items: ResourceItem[] = Array.isArray(data)
-          ? data
-          : (data as { results: ResourceItem[] }).results ?? [];
-        if (requestId !== requestSeq.current) return;
-        setResults(items);
-        setTotal(items.length);
-      } catch (e) {
-        if (requestId !== requestSeq.current) return;
-        console.error("资源库搜索失败:", e);
-        setResults([]);
-        setTotal(0);
-      } finally {
-        if (requestId === requestSeq.current) setLoading(false);
-      }
-    },
-    []
-  );
+  // ── 搜索（有 query）→ 走站内代理；mode=vector 时由服务端生成 embedding ──
+  const fetchResults = useCallback(async (q: string, mode: SearchMode) => {
+    const requestId = ++requestSeq.current;
+    const body: Record<string, unknown> = {
+      mode,
+      query: q,
+      limit: 50,
+    };
+    setLoading(true);
+    try {
+      const res = await fetch("/api/resource-search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const items: ResourceItem[] = Array.isArray(data)
+        ? data
+        : (data as { results: ResourceItem[] }).results ?? [];
+      const usedMode: SearchMode =
+        data && typeof data === "object" && (data as { mode?: string }).mode === "vector"
+          ? "vector"
+          : "fts";
+      if (requestId !== requestSeq.current) return;
+      setResults(items);
+      setTotal(items.length);
+      setActiveMode(usedMode);
+    } catch (e) {
+      if (requestId !== requestSeq.current) return;
+      console.error("资源库搜索失败:", e);
+      setResults([]);
+      setTotal(0);
+    } finally {
+      if (requestId === requestSeq.current) setLoading(false);
+    }
+  }, []);
 
   // 首次加载全量
   useEffect(() => {
@@ -104,7 +117,7 @@ export function ResourcesClient() {
     }
   }, [browse]);
 
-  // 探测向量搜索 RPC 可用性
+  // 探测向量搜索可用性（RPC + 本地 embed 服务）
   useEffect(() => {
     let cancelled = false;
     fetch("/api/resource-search-status")
@@ -122,7 +135,7 @@ export function ResourcesClient() {
 
   // 搜索防抖
   const debouncedSearch = useDebounce((q: string) => {
-    fetchResults(q);
+    fetchResults(q, searchModeRef.current);
   }, 350);
 
   const handleQueryChange = (val: string) => {
@@ -131,6 +144,15 @@ export function ResourcesClient() {
       debouncedSearch(val);
     } else {
       browse();
+    }
+  };
+
+  const toggleVectorMode = () => {
+    if (vectorAvailable !== true) return;
+    const next: SearchMode = searchMode === "vector" ? "fts" : "vector";
+    setSearchMode(next);
+    if (query.trim()) {
+      fetchResults(query.trim(), next);
     }
   };
 
@@ -169,6 +191,15 @@ export function ResourcesClient() {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
+  const vectorTitle =
+    vectorAvailable === true
+      ? searchMode === "vector"
+        ? "语义搜索已开启（点击切换回关键词）"
+        : "开启语义搜索"
+      : vectorAvailable === false
+        ? "语义搜索不可用（需本地 embed 服务）"
+        : "检测语义搜索可用性…";
+
   return (
     <div className="space-y-5">
       {/* 搜索栏 */}
@@ -179,32 +210,37 @@ export function ResourcesClient() {
           type="text"
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
-          placeholder="搜索资源、站点或分类…"
+          placeholder={
+            searchMode === "vector"
+              ? "语义搜索：用自然语言描述你想找的资源…"
+              : "搜索资源、站点或分类…"
+          }
           className="w-full rounded-[24px] border border-input bg-background/80 py-2.5 pl-10 pr-24 text-sm text-foreground/80 placeholder:text-muted-foreground/40 outline-none backdrop-blur-sm transition-all focus:border-primary/60 focus:ring-[3px] focus:ring-primary/20"
           spellCheck={false}
         />
         <div className="absolute top-1/2 right-3 flex -translate-y-1/2 items-center gap-2">
-          {vectorAvailable === true ? (
-            <button
-              type="button"
-              title="向量搜索：需服务端 embedding，暂未开放"
-              className="inline-flex h-7 w-7 cursor-not-allowed items-center justify-center rounded-full border border-border/50 bg-muted/20 text-muted-foreground/20"
-              aria-label="向量搜索（暂未开放）"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-            </button>
-          ) : vectorAvailable === false ? (
-            <span
-              className="inline-flex h-7 w-7 cursor-not-allowed items-center justify-center rounded-full border border-border/50 bg-muted/20 text-muted-foreground/20"
-              aria-label="向量搜索不可用"
-              title="向量搜索不可用（RPC 未部署）"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-            </span>
-          ) : (
+          {vectorAvailable === null ? (
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-muted/10">
               <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/30" />
             </span>
+          ) : (
+            <button
+              type="button"
+              onClick={toggleVectorMode}
+              disabled={vectorAvailable !== true}
+              title={vectorTitle}
+              aria-label={vectorTitle}
+              aria-pressed={searchMode === "vector"}
+              className={
+                vectorAvailable !== true
+                  ? "inline-flex h-7 w-7 cursor-not-allowed items-center justify-center rounded-full border border-border/50 bg-muted/20 text-muted-foreground/20"
+                  : searchMode === "vector"
+                    ? "inline-flex h-7 w-7 items-center justify-center rounded-full border border-primary/50 bg-primary/15 text-primary transition-colors hover:bg-primary/25"
+                    : "inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-muted/20 text-muted-foreground/60 transition-colors hover:border-primary/40 hover:text-primary"
+              }
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+            </button>
           )}
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -226,6 +262,11 @@ export function ResourcesClient() {
           )}
         </div>
       </div>
+
+      {/* 当前模式提示 */}
+      {query && activeMode === "vector" && (
+        <p className="text-xs text-primary/70">语义搜索 · 按相似度排序</p>
+      )}
 
       {/* 分类筛选 */}
       <div className="flex flex-wrap gap-2">
