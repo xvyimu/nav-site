@@ -21,6 +21,7 @@
     "bulk:add": "node scripts/bulk-add.mjs",
     "resource:ingest": "node scripts/resource-ingest/run.mjs",
     "resource:ingest:dry-run": "node scripts/resource-ingest/run.mjs --source devto --limit 20",
+    "resource:backfill-pages": "node scripts/resource-ingest/backfill-page-embeddings.mjs",
     "check:links": "node scripts/check-links.mjs --report",
     "db:reviews:apply": "node scripts/apply-reviews-migration.mjs",
     "db:reviews:apply:dry-run": "node scripts/apply-reviews-migration.mjs --dry-run",
