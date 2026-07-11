@@ -73,3 +73,19 @@ next-env.d.ts
 # perf reports (HTML 体积大，仅提交 JSON 摘要)
 docs/perf/*.html
 .lighthouseci/
+
+# local embed / tunnel / env migrate secrets & logs (never commit)
+.embed-api-key.local
+.embed-tunnel-url.local
+.cloudflared-tunnel.log
+.cloudflared-tunnel.err.log
+.vercel-env-migrate.local.json
+.vercel-env-merged.local.json
+.embed-server.err.log
+.embed-server.out.log
+.next-dev.err.log
+.next-dev.out.log
+scripts/_embed.err.txt
+scripts/_embed.out.txt
+scripts/_next.err.txt
+scripts/_next.out.txt
