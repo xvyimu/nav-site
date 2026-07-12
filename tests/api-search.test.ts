@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { SemanticRow } from "@/lib/search/types";
 
 const sampleLinks = [
   {
@@ -43,7 +44,12 @@ const sampleLinks = [
 ];
 
 const getApprovedLinks = vi.fn(async () => sampleLinks);
-const rpc = vi.fn(async () => ({ data: [], error: null }));
+const rpc = vi.fn(
+  async (): Promise<{ data: SemanticRow[] | null; error: { message: string } | null }> => ({
+    data: [],
+    error: null,
+  }),
+);
 const createServiceRoleClient = vi.fn(() => ({ rpc }));
 const loggerInfo = vi.fn();
 
