@@ -1,12 +1,41 @@
 # 生产运行手册
 
-> 最后更新：2026-07-09
-> 适用项目：nav-site
-> 生产入口：`https://nav-site.netlify.app`
+> 最后更新：2026-07-11  
+> 适用项目：nav-site  
+> **当前生产入口：`https://nav-site-kappa.vercel.app`**（Vercel Hobby）  
+> 历史 Netlify：`https://nav-site.netlify.app` — credits 用尽，已迁 Vercel；勿空触发 Netlify deploy
 
 ## 目标
 
-这份手册用于生产发布、故障处理、账号额度恢复、健康检查和跨代理交接。任何涉及生产数据库、部署平台 secret、GitHub secret、Netlify 账单和域名 DNS 的操作，都先按本手册确认影响范围，再执行。
+这份手册用于生产发布、故障处理、账号额度恢复、健康检查和跨代理交接。任何涉及生产数据库、部署平台 secret、GitHub secret、账单和域名 DNS 的操作，都先按本手册确认影响范围，再执行。
+
+## 语义检索 / Embedding（2026-07-11）
+
+生产向量检索已通：
+
+```text
+Vercel → https://nav-site-embed-proxy.xiej4352.workers.dev
+  → https://embed.aijiaqi.ccwu.cc (Named Tunnel)
+  → 本机 127.0.0.1:18003 (BGE-small-zh-v1.5 · 512-d)
+```
+
+| 探针 | 期望 |
+|------|------|
+| `GET /api/health` → `checks.embedding` | `ok` |
+| `GET /api/resource-search-status` | `available/vector/rpc: true` |
+| `POST /api/resource-search` `{"query":"...","mode":"vector"}` | `mode: "vector"` |
+
+本机日常：
+
+```powershell
+powershell -NoProfile -File D:/nav-site/scripts/start-embed-native.ps1
+powershell -NoProfile -File D:/nav-site/scripts/start-embed-tunnel.ps1
+```
+
+完整架构与 Bot Fight：`docs/embed-fly-deploy.md`  
+Worker 重部署：`scripts/deploy-embed-proxy-worker.ps1`  
+
+**脆弱点：** 本机关机或 tunnel 断 → embedding 降级 FTS。改 Vercel `EMBED_SERVER_*` 后必须 redeploy。
 
 ## 日常发布流程
 
@@ -27,20 +56,19 @@ rtk pnpm run audit:security
 rtk node scripts/pre-commit-secret-scan.mjs
 ```
 
-3. 推送到 `origin/master` 后，GitHub Actions 会自动运行 quality/build/E2E。`master` push 不会自动消耗 Netlify deploy credits。
+3. **当前生产 = Vercel**（`nav-site-kappa.vercel.app`）。推送/CLI deploy 以 Vercel 项目 `nav-site` 为准；改 `EMBED_SERVER_*` 等 env 后必须 **redeploy** 才进运行时。
 
-4. 生产部署只通过 GitHub Actions 手动运行：
+4. **历史 Netlify 路径**（credits 恢复前勿用）：`master` push → quality + build + E2E only；生产 deploy 仅 `workflow_dispatch`：`CI 检查 / 手动 Netlify 部署`。额度用尽期间 **禁止空触发**。
 
-- Workflow：`CI 检查 / 手动 Netlify 部署`
-- 条件：Netlify account credit/账单额度可用
-- 结果：同步 `master` 到 Netlify 监听的 `main`，等待 Netlify Git deploy，然后运行 deploy 后探针和 link check
+5. 部署后复验（Vercel）：
 
-5. 部署后复验：
-
-```powershell
-rtk pnpm run verify:production:latest -- --expect-commit <commit-sha>
-rtk pnpm run verify:launch-readiness
+```text
+GET  https://nav-site-kappa.vercel.app/api/health               → embedding=ok
+GET  https://nav-site-kappa.vercel.app/api/resource-search-status → vector:true
+POST https://nav-site-kappa.vercel.app/api/resource-search  {"query":"大模型","mode":"vector"}
 ```
+
+仓库质量门脚本 `verify:production:*` / `verify:launch-readiness` 仍可跑；入口 URL 以 Vercel 为准。
 
 ## Netlify Credit 问题
 
@@ -54,11 +82,10 @@ Netlify account credit usage exceeded
 
 ### 永久处理策略
 
-- 保持 `master` push 只做代码验证，不自动触发生产 deploy。
-- 保持 `netlify.toml` 的 `build.ignore` 门禁，仅允许 Netlify 生产监听分支继续构建。
-- 生产部署必须手动触发，避免每次 push 消耗 credits。
-- 额度恢复前不要重复触发 deploy job；先跑本地和 GitHub quality/build/E2E。
-- 额度恢复后只触发一次 `CI 检查 / 手动 Netlify 部署`，并等待 `link-check` 完成。
+- **生产已迁 Vercel**；Netlify 额度恢复前不要重复触发 Netlify deploy。
+- 保持 `master` push 以代码验证为主；Vercel 侧改 env 后必须 redeploy。
+- 若将来回切 Netlify：额度恢复后只触发一次手动 deploy，并等待探针完成。
+- 额度用尽期间先跑本地和 GitHub quality/build/E2E。
 
 ### 验证
 
@@ -72,7 +99,7 @@ rtk pnpm run verify:launch-readiness -- --skip-network
 生产健康入口：
 
 ```text
-/api/health
+https://nav-site-kappa.vercel.app/api/health
 ```
 
 核心字段：
@@ -82,10 +109,31 @@ rtk pnpm run verify:launch-readiness -- --skip-network
 | `database` | `ok` | 是 | 主 Supabase 分类表连通性 |
 | `env` | `ok` | 是 | 必需公开 Supabase env 是否存在，不暴露值 |
 | `sentry` | `ok` 或 `skipped` | 否 | Sentry 是可选观测项 |
-| `embedding` | `ok`、`skipped` 或 `error` | 否 | 语义搜索可降级到 Fuse；Netlify/serverless 默认跳过 loopback |
+| `embedding` | `ok`、`skipped` 或 `error` | 否 | 语义搜索可降级到 Fuse；loopback 在 serverless 默认跳过；远程须 HTTPS + `EMBED_SERVER_API_KEY`（见 ADR-005） |
 | `resourceLibrarySearch` | `ok` 或 `skipped` | 否 | 资源库公开搜索 RPC；`error` 会被生产探针标红 |
 
 资源库搜索健康检查只使用 `RESOURCE_LIBRARY_ANON_KEY` 或 `RESOURCE_LIBRARY_SUPABASE_ANON_KEY` 调用公开 RPC `resource_search_health`。缺 key 时标记 `skipped`，不会回退到 service role。
+
+### Embedding 远程端点（生产语义搜索）
+
+本地开发：`EMBED_SERVER_URL=http://127.0.0.1:18003`（或 8003 历史端口）。
+
+生产（**Vercel**，2026-07-11 已通）：
+
+1. 本机 `scripts/embed-server.py`（BGE-small-zh-v1.5，512 维）+ Named Tunnel `embed.aijiaqi.ccwu.cc`。
+2. Worker 反代 `https://nav-site-embed-proxy.xiej4352.workers.dev`（绕 zone Bot Fight 对 Vercel 出口的 403）。
+3. Vercel env（encrypted）：
+   - `EMBED_SERVER_URL=https://nav-site-embed-proxy.xiej4352.workers.dev`
+   - `EMBED_SERVER_API_KEY=<same as .embed-api-key.local>`
+4. 不要设 `EMBED_SERVER_LOOPBACK_ENABLED`；不要用远程 HTTP 明文。
+
+验收：
+
+- `/api/health` → `checks.embedding.status === "ok"`
+- `/api/resource-search-status` → `{ "available": true, "vector": true, "rpc": true }`
+- `mode=vector` 不降级 FTS
+
+详见 `docs/embed-fly-deploy.md` · `docs/adr-005-remote-embed-endpoint.md`。
 
 ## 生产探针
 
@@ -168,6 +216,6 @@ python C:\Users\yuanjia\agent-memory\scripts\handoff.py add --project nav-site -
 - 当前 commit、分支、是否已 push。
 - 本地验证结果。
 - 生产 deploy 是否已触发。
-- Netlify credit 是否恢复。
+- 生产是否在 Vercel；embedding/vector 是否 ok；本机 native+tunnel 是否在线。
 - 是否需要生产 Supabase/Resource Library 操作。
 - 不要在 handoff、日志、commit message、README 中写入任何 secret。

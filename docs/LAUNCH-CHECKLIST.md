@@ -22,7 +22,7 @@
 | Netlify credit preflight | 通过 | 默认检查窗口扩展到 24 小时；额度已耗尽时阻断 deploy trigger，避免重复创建失败 build |
 | 生产部署手动门禁 | 通过 | `master` push 只验证代码；Netlify 生产部署、分支镜像和 deploy 后 link-check 仅在手动运行 `CI 检查 / 手动 Netlify 部署` 时执行 |
 | Netlify 分支构建门禁 | 通过 | `netlify.toml` 使用 `build.ignore` 调用 `scripts/netlify-ignore-build.mjs`；默认只有 `main` 分支继续构建，其他分支跳过 |
-| embedding 健康检查 | 通过 | 未配置 `EMBED_SERVER_URL` 时 `/api/health` 标记 `embedding=skipped`；Netlify/Serverless 运行时即使残留 loopback `EMBED_SERVER_URL` 也默认跳过，除非显式设置 `EMBED_SERVER_LOOPBACK_ENABLED=true`；本地/自托管显式配置后才探测本地服务 |
+| embedding 健康检查 | 通过 | 未配置 `EMBED_SERVER_URL` 时 `embedding=skipped`；serverless 默认跳过 loopback；远程 HTTPS + `EMBED_SERVER_API_KEY` 可在生产启用语义（ADR-005） |
 | Resource Library 健康检查 | 通过 | `/api/health` 暴露 `resourceLibrarySearch`；配置公开 anon key 时调用 `resource_search_health`，缺 key 时 `skipped`，不使用 service role 做健康探针 |
 | Supabase timeout 降级 | 通过 | 首页数据读取使用 `AbortSignal.timeout(15000)`；Supabase 短时不可达时降级为空数据而不是挂起构建/请求 |
 | migration apply 兜底 | 通过 | `pnpm db:reviews:apply` 支持 `DATABASE_URL`/`SUPABASE_DB_URL`，优先 Supabase CLI，失败后回退 `psql`；无 DB URL 时可用 linked Supabase 项目 |

@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
+// Hobby Edge 上限 1MB：next/og 依赖超限，改用 Node runtime
 export const alt = "综合导航站 — 开发者一站式资源导航";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
