@@ -59,6 +59,7 @@ interface ImportRouteEnv {
   publicRatingStatsRpc?: string;
   serviceRole?: string;
   embedServerUrl?: string;
+  embedServerApiKey?: string;
 }
 
 async function importRoute<T>(path: string, env: ImportRouteEnv = {}): Promise<T> {
@@ -73,6 +74,9 @@ async function importRoute<T>(path: string, env: ImportRouteEnv = {}): Promise<T
   }
   if (env.embedServerUrl !== undefined) {
     vi.stubEnv("EMBED_SERVER_URL", env.embedServerUrl);
+  }
+  if (env.embedServerApiKey !== undefined) {
+    vi.stubEnv("EMBED_SERVER_API_KEY", env.embedServerApiKey);
   }
   return import(path) as Promise<T>;
 }
@@ -126,7 +130,7 @@ describe("resource library API routes", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toContain("s-maxage=300");
+    expect(response.headers.get("cache-control")).toContain("s-maxage=30");
     expect(body.results).toEqual([
       {
         id: "0194b64d-5cb6-7330-a273-1ab8f926e169",
@@ -189,7 +193,7 @@ describe("resource library API routes", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toContain("s-maxage=300");
+    expect(response.headers.get("cache-control")).toContain("s-maxage=30");
     expect(body.available).toBe(false);
     expect(body.rpc).toBe(false);
     expect(body.vector).toBe(false);
@@ -232,6 +236,83 @@ describe("resource library API routes", () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 
+  it("probes remote HTTPS embed with Bearer key for resource-search-status", async () => {
+    mocks.createClient.mockReturnValue({
+      rpc: vi.fn(() => ({
+        abortSignal: vi.fn(() => ({ error: null })),
+      })),
+    });
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/health")) {
+        expect(init?.headers).toEqual(
+          expect.objectContaining({
+            Authorization: "Bearer remote-secret",
+          })
+        );
+        return new Response(JSON.stringify({ status: "ok", dim: 512, model: "BAAI/bge-small-zh-v1.5" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { GET } = await importRoute<typeof import("@/app/api/resource-search-status/route")>(
+      "@/app/api/resource-search-status/route",
+      {
+        anonKey: "test-anon-key",
+        embedServerUrl: "https://embed.example.com",
+        embedServerApiKey: "remote-secret",
+      }
+    );
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ available: true, vector: true, rpc: true });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://embed.example.com/health",
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.objectContaining({
+          Authorization: "Bearer remote-secret",
+        }),
+      })
+    );
+    expect(JSON.stringify(body)).not.toContain("remote-secret");
+  });
+
+  it("marks vector unavailable when remote embed lacks API key", async () => {
+    mocks.createClient.mockReturnValue({
+      rpc: vi.fn(() => ({
+        abortSignal: vi.fn(() => ({ error: null })),
+      })),
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { GET } = await importRoute<typeof import("@/app/api/resource-search-status/route")>(
+      "@/app/api/resource-search-status/route",
+      {
+        anonKey: "test-anon-key",
+        embedServerUrl: "https://embed.example.com",
+      }
+    );
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.available).toBe(false);
+    expect(body.vector).toBe(false);
+    expect(body.rpc).toBe(true);
+    expect(body.reason).toContain("EMBED_SERVER_API_KEY");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it("rejects invalid resource search requests before calling the upstream API", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

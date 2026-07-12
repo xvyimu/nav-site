@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { describeEmbedSkipReason, resolveLoopbackEmbedEndpoint } from "@/lib/embedding-runtime";
+import {
+  buildEmbedRequestHeaders,
+  describeEmbedSkipReason,
+  resolveEmbedEndpoint,
+} from "@/lib/embedding-runtime";
 import { logger } from "@/lib/logger";
 import {
   RESOURCE_LIBRARY_URL,
   getResourceLibraryAnonKey,
 } from "@/lib/resource-library/client";
 
-const EMBED_HEALTH_TIMEOUT_MS = 1500;
+const EMBED_HEALTH_TIMEOUT_MS = 8000;
 const RESOURCE_LIBRARY_HEALTH_TIMEOUT_MS = 1500;
 
 type HealthCheck = {
@@ -47,7 +51,7 @@ function getBuildVersion() {
 }
 
 function getEmbedHealthEndpoint() {
-  return resolveLoopbackEmbedEndpoint({
+  return resolveEmbedEndpoint({
     raw: process.env.EMBED_SERVER_URL,
     path: "/health",
   });
@@ -173,6 +177,7 @@ export async function GET() {
   } else {
     try {
       const response = await fetch(embedEndpoint, {
+        headers: buildEmbedRequestHeaders({ json: false }),
         signal: AbortSignal.timeout(EMBED_HEALTH_TIMEOUT_MS),
       });
       checks.embedding = {

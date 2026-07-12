@@ -6,17 +6,18 @@ import {
   getResourceLibraryAnonKey,
 } from "@/lib/resource-library/client";
 import {
+  buildEmbedRequestHeaders,
   describeEmbedSkipReason,
-  resolveLoopbackEmbedEndpoint,
+  resolveEmbedEndpoint,
 } from "@/lib/embedding-runtime";
 
 const RL_URL = RESOURCE_LIBRARY_URL;
 const PROBE_TIMEOUT_MS = 5000;
-const EMBED_PROBE_TIMEOUT_MS = 1500;
+const EMBED_PROBE_TIMEOUT_MS = 8000;
 const DEFAULT_EMBED_SERVER_URL = "http://127.0.0.1:8003";
 const EXPECTED_EMBED_DIM = 512;
 const STATUS_CACHE_CONTROL =
-  "public, max-age=60, s-maxage=300, stale-while-revalidate=600";
+  "public, max-age=15, s-maxage=30, stale-while-revalidate=60";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,7 @@ async function probeRpc(anonKey: string): Promise<boolean> {
 }
 
 async function probeEmbed(): Promise<{ ok: boolean; reason?: string }> {
-  const resolved = resolveLoopbackEmbedEndpoint({
+  const resolved = resolveEmbedEndpoint({
     raw: process.env.EMBED_SERVER_URL,
     fallback: DEFAULT_EMBED_SERVER_URL,
     path: "/health",
@@ -80,6 +81,7 @@ async function probeEmbed(): Promise<{ ok: boolean; reason?: string }> {
   try {
     const res = await fetch(resolved.endpoint, {
       method: "GET",
+      headers: buildEmbedRequestHeaders({ json: false }),
       signal: AbortSignal.timeout(EMBED_PROBE_TIMEOUT_MS),
     });
 

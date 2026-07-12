@@ -33,6 +33,7 @@ describe("/api/health", () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
     delete process.env.EMBED_SERVER_URL;
+    delete process.env.EMBED_SERVER_API_KEY;
     delete process.env.RESOURCE_LIBRARY_ANON_KEY;
     delete process.env.RESOURCE_LIBRARY_SUPABASE_ANON_KEY;
     supabaseSelect.mockResolvedValue({ count: 3, error: null });
@@ -43,6 +44,7 @@ describe("/api/health", () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     delete process.env.EMBED_SERVER_URL;
+    delete process.env.EMBED_SERVER_API_KEY;
     delete process.env.RESOURCE_LIBRARY_ANON_KEY;
     delete process.env.RESOURCE_LIBRARY_SUPABASE_ANON_KEY;
     delete process.env.EMBED_SERVER_LOOPBACK_ENABLED;
@@ -130,7 +132,7 @@ describe("/api/health", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("skips embedding health for non-loopback embed URLs", async () => {
+  it("skips embedding health for remote HTTPS without API key", async () => {
     process.env.EMBED_SERVER_URL = "https://embeddings.example.com";
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -141,7 +143,54 @@ describe("/api/health", () => {
 
     expect(response.status).toBe(200);
     expect(body.checks.embedding.status).toBe("skipped");
+    expect(body.checks.embedding.detail).toBe(
+      "remote EMBED_SERVER_URL requires EMBED_SERVER_API_KEY"
+    );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("skips embedding health for remote HTTP even with API key", async () => {
+    process.env.EMBED_SERVER_URL = "http://embeddings.example.com";
+    process.env.EMBED_SERVER_API_KEY = "secret-key";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { GET } = await import("@/app/api/health/route");
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.checks.embedding.status).toBe("skipped");
+    expect(body.checks.embedding.detail).toBe(
+      "non-loopback EMBED_SERVER_URL must use HTTPS"
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("probes remote HTTPS embed health with Bearer API key", async () => {
+    process.env.EMBED_SERVER_URL = "https://embeddings.example.com";
+    process.env.EMBED_SERVER_API_KEY = "secret-key";
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { GET } = await import("@/app/api/health/route");
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.checks.embedding.status).toBe("ok");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://embeddings.example.com/health",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer secret-key",
+        }),
+      })
+    );
+    expect(JSON.stringify(body)).not.toContain("secret-key");
   });
 
   it("skips loopback embedding health in serverless runtimes by default", async () => {
