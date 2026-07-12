@@ -29,30 +29,31 @@
   --paper-accent: #5f84b2;
   --paper-accent-soft: rgba(95, 132, 178, 0.1);
 
-  --background: #f8f6f2;
-  --foreground: #3d4a5a;
+  /* 语义色绑定 paper 令牌，避免双轨 */
+  --background: var(--paper-bg);
+  --foreground: var(--paper-ink);
 
-  --card: #fffdfa;
-  --card-foreground: #3d4a5a;
-  --popover: #fffdfa;
-  --popover-foreground: #3d4a5a;
+  --card: var(--paper-surface);
+  --card-foreground: var(--paper-ink);
+  --popover: var(--paper-surface);
+  --popover-foreground: var(--paper-ink);
 
   /* 低饱和蓝灰主色 */
-  --primary: #5f84b2;
-  --primary-foreground: #fffdfa;
+  --primary: var(--paper-accent);
+  --primary-foreground: var(--paper-surface);
 
   --secondary: #ede9e1;
-  --secondary-foreground: #3d4a5a;
+  --secondary-foreground: var(--paper-ink);
   --muted: #ede9e1;
-  --muted-foreground: #6f7f91;
+  --muted-foreground: var(--paper-muted);
 
   --accent: #e7edf3;
-  --accent-foreground: #3d4a5a;
+  --accent-foreground: var(--paper-ink);
 
   --destructive: oklch(0.58 0.22 22);
-  --border: #d8e0e7;
-  --input: #d8e0e7;
-  --ring: #5f84b2;
+  --border: var(--paper-line);
+  --input: var(--paper-line);
+  --ring: var(--paper-accent);
 
   --chart-1: oklch(0.62 0.18 250);
   --chart-2: oklch(0.55 0.2 280);
@@ -155,39 +156,49 @@ body {
 /* ===== 暗色模式 ===== */
 .dark {
   color-scheme: dark;
-  /* 深蓝灰基调，比纯黑更柔和 */
-  --background: oklch(0.12 0.008 260);
-  --foreground: oklch(0.93 0.005 260);
+  /* paper 令牌与 shadcn 语义色对齐，避免双轨色值 */
+  --paper-bg: oklch(0.12 0.008 260);
+  --paper-surface: oklch(0.15 0.01 260);
+  --paper-surface-soft: oklch(0.18 0.01 260);
+  --paper-ink: oklch(0.93 0.005 260);
+  --paper-muted: oklch(0.68 0.012 255);
+  --paper-faint: oklch(0.55 0.01 255);
+  --paper-line: oklch(0.93 0.005 260 / 10%);
+  --paper-accent: oklch(0.72 0.12 250);
+  --paper-accent-soft: oklch(0.62 0.18 250 / 16%);
 
-  --card: oklch(0.15 0.01 260);
-  --card-foreground: oklch(0.93 0.005 260);
-  --popover: oklch(0.15 0.01 260);
-  --popover-foreground: oklch(0.93 0.005 260);
+  --background: var(--paper-bg);
+  --foreground: var(--paper-ink);
 
-  --primary: oklch(0.62 0.18 250);
+  --card: var(--paper-surface);
+  --card-foreground: var(--paper-ink);
+  --popover: var(--paper-surface);
+  --popover-foreground: var(--paper-ink);
+
+  --primary: var(--paper-accent);
   --primary-foreground: oklch(0.98 0.005 260);
 
-  --secondary: oklch(0.2 0.01 260);
-  --secondary-foreground: oklch(0.93 0.005 260);
-  --muted: oklch(0.18 0.01 260);
-  --muted-foreground: oklch(0.5 0.01 255);
+  --secondary: var(--paper-surface-soft);
+  --secondary-foreground: var(--paper-ink);
+  --muted: var(--paper-surface-soft);
+  --muted-foreground: var(--paper-muted);
 
   --accent: oklch(0.22 0.03 250);
-  --accent-foreground: oklch(0.93 0.005 260);
+  --accent-foreground: var(--paper-ink);
 
   --destructive: oklch(0.58 0.22 22);
-  --border: oklch(0.93 0.005 260 / 8%);
+  --border: var(--paper-line);
   --input: oklch(0.93 0.005 260 / 10%);
-  --ring: oklch(0.62 0.18 250);
+  --ring: var(--paper-accent);
 
   --sidebar: oklch(0.13 0.01 260);
-  --sidebar-foreground: oklch(0.93 0.005 260);
-  --sidebar-primary: oklch(0.62 0.18 250);
+  --sidebar-foreground: var(--paper-ink);
+  --sidebar-primary: var(--paper-accent);
   --sidebar-primary-foreground: oklch(0.98 0.005 260);
   --sidebar-accent: oklch(0.22 0.03 250);
-  --sidebar-accent-foreground: oklch(0.93 0.005 260);
-  --sidebar-border: oklch(0.93 0.005 260 / 8%);
-  --sidebar-ring: oklch(0.62 0.18 250);
+  --sidebar-accent-foreground: var(--paper-ink);
+  --sidebar-border: var(--paper-line);
+  --sidebar-ring: var(--paper-accent);
 }
 
 /* ===== 卡片悬停体系（Restrained：单一 border 反馈） =====

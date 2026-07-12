@@ -4,33 +4,11 @@
  * 提取跨模块复用的通用工具，避免重复定义。
  */
 
-type ClassValue = string | number | false | null | undefined | ClassDictionary | ClassArray;
-type ClassDictionary = Record<string, boolean | null | undefined>;
-type ClassArray = ClassValue[];
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]): string {
-  const classes: string[] = [];
-
-  for (const input of inputs) {
-    if (!input) continue;
-
-    if (typeof input === "string" || typeof input === "number") {
-      classes.push(String(input));
-      continue;
-    }
-
-    if (Array.isArray(input)) {
-      const value = cn(...input);
-      if (value) classes.push(value);
-      continue;
-    }
-
-    for (const [key, value] of Object.entries(input)) {
-      if (value) classes.push(key);
-    }
-  }
-
-  return classes.join(" ");
+  return twMerge(clsx(inputs));
 }
 
 /**
@@ -102,9 +80,9 @@ export function getClientIp(request: Request): string {
  */
 export function escapeJsonForHtml(json: string): string {
   return json
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e")
-    .replace(/&/g, "\\u0026")
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
+    .replace(/</g, "\u003c")
+    .replace(/>/g, "\u003e")
+    .replace(/&/g, "\u0026")
+    .replace(new RegExp(String.fromCharCode(0x2028), "g"), "\u2028")
+    .replace(new RegExp(String.fromCharCode(0x2029), "g"), "\u2029");
 }
