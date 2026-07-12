@@ -26,11 +26,12 @@ interface CategoryOption {
   label: string;
 }
 
-type SearchMode = "fts" | "vector";
+type SearchMode = "fts" | "vector" | "hybrid";
 
 export function ResourcesClient() {
   const [query, setQuery] = useState("");
-  const [searchMode, setSearchMode] = useState<SearchMode>("fts");
+  // 默认 hybrid：vector 可用时 RRF 混排；不可用则服务端/探测回落到 fts
+  const [searchMode, setSearchMode] = useState<SearchMode>("hybrid");
   const [vectorAvailable, setVectorAvailable] = useState<boolean | null>(null);
   const [activeMode, setActiveMode] = useState<SearchMode>("fts");
   const [results, setResults] = useState<ResourceItem[]>([]);
@@ -40,7 +41,7 @@ export function ResourcesClient() {
   const initialLoad = useRef(true);
   const requestSeq = useRef(0);
   // 用 ref 避免防抖闭包拿到过期的 mode（在 effect 中同步，不在 render 写 ref）
-  const searchModeRef = useRef<SearchMode>("fts");
+  const searchModeRef = useRef<SearchMode>("hybrid");
 
   useEffect(() => {
     searchModeRef.current = searchMode;
@@ -91,10 +92,10 @@ export function ResourcesClient() {
       const items: ResourceItem[] = Array.isArray(data)
         ? data
         : (data as { results: ResourceItem[] }).results ?? [];
+      const rawMode =
+        data && typeof data === "object" ? (data as { mode?: string }).mode : undefined;
       const usedMode: SearchMode =
-        data && typeof data === "object" && (data as { mode?: string }).mode === "vector"
-          ? "vector"
-          : "fts";
+        rawMode === "hybrid" || rawMode === "vector" || rawMode === "fts" ? rawMode : "fts";
       if (requestId !== requestSeq.current) return;
       setResults(items);
       setTotal(items.length);
@@ -123,10 +124,19 @@ export function ResourcesClient() {
     fetch("/api/resource-search-status")
       .then((res) => res.json())
       .then((data) => {
-        if (!cancelled) setVectorAvailable(data.available === true);
+        if (cancelled) return;
+        const available = data.available === true;
+        setVectorAvailable(available);
+        if (!available && searchModeRef.current !== "fts") {
+          setSearchMode("fts");
+          searchModeRef.current = "fts";
+        }
       })
       .catch(() => {
-        if (!cancelled) setVectorAvailable(false);
+        if (cancelled) return;
+        setVectorAvailable(false);
+        setSearchMode("fts");
+        searchModeRef.current = "fts";
       });
     return () => {
       cancelled = true;
@@ -147,9 +157,12 @@ export function ResourcesClient() {
     }
   };
 
+  // 三态：fts → hybrid → vector → fts（vector 不可用时禁用切换）
   const toggleVectorMode = () => {
     if (vectorAvailable !== true) return;
-    const next: SearchMode = searchMode === "vector" ? "fts" : "vector";
+    const order: SearchMode[] = ["fts", "hybrid", "vector"];
+    const idx = order.indexOf(searchMode);
+    const next = order[(idx + 1) % order.length];
     setSearchMode(next);
     if (query.trim()) {
       fetchResults(query.trim(), next);
@@ -193,9 +206,11 @@ export function ResourcesClient() {
 
   const vectorTitle =
     vectorAvailable === true
-      ? searchMode === "vector"
-        ? "语义搜索已开启（点击切换回关键词）"
-        : "开启语义搜索"
+      ? searchMode === "hybrid"
+        ? "混合排序（语义+关键词）· 点击切换纯语义"
+        : searchMode === "vector"
+          ? "纯语义搜索 · 点击切回关键词"
+          : "关键词搜索 · 点击开启混合排序"
       : vectorAvailable === false
         ? "语义搜索不可用（需本地 embed 服务）"
         : "检测语义搜索可用性…";
@@ -213,7 +228,9 @@ export function ResourcesClient() {
           placeholder={
             searchMode === "vector"
               ? "语义搜索：用自然语言描述你想找的资源…"
-              : "搜索资源、站点或分类…"
+              : searchMode === "hybrid"
+                ? "混合搜索：关键词 + 语义…"
+                : "搜索资源、站点或分类…"
           }
           className="w-full rounded-[24px] border border-input bg-background/80 py-2.5 pl-10 pr-24 text-sm text-foreground/80 placeholder:text-muted-foreground/40 outline-none backdrop-blur-sm transition-all focus:border-primary/60 focus:ring-[3px] focus:ring-primary/20"
           spellCheck={false}
@@ -230,13 +247,13 @@ export function ResourcesClient() {
               disabled={vectorAvailable !== true}
               title={vectorTitle}
               aria-label={vectorTitle}
-              aria-pressed={searchMode === "vector"}
+              aria-pressed={searchMode !== "fts"}
               className={
                 vectorAvailable !== true
                   ? "inline-flex h-7 w-7 cursor-not-allowed items-center justify-center rounded-full border border-border/50 bg-muted/20 text-muted-foreground/20"
-                  : searchMode === "vector"
-                    ? "inline-flex h-7 w-7 items-center justify-center rounded-full border border-primary/50 bg-primary/15 text-primary transition-colors hover:bg-primary/25"
-                    : "inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-muted/20 text-muted-foreground/60 transition-colors hover:border-primary/40 hover:text-primary"
+                  : searchMode === "fts"
+                    ? "inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-muted/20 text-muted-foreground/60 transition-colors hover:border-primary/40 hover:text-primary"
+                    : "inline-flex h-7 w-7 items-center justify-center rounded-full border border-primary/50 bg-primary/15 text-primary transition-colors hover:bg-primary/25"
               }
             >
               <Sparkles className="h-3.5 w-3.5" />
@@ -264,6 +281,9 @@ export function ResourcesClient() {
       </div>
 
       {/* 当前模式提示 */}
+      {query && activeMode === "hybrid" && (
+        <p className="text-xs text-primary/70">混合排序 · 语义 + 关键词（RRF）</p>
+      )}
       {query && activeMode === "vector" && (
         <p className="text-xs text-primary/70">语义搜索 · 按相似度排序</p>
       )}

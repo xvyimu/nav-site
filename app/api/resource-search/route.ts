@@ -13,13 +13,17 @@ const RESOURCE_SEARCH_API_KEY =
 const SEARCH_TIMEOUT_MS = 8000;
 const EXPECTED_EMBED_DIM = 512;
 const SEARCH_CACHE_CONTROL = "no-store";
+/** RRF constant (Cormack et al.) — same as nav link hybrid merge */
+const RRF_K = 60;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+type SearchMode = "fts" | "vector" | "hybrid";
+
 const searchSchema = z.object({
   query: z.string().trim().min(1, "搜索词不能为空").max(200, "搜索词不能超过 200 字符"),
-  mode: z.enum(["fts", "vector"]).default("fts"),
+  mode: z.enum(["fts", "vector", "hybrid"]).default("fts"),
   limit: z.coerce.number().int().min(1).max(50).default(50),
 });
 
@@ -67,18 +71,22 @@ function normalizeResource(value: unknown): ResourceItem | null {
   };
 }
 
-function normalizeResponse(
-  data: unknown,
-  mode: "fts" | "vector"
-): { results: ResourceItem[]; mode: "fts" | "vector" } {
+function extractResults(data: unknown): ResourceItem[] {
   const rawResults = Array.isArray(data)
     ? data
     : data && typeof data === "object" && Array.isArray((data as { results?: unknown }).results)
       ? (data as { results: unknown[] }).results
       : [];
 
+  return rawResults.map(normalizeResource).filter((item): item is ResourceItem => item !== null);
+}
+
+function normalizeResponse(
+  data: unknown,
+  mode: SearchMode
+): { results: ResourceItem[]; mode: SearchMode } {
   return {
-    results: rawResults.map(normalizeResource).filter((item): item is ResourceItem => item !== null),
+    results: extractResults(data),
     mode,
   };
 }
@@ -89,6 +97,69 @@ function isValidEmbedding(value: number[] | null): value is number[] {
     value.length === EXPECTED_EMBED_DIM &&
     value.every((n) => typeof n === "number" && Number.isFinite(n))
   );
+}
+
+/**
+ * Lightweight RRF merge for resource library vector + FTS lists.
+ * Exported for unit tests.
+ */
+export function mergeResourceHybrid(
+  vector: ResourceItem[],
+  fts: ResourceItem[],
+  limit: number
+): ResourceItem[] {
+  if (vector.length === 0 && fts.length === 0) return [];
+  if (vector.length === 0) return fts.slice(0, limit);
+  if (fts.length === 0) return vector.slice(0, limit);
+
+  const scores = new Map<string, { item: ResourceItem; score: number }>();
+
+  const addRank = (results: ResourceItem[]) => {
+    for (let rank = 0; rank < results.length; rank += 1) {
+      const item = results[rank];
+      const rrf = 1 / (RRF_K + rank + 1);
+      const existing = scores.get(item.id);
+      if (existing) {
+        existing.score += rrf;
+        // keep the stronger source rank for display
+        if (item.rank > existing.item.rank) {
+          existing.item = { ...item, rank: existing.score };
+        }
+      } else {
+        scores.set(item.id, { item, score: rrf });
+      }
+    }
+  };
+
+  addRank(vector);
+  addRank(fts);
+
+  return Array.from(scores.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ item, score }) => ({ ...item, rank: score }));
+}
+
+async function upstreamSearch(body: Record<string, unknown>): Promise<{
+  ok: boolean;
+  status: number;
+  data: unknown;
+}> {
+  const upstream = await fetch(SEARCH_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: RESOURCE_SEARCH_API_KEY,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+  });
+
+  if (!upstream.ok) {
+    return { ok: false, status: upstream.status, data: null };
+  }
+
+  return { ok: true, status: upstream.status, data: await upstream.json() };
 }
 
 export async function POST(request: Request) {
@@ -111,16 +182,21 @@ export async function POST(request: Request) {
     );
   }
 
-  let mode: "fts" | "vector" = parsed.data.mode;
+  const requestedMode = parsed.data.mode;
+  const limit = parsed.data.limit;
+  const query = parsed.data.query;
+
+  let mode: SearchMode = requestedMode;
   let queryEmbedding: number[] | undefined;
 
-  if (mode === "vector") {
-    const embedding = await getEmbedding(parsed.data.query);
+  if (requestedMode === "vector" || requestedMode === "hybrid") {
+    const embedding = await getEmbedding(query);
     const dim = Array.isArray(embedding) ? embedding.length : 0;
     if (!isValidEmbedding(embedding)) {
       logger.warn("Resource vector embed unavailable, falling back to FTS", {
         source: "resource-search",
         dim,
+        requestedMode,
       });
       mode = "fts";
     } else {
@@ -128,42 +204,86 @@ export async function POST(request: Request) {
     }
   }
 
-  const upstreamBody =
-    mode === "vector" && queryEmbedding
-      ? {
-          query: parsed.data.query,
-          mode: "vector" as const,
-          limit: parsed.data.limit,
-          query_embedding: queryEmbedding,
-        }
-      : {
-          query: parsed.data.query,
-          mode: "fts" as const,
-          limit: parsed.data.limit,
-        };
-
   try {
-    const upstream = await fetch(SEARCH_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: RESOURCE_SEARCH_API_KEY,
-      },
-      body: JSON.stringify(upstreamBody),
-      signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-    });
+    // pure FTS (including hybrid/vector fallback)
+    if (mode === "fts" || !queryEmbedding) {
+      const fts = await upstreamSearch({
+        query,
+        mode: "fts",
+        limit,
+      });
+      if (!fts.ok) {
+        logger.warn("Resource search upstream request failed", {
+          source: "resource-search",
+          status: fts.status,
+          mode: "fts",
+        });
+        return json({ error: "资源搜索失败" }, 502);
+      }
+      return json(normalizeResponse(fts.data, "fts"));
+    }
 
-    if (!upstream.ok) {
-      logger.warn("Resource search upstream request failed", {
+    // pure vector
+    if (mode === "vector") {
+      const vector = await upstreamSearch({
+        query,
+        mode: "vector",
+        limit,
+        query_embedding: queryEmbedding,
+      });
+      if (!vector.ok) {
+        logger.warn("Resource search upstream request failed", {
+          source: "resource-search",
+          status: vector.status,
+          mode: "vector",
+        });
+        return json({ error: "资源搜索失败" }, 502);
+      }
+      return json(normalizeResponse(vector.data, "vector"));
+    }
+
+    // hybrid: fetch both in parallel, RRF merge (B6)
+    const fetchLimit = Math.min(50, Math.max(limit, Math.ceil(limit * 1.5)));
+    const [vectorRes, ftsRes] = await Promise.all([
+      upstreamSearch({
+        query,
+        mode: "vector",
+        limit: fetchLimit,
+        query_embedding: queryEmbedding,
+      }),
+      upstreamSearch({
+        query,
+        mode: "fts",
+        limit: fetchLimit,
+      }),
+    ]);
+
+    if (!vectorRes.ok && !ftsRes.ok) {
+      logger.warn("Resource hybrid both upstreams failed", {
         source: "resource-search",
-        status: upstream.status,
-        mode,
+        vectorStatus: vectorRes.status,
+        ftsStatus: ftsRes.status,
       });
       return json({ error: "资源搜索失败" }, 502);
     }
 
-    const data = await upstream.json();
-    return json(normalizeResponse(data, mode));
+    const vectorItems = vectorRes.ok ? extractResults(vectorRes.data) : [];
+    const ftsItems = ftsRes.ok ? extractResults(ftsRes.data) : [];
+
+    if (vectorItems.length === 0 && ftsItems.length === 0) {
+      return json({ results: [], mode: vectorRes.ok ? "hybrid" : "fts" });
+    }
+    if (vectorItems.length === 0) {
+      return json({ results: ftsItems.slice(0, limit), mode: "fts" });
+    }
+    if (ftsItems.length === 0) {
+      return json({ results: vectorItems.slice(0, limit), mode: "vector" });
+    }
+
+    return json({
+      results: mergeResourceHybrid(vectorItems, ftsItems, limit),
+      mode: "hybrid",
+    });
   } catch (e) {
     logger.warn("Resource search proxy request failed", {
       source: "resource-search",

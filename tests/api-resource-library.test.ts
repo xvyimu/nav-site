@@ -489,6 +489,95 @@ describe("resource library API routes", () => {
     });
   });
 
+  it("merges vector and FTS via RRF when mode is hybrid", async () => {
+    vi.stubEnv("RESOURCE_LIBRARY_API_KEY", "server-search-key");
+    const embedding = makeEmbedding(512);
+    mocks.getEmbedding.mockResolvedValue(embedding);
+
+    const vectorOnly = {
+      id: "vector-only",
+      title: "Vector Only",
+      url: "https://example.com/v",
+      domain: "example.com",
+      summary: "",
+      category: "AI",
+      tags: [],
+      crawled_at: "",
+      similarity: 0.9,
+    };
+    const both = {
+      id: "both",
+      title: "Both Sources",
+      url: "https://example.com/b",
+      domain: "example.com",
+      summary: "",
+      category: "AI",
+      tags: [],
+      crawled_at: "",
+    };
+    const ftsOnly = {
+      id: "fts-only",
+      title: "FTS Only",
+      url: "https://example.com/f",
+      domain: "example.com",
+      summary: "",
+      category: "Other",
+      tags: [],
+      crawled_at: "",
+      rank: 0.4,
+    };
+
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { mode?: string };
+      if (body.mode === "vector") {
+        return new Response(
+          JSON.stringify({
+            results: [
+              { ...vectorOnly },
+              { ...both, similarity: 0.8 },
+            ],
+            mode: "vector",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          results: [
+            { ...both, rank: 0.7 },
+            { ...ftsOnly },
+          ],
+          mode: "fts",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { POST } = await importRoute<typeof import("@/app/api/resource-search/route")>(
+      "@/app/api/resource-search/route"
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/resource-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "design", mode: "hybrid", limit: 10 }),
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.mode).toBe("hybrid");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // "both" appears in both lists → highest RRF; then vector-only rank0 + fts-only rank1
+    expect(body.results.map((r: { id: string }) => r.id)).toEqual([
+      "both",
+      "vector-only",
+      "fts-only",
+    ]);
+  });
+
   it("falls back to FTS when vector mode cannot obtain a valid embedding", async () => {
     vi.stubEnv("RESOURCE_LIBRARY_API_KEY", "server-search-key");
     mocks.getEmbedding.mockResolvedValue(null);
