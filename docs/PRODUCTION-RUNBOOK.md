@@ -1,6 +1,6 @@
 # 生产运行手册
 
-> 最后更新：2026-07-11  
+> 最后更新：2026-07-12  
 > 适用项目：nav-site  
 > **当前生产入口：`https://nav-site-kappa.vercel.app`**（Vercel Hobby）  
 > 历史 Netlify：`https://nav-site.netlify.app` — credits 用尽，已迁 Vercel；勿空触发 Netlify deploy
@@ -9,7 +9,7 @@
 
 这份手册用于生产发布、故障处理、账号额度恢复、健康检查和跨代理交接。任何涉及生产数据库、部署平台 secret、GitHub secret、账单和域名 DNS 的操作，都先按本手册确认影响范围，再执行。
 
-## 语义检索 / Embedding（2026-07-11）
+## 语义检索 / Embedding（2026-07-12）
 
 生产向量检索已通：
 
@@ -24,18 +24,45 @@ Vercel → https://nav-site-embed-proxy.xiej4352.workers.dev
 | `GET /api/health` → `checks.embedding` | `ok` |
 | `GET /api/resource-search-status` | `available/vector/rpc: true` |
 | `POST /api/resource-search` `{"query":"...","mode":"vector"}` | `mode: "vector"` |
+| `POST /api/resource-search` `{"query":"...","mode":"hybrid"}` | `mode: "hybrid"`（RRF） |
 
 本机日常：
 
 ```powershell
+# 幂等拉起 native + tunnel
+powershell -NoProfile -File D:/nav-site/scripts/ensure-embed-stack.ps1
+
+# 或分步
 powershell -NoProfile -File D:/nav-site/scripts/start-embed-native.ps1
 powershell -NoProfile -File D:/nav-site/scripts/start-embed-tunnel.ps1
 ```
 
+**登录自启（当前用户，无需管理员）：**
+
+```powershell
+powershell -NoProfile -File D:/nav-site/scripts/install-embed-autostart.ps1
+# 卸载
+powershell -NoProfile -File D:/nav-site/scripts/uninstall-embed-autostart.ps1
+```
+
+任务名：`nav-site-embed-stack` · 登录后 90s · 日志 `.embed-autostart.log`
+
 完整架构与 Bot Fight：`docs/embed-fly-deploy.md`  
 Worker 重部署：`scripts/deploy-embed-proxy-worker.ps1`  
 
-**脆弱点：** 本机关机或 tunnel 断 → embedding 降级 FTS。改 Vercel `EMBED_SERVER_*` 后必须 redeploy。
+**脆弱点：** 本机关机或 tunnel 断 → embedding 降级 FTS。改 Vercel `EMBED_SERVER_*` 后必须 redeploy。  
+**勿**把 `EMBED_SERVER_URL` 指回失效 `*.trycloudflare.com` quick tunnel。
+
+### 生产探针与系统代理
+
+本机若启用 IE/系统代理（如 FlClash `127.0.0.1:7890`），PowerShell 能通而 Node undici 直连会 `UND_ERR_CONNECT_TIMEOUT`。
+
+`scripts/probe-production.mjs` 会自动读 `HTTPS_PROXY` / Windows 注册表代理并 `ProxyAgent`：
+
+```powershell
+pnpm run verify:production
+# 强制直连：pnpm exec node scripts/probe-production.mjs --no-proxy
+```
 
 ## 日常发布流程
 

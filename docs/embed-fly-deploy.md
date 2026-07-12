@@ -33,6 +33,10 @@ Vercel production (nav-site-kappa.vercel.app)
 ## 日常启停
 
 ```powershell
+# 推荐：幂等一次拉起
+powershell -NoProfile -File D:/nav-site/scripts/ensure-embed-stack.ps1
+
+# 或分步
 # 1) 原生 embed
 powershell -NoProfile -File D:/nav-site/scripts/start-embed-native.ps1
 # 2) Named Tunnel（会先探 origin，down 则自动拉 native）
@@ -43,6 +47,14 @@ powershell -NoProfile -File D:/nav-site/scripts/stop-embed-tunnel.ps1
 powershell -NoProfile -File D:/nav-site/scripts/stop-embed-native.ps1
 ```
 
+**登录自启（当前用户）：**
+
+```powershell
+powershell -NoProfile -File D:/nav-site/scripts/install-embed-autostart.ps1
+# 任务名 nav-site-embed-stack · AtLogOn + 90s · 日志 .embed-autostart.log
+powershell -NoProfile -File D:/nav-site/scripts/uninstall-embed-autostart.ps1
+```
+
 验收：
 
 ```text
@@ -51,7 +63,7 @@ GET  https://embed.aijiaqi.ccwu.cc/health
 GET  https://nav-site-embed-proxy.xiej4352.workers.dev/health   # 可用 UA: node
 GET  https://nav-site-kappa.vercel.app/api/health               → embedding=ok
 GET  https://nav-site-kappa.vercel.app/api/resource-search-status → vector:true
-POST https://nav-site-kappa.vercel.app/api/resource-search  {"query":"...","mode":"vector"}
+POST https://nav-site-kappa.vercel.app/api/resource-search  {"query":"...","mode":"vector"|"hybrid"}
 ```
 
 ## 已完成
@@ -62,9 +74,11 @@ POST https://nav-site-kappa.vercel.app/api/resource-search  {"query":"...","mode
 - [x] Cloudflare Named Tunnel + DNS `embed.aijiaqi.ccwu.cc`
 - [x] Worker 反代 `nav-site-embed-proxy`（绕 Bot Fight）
 - [x] Vercel `EMBED_SERVER_URL` → workers.dev + redeploy
-- [x] 生产 embedding=ok / vector 检索可用（2026-07-11 deploy `dpl_EvY1hXsW2xvZfnZFi3ZrcqyBkGqn`）
+- [x] 生产 embedding=ok / vector 检索可用（2026-07-12 deploy `dpl_4YdkTxZE…`）
 - [x] 启停脚本：`start|stop-embed-native.ps1`、`start|stop-embed-tunnel.ps1`
+- [x] `ensure-embed-stack` + 登录计划任务自启
 - [x] 客户端 UA：`nav-site-embed-client/1.0`（`lib/embedding-runtime.ts`）
+- [x] 资源库 B6 hybrid RRF（`mode=hybrid`）
 
 ## 路径对照（历史）
 

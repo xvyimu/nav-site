@@ -1,4 +1,6 @@
 import { pathToFileURL } from "node:url";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 
 const DEFAULT_BASE_URL = "https://nav-site-kappa.vercel.app";
 const DEFAULT_TIMEOUT_MS = 45_000;
@@ -28,6 +30,90 @@ function normalize(value) {
 
 function parseBoolean(value) {
   return TRUE_VALUES.has(normalize(value));
+}
+
+function normalizeProxyUrl(raw) {
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw) || /^socks/i.test(raw)) return raw;
+  return `http://${raw}`;
+}
+
+/**
+ * Windows IE/system proxy (HKCU Internet Settings) is used by PowerShell /
+ * WinINet but NOT by Node undici. Without this, direct HTTPS to Vercel often
+ * hits UND_ERR_CONNECT_TIMEOUT when a local client proxy (e.g. FlClash :7890)
+ * is the only egress path.
+ *
+ * Order: explicit HTTP(S)_PROXY / ALL_PROXY → Windows registry ProxyServer.
+ * Skip when PROBE_NO_PROXY=1 / --no-proxy.
+ */
+export function resolveSystemProxyUrl(env = process.env) {
+  if (parseBoolean(env.PROBE_NO_PROXY) || parseBoolean(env.NO_PROXY_FORCE)) {
+    return null;
+  }
+
+  const explicit =
+    env.HTTPS_PROXY ||
+    env.https_proxy ||
+    env.HTTP_PROXY ||
+    env.http_proxy ||
+    env.ALL_PROXY ||
+    env.all_proxy;
+  if (typeof explicit === "string" && explicit.trim()) {
+    return normalizeProxyUrl(explicit.trim());
+  }
+
+  if (process.platform !== "win32") return null;
+
+  try {
+    const ps = [
+      "$p = Get-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings' -ErrorAction Stop;",
+      "if ([int]$p.ProxyEnable -ne 1) { exit 0 };",
+      "Write-Output $p.ProxyServer",
+    ].join(" ");
+    const out = execFileSync(
+      "powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-Command", ps],
+      { encoding: "utf8", timeout: 5000, windowsHide: true }
+    ).trim();
+    if (!out) return null;
+    // ProxyServer may be "host:port" or "http=host:port;https=host:port"
+    const httpsPart = out
+      .split(";")
+      .map((s) => s.trim())
+      .find((s) => /^https?=/i.test(s));
+    const raw = httpsPart ? httpsPart.split("=").slice(1).join("=") : out;
+    return normalizeProxyUrl(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Apply system/env proxy to undici global dispatcher (CLI only).
+ * Uses createRequire('undici') so vitest static analysis never resolves the package.
+ */
+export function bootstrapProbeProxy({ env = process.env, args = [], logger = console } = {}) {
+  if (args.includes("--no-proxy") || parseBoolean(env.PROBE_NO_PROXY)) {
+    return null;
+  }
+
+  const proxyUrl = resolveSystemProxyUrl(env);
+  if (!proxyUrl) return null;
+
+  try {
+    const require = createRequire(import.meta.url);
+    const undici = require("undici");
+    undici.setGlobalDispatcher(new undici.ProxyAgent(proxyUrl));
+    if (!parseBoolean(env.PROBE_PROXY_QUIET)) {
+      const safe = proxyUrl.replace(/\/\/([^/@]+)@/, "//***@");
+      logger.log(`Production probe proxy: ${safe}`);
+    }
+    return proxyUrl;
+  } catch (error) {
+    logger.error(`Failed to set probe proxy ${proxyUrl}: ${errorMessage(error)}`);
+    return null;
+  }
 }
 
 function parsePositiveNumber(value, fallback) {
@@ -325,6 +411,10 @@ export function assertProbePassed(results) {
 }
 
 export async function main({ env = process.env, args = process.argv.slice(2), fetchImpl = fetch, logger = console } = {}) {
+  // Only bootstrap proxy when using the real global fetch (not injected mocks).
+  if (fetchImpl === fetch) {
+    bootstrapProbeProxy({ env, args, logger });
+  }
   const config = readConfigFromEnv(env, args);
   const results = await runProductionProbe({ config, fetchImpl });
   logger.log(`Production probe base: ${config.baseUrl}`);

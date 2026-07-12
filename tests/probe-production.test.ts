@@ -219,6 +219,30 @@ describe("scripts/probe-production", () => {
     });
   });
 
+  it("resolves explicit HTTPS_PROXY before Windows registry lookup", async () => {
+    const { resolveSystemProxyUrl } = await importProbeModule();
+
+    expect(
+      resolveSystemProxyUrl({
+        HTTPS_PROXY: "http://127.0.0.1:7890",
+        PROBE_NO_PROXY: "",
+      } as unknown as NodeJS.ProcessEnv)
+    ).toBe("http://127.0.0.1:7890");
+
+    expect(
+      resolveSystemProxyUrl({
+        HTTPS_PROXY: "127.0.0.1:7890",
+      } as unknown as NodeJS.ProcessEnv)
+    ).toBe("http://127.0.0.1:7890");
+
+    expect(
+      resolveSystemProxyUrl({
+        HTTPS_PROXY: "http://127.0.0.1:7890",
+        PROBE_NO_PROXY: "1",
+      } as unknown as NodeJS.ProcessEnv)
+    ).toBeNull();
+  });
+
   it("retries transient network failures without hiding persistent semantic failures", async () => {
     const { runProductionProbe, assertProbePassed } = await importProbeModule();
     const baseUrl = "https://nav-site.example";
