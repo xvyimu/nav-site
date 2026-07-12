@@ -1,6 +1,6 @@
 import { pathToFileURL } from "node:url";
 
-const DEFAULT_BASE_URL = "https://nav-site.netlify.app";
+const DEFAULT_BASE_URL = "https://nav-site-kappa.vercel.app";
 const DEFAULT_TIMEOUT_MS = 45_000;
 const DEFAULT_RETRIES = 1;
 const DEFAULT_RETRY_DELAY_MS = 750;
