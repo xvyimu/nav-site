@@ -190,7 +190,7 @@ function commitMatches(actual, expected) {
   );
 }
 
-export function validateHealthPayload(payload, { expectEmbeddingSkipped } = {}) {
+export function validateHealthPayload(payload, { expectEmbeddingSkipped, requireEmbedding } = {}) {
   const failures = [];
 
   if (payload?.status !== "healthy") {
@@ -211,6 +211,11 @@ export function validateHealthPayload(payload, { expectEmbeddingSkipped } = {}) 
     const embeddingStatus = payload?.checks?.embedding?.status;
     if (embeddingStatus !== "skipped") {
       failures.push(`expected embedding check skipped, got ${embeddingStatus ?? "missing"}`);
+    }
+  } else if (requireEmbedding) {
+    const embeddingStatus = payload?.checks?.embedding?.status;
+    if (embeddingStatus !== "ok") {
+      failures.push(`expected embedding check ok, got ${embeddingStatus ?? "missing"}`);
     }
   }
 

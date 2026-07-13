@@ -21,20 +21,27 @@ const FAVORITES_MAX_ATTEMPTS = 30;
 
 /**
  * 收藏写操作（POST/DELETE）的速率限制包装。
- * GET 不限速（只读），但所有写操作都会先经过 IP 限流再走 repository 层。
  *
- * 限流策略：
- * - fail-open：DB 故障时放行（避免影响正常用户）
- * - 每条记录都通过 recordAttempt 留痕，便于审计
+ * 表 RLS 仅允许 service_role SELECT/DELETE，anon 只有 INSERT →
+ * 必须用 service_role 做 count，否则 check 恒 fail-open。
+ * 写路径 fail-close（DB 故障走内存兜底），防刷。
  */
 async function enforceFavoritesRateLimit(ip: string): Promise<{ allowed: boolean; count: number }> {
+  const supabase = createServiceRoleClient();
   return checkRateLimit(
     "favorites_rate_limits",
     ip,
     FAVORITES_WINDOW_MS,
     FAVORITES_MAX_ATTEMPTS,
-    false // fail-open
+    true,
+    supabase
   );
+}
+
+async function recordFavoritesAttempt(ip: string, success: boolean): Promise<void> {
+  const supabase = createServiceRoleClient();
+  // favorites_rate_limits 无 success 列；recordAttempt 会自动裁剪
+  await recordAttempt("favorites_rate_limits", ip, success, undefined, supabase);
 }
 
 // GET /api/favorites — 获取当前用户的收藏列表
@@ -64,17 +71,7 @@ export async function POST(request: NextRequest) {
     const csrfError = checkOrigin(request, "api-favorites");
     if (csrfError) return csrfError;
 
-    const ip = getClientIp(request);
-
-    // IP 速率限制（防御凭证滥用）
-    const { allowed } = await enforceFavoritesRateLimit(ip);
-    if (!allowed) {
-      return NextResponse.json(
-        { error: "操作过于频繁，请 15 分钟后再试" },
-        { status: 429 }
-      );
-    }
-
+    // 先校验 body，避免坏请求仍打 service_role 限流
     let body: unknown;
     try {
       body = await request.json();
@@ -88,9 +85,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "linkIds 格式不正确" }, { status: 400 });
     }
 
-    const supabase = await createServiceRoleClient();
+    const ip = getClientIp(request);
+
+    const { allowed } = await enforceFavoritesRateLimit(ip);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "操作过于频繁，请 15 分钟后再试" },
+        { status: 429 }
+      );
+    }
+
+    const supabase = createServiceRoleClient();
     const result = await addUserFavorites(supabase, session.user.id, parsed.data);
-    await recordAttempt("favorites_rate_limits", ip, !("error" in result));
+    await recordFavoritesAttempt(ip, !("error" in result));
 
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 500 });
@@ -137,7 +144,7 @@ export async function DELETE(request: NextRequest) {
       result = await removeUserFavorite(session.user.id, linkId);
     }
 
-    await recordAttempt("favorites_rate_limits", ip, !("error" in result));
+    await recordFavoritesAttempt(ip, !("error" in result));
 
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 500 });

@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { getClientIp } from "@/lib/utils";
+import { checkOrigin } from "@/lib/csrf";
 import { checkRateLimit, recordAttempt } from "@/lib/rate-limit";
 import { findExistingLinkByUrl, submitLink } from "@/lib/repositories";
 import { submitLinkSchema } from "@/lib/schemas";
 
 export async function POST(request: Request) {
   try {
+    const csrfError = checkOrigin(request, "submit-api");
+    if (csrfError) return csrfError;
+
     const ip = getClientIp(request);
 
     // 速率限制
@@ -37,7 +41,7 @@ export async function POST(request: Request) {
 
     const { title, url, description, category_id } = parsed.data;
 
-    // 重复 URL 检测
+    // 重复 URL 检测（service_role，含 pending）
     const existing = await findExistingLinkByUrl(url);
     if (existing) {
       return NextResponse.json(
@@ -46,10 +50,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const success = await submitLink({ title, url, description, category_id });
-    await recordAttempt("submit_attempts", ip, success);
+    const result = await submitLink({ title, url, description, category_id });
+    await recordAttempt("submit_attempts", ip, result.ok);
 
-    if (!success) {
+    if (!result.ok) {
+      if (result.duplicate) {
+        return NextResponse.json(
+          { error: "该站点已提交，等待审核中" },
+          { status: 409 }
+        );
+      }
       return NextResponse.json(
         { error: "提交失败，请重试" },
         { status: 500 }

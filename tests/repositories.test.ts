@@ -326,13 +326,18 @@ describe("repositories · 链接", () => {
   it("submitLink 成功", async () => {
     const db = freshMocks();
     db.setResponse("nav_links", { data: null, error: null });
-    expect(await submitLink({ title: "N", url: "https://n.com", description: null, category_id: null })).toBe(true);
+    expect(await submitLink({ title: "N", url: "https://n.com", description: null, category_id: null })).toEqual({
+      ok: true,
+    });
   });
 
   it("submitLink 失败", async () => {
     const db = freshMocks();
     db.setResponse("nav_links", { data: null, error: { code: "23505", message: "dup" } });
-    expect(await submitLink({ title: "N", url: "https://n.com", description: null, category_id: null })).toBe(false);
+    expect(await submitLink({ title: "N", url: "https://n.com", description: null, category_id: null })).toEqual({
+      ok: false,
+      duplicate: true,
+    });
   });
 
   it("findApprovedLinkByUrl 命中", async () => {

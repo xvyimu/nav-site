@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { getClientIp } from "@/lib/utils";
+import { checkOrigin } from "@/lib/csrf";
 import { z } from "zod";
 import {
   createResourceLibraryPublicRatingStatsClient,
@@ -45,6 +46,9 @@ function ratingStatsResponse(count: number) {
 
 export async function POST(request: Request) {
   try {
+    const csrfError = checkOrigin(request, "resource-ratings");
+    if (csrfError) return csrfError;
+
     let body: unknown;
     try {
       body = await request.json();
@@ -84,6 +88,11 @@ export async function POST(request: Request) {
         source: "resource-ratings",
         error: rateLimitErr.message,
       });
+      // fail-close：限流不可用时拒绝写
+      return NextResponse.json(
+        { error: "评分服务暂时不可用，请稍后重试" },
+        { status: 503 }
+      );
     }
     if ((count ?? 0) >= 10) {
       return NextResponse.json(

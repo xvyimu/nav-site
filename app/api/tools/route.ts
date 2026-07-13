@@ -65,10 +65,9 @@ export async function GET(request: NextRequest) {
       result = result.filter((l) => idSet.has(l.id));
     }
 
-    // 数量限制（上限 100，防止滥用，Zod 已校验范围）
-    if (zodResult.data.limit !== undefined) {
-      result = result.slice(0, Math.min(zodResult.data.limit, 100));
-    }
+    // 默认 limit=50（schema default），硬顶 100
+    const limit = Math.min(zodResult.data.limit ?? 50, 100);
+    result = result.slice(0, limit);
 
     // 构建分类映射
     const categoryMap = new Map(categories.map((c) => [c.id, c]));

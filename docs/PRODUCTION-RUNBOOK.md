@@ -1,10 +1,12 @@
 # 生产运行手册
 
-> 最后更新：2026-07-12  
+> 最后更新：2026-07-13  
 > 适用项目：nav-site  
-> **当前生产入口：`https://nav-site-kappa.vercel.app`**（Vercel Hobby · **唯一生产轨**）  
-> 历史 Netlify：`https://nav-site.netlify.app` — credits 用尽；`netlify.toml` ignore **默认跳过全部构建**。  
-> 紧急 Netlify 构建：设 `NETLIFY_FORCE_BUILD=1` 或 `NETLIFY_ALLOWED_BUILD_BRANCHES`
+> **生产入口：`https://yuanjia1314.ccwu.cc`**（自定义域 · Vercel 项目 `nav-site` · **verified**）  
+> 备用直连：`https://nav-site-kappa.vercel.app`（同部署）  
+> DNS（Cloudflare zone `yuanjia1314.ccwu.cc` / gmail 账）：apex **CNAME** → `41f090bbdb4a5afe.vercel-dns-017.com`（橙云）+ `_vercel` **TXT** 校验  
+> 历史 Netlify site `nav-site`：**账号侧已 disable**（`credit_save_vercel_primary`）+ build hook 已删 + custom_domain 已解绑；`netlify.toml` ignore **默认跳过全部构建**。  
+> 紧急 Netlify 构建：先 enableSite，再 `NETLIFY_FORCE_BUILD=1` 或 allowlist（一般不需要）
 
 ## 目标
 
@@ -38,22 +40,23 @@ powershell -NoProfile -File D:/nav-site/scripts/start-embed-native.ps1
 powershell -NoProfile -File D:/nav-site/scripts/start-embed-tunnel.ps1
 ```
 
-**登录自启（当前用户，无需管理员）：**
+**登录自启（可选 · 2026-07-13 默认已卸载）：**
 
 ```powershell
+# 当前状态：计划任务 nav-site-embed-stack 已卸；需语义检索时手动 ensure
+powershell -NoProfile -File D:/nav-site/scripts/ensure-embed-stack.ps1
+
+# 若要重新安装登录自启：
 powershell -NoProfile -File D:/nav-site/scripts/install-embed-autostart.ps1
 # 卸载
 powershell -NoProfile -File D:/nav-site/scripts/uninstall-embed-autostart.ps1
 ```
 
-任务名：`nav-site-embed-stack` · 登录后 90s · 日志 `.embed-autostart.log`
+任务名：`nav-site-embed-stack` · 登录后 90s · 日志 `.embed-autostart.log`  
 
-完整架构与 Bot Fight：`docs/embed-fly-deploy.md`  
-Worker 重部署：`scripts/deploy-embed-proxy-worker.ps1`  
-
-**脆弱点：** 本机关机或 tunnel 断 → embedding 降级 FTS。改 Vercel `EMBED_SERVER_*` 后必须 redeploy。  
+**脆弱点：** 本机关机/未跑 ensure → embedding error；默认 health 仍 healthy（探针可设 `HEALTH_REQUIRE_EMBEDDING=1` 或 `pnpm verify:production` 加 `--require-embedding`）。语义搜索降级 FTS。  
 **勿**把 `EMBED_SERVER_URL` 指回失效 `*.trycloudflare.com` quick tunnel。  
-**云端路径：** 生产「云 embed」= Worker + Named Tunnel + 本机 BGE（Fly.io 绑卡拒绝；Docker 路径已清理）。见 `docs/embed-fly-deploy.md`。
+**云端路径说明：** Worker + Named Tunnel 只是公网入口；**origin 仍是本机 BGE**（非始终在线云 GPU）。长期应迁 VPS。见 `docs/embed-fly-deploy.md`。
 
 ### 管理员密码（scrypt）
 
@@ -67,7 +70,7 @@ pnpm hash:admin-password
 # 配置 HASH 后删除 ADMIN_PASSWORD 明文，然后 redeploy
 ```
 
-过渡期仅设 `ADMIN_PASSWORD` 仍可用（timingSafeEqual）；有 HASH 时只认哈希。
+**生产 / Vercel：仅认 `ADMIN_PASSWORD_HASH`。** 明文 `ADMIN_PASSWORD` 在 `NODE_ENV=production` 或 `VERCEL=1` 下会被拒绝。本地开发仍可临时用明文。
 
 ### 生产探针与系统代理
 
@@ -126,9 +129,11 @@ Netlify account credit usage exceeded
 ### 永久处理策略
 
 - **生产已迁 Vercel**；Netlify 额度恢复前不要重复触发 Netlify deploy。
+- **2026-07-12：** 账号侧 `disableSite` 已执行；build hook 清空；站点 custom_domain 解绑。代码 ignore 仍默认 skip。
 - 保持 `master` push 以代码验证为主；Vercel 侧改 env 后必须 redeploy。
-- 若将来回切 Netlify：额度恢复后只触发一次手动 deploy，并等待探针完成。
+- 若将来回切 Netlify：`enableSite` → 额度恢复 → 只触发一次手动 deploy，并等待探针完成。
 - 额度用尽期间先跑本地和 GitHub quality/build/E2E。
+- 自定义域切 Vercel 步骤见记忆 `nav-site-domain-cutover-todo`（TXT 校验 + CF DNS）。
 
 ### 验证
 

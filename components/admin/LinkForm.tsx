@@ -21,6 +21,8 @@ export function LinkForm({ categories, editingLink, onSave, onCancel }: Props) {
     featured: false,
   });
 
+  const [saving, setSaving] = useState(false);
+
   // 切换编辑目标时填充表单
   useEffect(() => {
     if (editingLink) {
@@ -52,21 +54,27 @@ export function LinkForm({ categories, editingLink, onSave, onCancel }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const url = editingLink ? `/api/admin/links/${editingLink.id}` : "/api/admin/links";
-    const method = editingLink ? "PUT" : "POST";
+    if (saving) return;
+    setSaving(true);
+    try {
+      const url = editingLink ? `/api/admin/links/${editingLink.id}` : "/api/admin/links";
+      const method = editingLink ? "PUT" : "POST";
 
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    if (res.ok) {
-      resetForm();
-      onCancel();
-      onSave();
-    } else {
-      const d = await res.json();
-      alert(d.error || "操作失败");
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        resetForm();
+        onCancel();
+        onSave();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || `操作失败 (${res.status})`);
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -78,23 +86,23 @@ export function LinkForm({ categories, editingLink, onSave, onCancel }: Props) {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Field label="标题 *" required>
           <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-            className="field-input" required />
+            className="field-input" required disabled={saving} />
         </Field>
         <Field label="URL *" required>
           <input value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
-            className="field-input" required />
+            className="field-input" required disabled={saving} />
         </Field>
         <Field label="描述">
           <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-            className="field-input" />
+            className="field-input" disabled={saving} />
         </Field>
         <Field label="图标">
           <input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))}
-            className="field-input" />
+            className="field-input" disabled={saving} />
         </Field>
         <Field label="分类">
           <select value={form.category_id ?? ""} onChange={e => setForm(f => ({ ...f, category_id: e.target.value || null }))}
-            className="field-input">
+            className="field-input" disabled={saving}>
             <option value="">无分类</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -102,28 +110,28 @@ export function LinkForm({ categories, editingLink, onSave, onCancel }: Props) {
         <div className="flex items-end gap-4">
           <label className="flex items-center gap-2 text-sm text-white/70">
             <input type="checkbox" checked={form.approved} onChange={e => setForm(f => ({ ...f, approved: e.target.checked }))}
-              className="accent-sky-500" />
+              className="accent-sky-500" disabled={saving} />
             已审核
           </label>
           <label className="flex items-center gap-2 text-sm text-white/70">
             <input type="checkbox" checked={form.featured} onChange={e => setForm(f => ({ ...f, featured: e.target.checked }))}
-              className="accent-sky-500" />
+              className="accent-sky-500" disabled={saving} />
             推荐
           </label>
         </div>
       </div>
       <div className="flex gap-2 pt-2">
-        <button type="submit" aria-label={isEditing ? "保存编辑" : "添加新链接"}
-            className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-400">
-          {isEditing ? "保存" : "添加"}
+        <button type="submit" disabled={saving} aria-label={isEditing ? "保存编辑" : "添加新链接"}
+            className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-400 disabled:opacity-50">
+          {saving ? "提交中…" : isEditing ? "保存" : "添加"}
         </button>
-        <button type="button" aria-label="取消编辑" onClick={onCancel}
-            className="rounded-lg bg-white/10 px-4 py-2 text-sm text-white/60 transition hover:bg-white/20">
+        <button type="button" aria-label="取消编辑" onClick={onCancel} disabled={saving}
+            className="rounded-lg bg-white/10 px-4 py-2 text-sm text-white/60 transition hover:bg-white/20 disabled:opacity-50">
           取消
         </button>
         {isEditing && (
-          <button type="button" aria-label="切换为新增链接" onClick={resetForm}
-            className="rounded-lg bg-white/10 px-4 py-2 text-sm text-white/60 transition hover:bg-white/20">
+          <button type="button" aria-label="切换为新增链接" onClick={resetForm} disabled={saving}
+            className="rounded-lg bg-white/10 px-4 py-2 text-sm text-white/60 transition hover:bg-white/20 disabled:opacity-50">
             新增新链接
           </button>
         )}

@@ -105,7 +105,7 @@ describe("API malformed JSON boundaries", () => {
 
     expect(response.status).toBe(400);
     expect(body.error).toMatch(/json/i);
-    expect(mocks.createServiceRoleClient).not.toHaveBeenCalled();
+    expect(mocks.addUserFavorites).not.toHaveBeenCalled();
   });
 
   it("returns 400 for malformed submit JSON", async () => {

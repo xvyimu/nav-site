@@ -1,6 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
-export const RESOURCE_LIBRARY_URL = "https://ihnmfsfbfnctgkhxmghk.supabase.co";
+/** 允许 env 覆盖；默认生产 RL 项目 */
+export const RESOURCE_LIBRARY_URL =
+  process.env.RESOURCE_LIBRARY_SUPABASE_URL ||
+  process.env.RESOURCE_LIBRARY_URL ||
+  "https://ihnmfsfbfnctgkhxmghk.supabase.co";
 export const RESOURCE_LIBRARY_SAFE_PAGE_COLUMNS =
   "id,title,url,domain,summary,category,tags,crawled_at";
 

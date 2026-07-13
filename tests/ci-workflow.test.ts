@@ -11,14 +11,13 @@ function readWorkflow(fileName: string) {
 describe("CI workflow launch behavior", () => {
   it("gates production deployment behind a manual workflow dispatch", () => {
     const workflow = readWorkflow("ci.yml");
-    const manualDeployCondition =
-      "github.ref == 'refs/heads/master' && github.event_name == 'workflow_dispatch'";
-
     expect(workflow).toContain("workflow_dispatch:");
-    expect(workflow.split(manualDeployCondition).length - 1).toBe(2);
+    expect(workflow).toContain("ALLOW_NETLIFY_MIRROR");
+    expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
     expect(workflow).not.toContain(
       "github.event_name == 'push' || github.event_name == 'workflow_dispatch'"
     );
+    expect(workflow).toContain("[Emergency] Netlify mirror");
   });
 
   it("monitors production smoke on a schedule without requiring deploy credentials", () => {

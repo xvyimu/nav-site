@@ -86,7 +86,17 @@ export function AtlasWorkspace({
   resultsRef,
   announceRef,
 }: AtlasWorkspaceProps) {
-  const sectionOffset = featured.length + latest.length + popular.length;
+  // 按 flatResults / 分区同序累加 offset，避免每个 CategorySection 共用同一 sectionOffset
+  const sectionOffsets = useMemo(() => {
+    let running = featured.length + latest.length + popular.length;
+    const map = new Map<string, number>();
+    for (const section of linkSections) {
+      map.set(section.key, running);
+      running += section.links.length;
+    }
+    return map;
+  }, [featured.length, latest.length, popular.length, linkSections]);
+
   const panelResults = useMemo(
     () => flatResults.map((item) => item.link),
     [flatResults],
@@ -160,7 +170,7 @@ export function AtlasWorkspace({
             <CategorySection
               key={section.key}
               section={section}
-              sectionOffset={sectionOffset}
+              sectionOffset={sectionOffsets.get(section.key) ?? 0}
               activeCategory={activeCategory}
               focusedIndex={focusedIndex}
               onFocusChange={setFocusedIndex}

@@ -184,17 +184,27 @@ export async function GET() {
         status: response.ok ? "ok" : "error",
         latency_ms: Date.now() - embedStart,
         detail: response.ok
-          ? "optional embed service reachable"
-          : `optional embed service returned ${response.status}; semantic search will fall back`,
+          ? "embed service reachable"
+          : `embed service returned ${response.status}; semantic search will fall back`,
       };
+      // 默认 embedding 失败不拖垮全局 healthy；生产探针可设 HEALTH_REQUIRE_EMBEDDING=1
+      if (
+        !response.ok &&
+        process.env.HEALTH_REQUIRE_EMBEDDING === "1"
+      ) {
+        healthy = false;
+      }
     } catch (e) {
       checks.embedding = {
         status: "error",
         latency_ms: Date.now() - embedStart,
         detail: e instanceof Error
-          ? `optional embed service unavailable: ${e.message}`
-          : "optional embed service unavailable; semantic search will fall back",
+          ? `embed service unavailable: ${e.message}`
+          : "embed service unavailable; semantic search will fall back",
       };
+      if (process.env.HEALTH_REQUIRE_EMBEDDING === "1") {
+        healthy = false;
+      }
     }
   }
 

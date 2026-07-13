@@ -6,7 +6,7 @@
  * 对敏感操作（如登录）提供内存级备用限制，数据库故障时 fail-close。
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 
@@ -148,19 +148,29 @@ export async function checkRateLimit(
   return { allowed: (count ?? 0) < maxAttempts, count: count ?? 0 };
 }
 
+/** 仅有 ip/created_at、无 success 列的限流表 */
+const TABLES_WITHOUT_SUCCESS = new Set([
+  "favorites_rate_limits",
+  "click_rate_limits",
+]);
+
 /**
  * 记录一次尝试（成功或失败）
+ *
+ * @param client - 可选；favorites 等仅 service_role 可读表的表必须传入 service_role
  */
 export async function recordAttempt(
   table: string,
   ip: string,
   success: boolean,
-  extra?: Record<string, unknown>
+  extra?: Record<string, unknown>,
+  client?: SupabaseClient
 ): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from(table)
-    .insert({ ip, success, ...extra });
+  const supabase = client ?? (await createClient());
+  const row = TABLES_WITHOUT_SUCCESS.has(table)
+    ? { ip, ...extra }
+    : { ip, success, ...extra };
+  const { error } = await supabase.from(table).insert(row);
 
   if (error) {
     logger.warn("Rate limit record failed", { table, ip, error: error.message });
@@ -171,6 +181,7 @@ export async function recordAttempt(
  * 点击速率限制 — 同一 IP 对同一链接在窗口内只计一次
  *
  * @returns { allowed } - 是否允许记录点击
+ * @deprecated 优先使用 tryRecordClick（先插后计，消除 TOCTOU）
  */
 export async function checkClickRateLimit(
   ip: string,
@@ -199,13 +210,18 @@ export async function checkClickRateLimit(
 }
 
 /**
- * 记录点击（窗口内去重）
+ * 尝试记录点击（窗口内去重）
  *
- * 用 DB UNIQUE 约束 (ip, url, window_start) 替代 SELECT-then-INSERT，
- * 消除并发竞争条件（TOCTOU）。唯一约束冲突说明窗口内已记录过。
+ * 用 DB UNIQUE (ip, url, window_start) 原子抢占：
+ * - inserted=true → 本窗口首次，调用方再 increment
+ * - inserted=false → 已计过 / 冲突，不得再 +1
  */
-export async function recordClick(ip: string, url: string): Promise<void> {
-  const supabase = await createClient();
+export async function tryRecordClick(
+  ip: string,
+  url: string
+): Promise<{ inserted: boolean }> {
+  // service_role：click_rate_limits 通常无 anon 写权限
+  const supabase = createServiceRoleClient();
 
   // 15 分钟固定桶：0/15/30/45 分钟
   const now = new Date();
@@ -213,24 +229,36 @@ export async function recordClick(ip: string, url: string): Promise<void> {
   const windowStart = new Date(now);
   windowStart.setMinutes(Math.floor(minutes / 15) * 15, 0, 0);
 
+  await cleanupOldAttempts(supabase, "click_rate_limits");
+
   const { error } = await supabase
     .from("click_rate_limits")
     .insert({ ip, url, window_start: windowStart.toISOString() });
 
-  // 23505 = unique_violation — 窗口内已存在相同 (ip, url, window_start)
+  // 23505 = unique_violation — 窗口内已存在
   if (error && error.code === "23505") {
-    return;
+    return { inserted: false };
   }
   if (error) {
     logger.warn("Click record failed", { ip, url, error: error.message });
+    // 写失败时不 increment，避免无限刷榜
+    return { inserted: false };
   }
+  return { inserted: true };
+}
+
+/**
+ * 记录点击（窗口内去重）— 兼容旧调用
+ */
+export async function recordClick(ip: string, url: string): Promise<void> {
+  await tryRecordClick(ip, url);
 }
 
 /**
  * 递增链接点击计数（通过 RPC）
  */
 export async function incrementClickCount(url: string): Promise<void> {
-  const supabase = await createClient();
+  const supabase = createServiceRoleClient();
   const { error } = await supabase.rpc("increment_click", { link_url: url });
   if (error) {
     logger.warn("Click increment failed", { url, error: error.message });

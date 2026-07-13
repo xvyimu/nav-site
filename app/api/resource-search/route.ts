@@ -9,10 +9,8 @@ import type { ResourceItem } from "@/lib/types";
 
 const SEARCH_API =
   "https://ihnmfsfbfnctgkhxmghk.supabase.co/functions/v1/search-api-v3";
-const RESOURCE_SEARCH_API_KEY =
-  process.env.RESOURCE_LIBRARY_API_KEY ||
-  process.env.NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY ||
-  "";
+// 仅服务端密钥；禁止 NEXT_PUBLIC_* 回落（会进浏览器包）
+const RESOURCE_SEARCH_API_KEY = process.env.RESOURCE_LIBRARY_API_KEY || "";
 const SEARCH_TIMEOUT_MS = 8000;
 const EXPECTED_EMBED_DIM = 512;
 const SEARCH_CACHE_CONTROL = "no-store";

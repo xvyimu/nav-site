@@ -84,14 +84,28 @@ export function useKeyboardNav(params: KeyboardNavParams): KeyboardNavState {
     if (announceRef.current && q) announceRef.current.textContent = `找到 ${totalResults} 个结果`;
   }, [totalResults, q, announceRef]);
 
+  const focusResult = useCallback(
+    (index: number) => {
+      setFocusedIndex(index);
+      // 下一帧再 focus，确保 tabIndex 已更新
+      requestAnimationFrame(() => {
+        const el = resultsRef.current?.querySelector<HTMLElement>(
+          `[data-result-index="${index}"]`
+        );
+        el?.focus({ preventScroll: true });
+        el?.scrollIntoView({ block: "nearest" });
+      });
+    },
+    [resultsRef]
+  );
+
   const handleSearchKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
           if (flatResults.length > 0) {
-            setFocusedIndex(0);
-            resultsRef.current?.querySelector<HTMLElement>('[data-result-index="0"]')?.scrollIntoView({ block: "nearest" });
+            focusResult(0);
           }
           break;
         case "Escape":
@@ -106,7 +120,7 @@ export function useKeyboardNav(params: KeyboardNavParams): KeyboardNavState {
           break;
       }
     },
-    [flatResults.length, rawSearch, resetFocus, setRawSearch, setSearch, setServerResults, inputRef, resultsRef],
+    [flatResults.length, rawSearch, resetFocus, setRawSearch, setSearch, setServerResults, inputRef, focusResult],
   );
 
   const handleResultKeyDown = useCallback(
@@ -117,15 +131,13 @@ export function useKeyboardNav(params: KeyboardNavParams): KeyboardNavState {
         case "ArrowDown":
           e.preventDefault();
           if (index < flatResults.length - 1) {
-            setFocusedIndex(index + 1);
-            resultsRef.current?.querySelector<HTMLElement>(`[data-result-index="${index + 1}"]`)?.scrollIntoView({ block: "nearest" });
+            focusResult(index + 1);
           }
           break;
         case "ArrowUp":
           e.preventDefault();
           if (index > 0) {
-            setFocusedIndex(index - 1);
-            resultsRef.current?.querySelector<HTMLElement>(`[data-result-index="${index - 1}"]`)?.scrollIntoView({ block: "nearest" });
+            focusResult(index - 1);
           } else {
             setFocusedIndex(-1);
             inputRef.current?.focus();
@@ -140,7 +152,7 @@ export function useKeyboardNav(params: KeyboardNavParams): KeyboardNavState {
           break;
       }
     },
-    [flatResults, inputRef, resultsRef],
+    [flatResults, inputRef, focusResult],
   );
 
   return {

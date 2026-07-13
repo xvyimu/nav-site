@@ -3,20 +3,40 @@
 import { useEffect, useState } from "react";
 
 /**
- * useFavicon — 域名 favicon 加载（带兜底链 + 进程内去重）
+ * useFavicon — 域名 favicon 加载（兜底链 + 进程内去重 + 并发池）
  *
- * 抽自 LinkCard.tsx 原内联逻辑。加载顺序：
- *   1. /api/favicon?domain=xxx&v=2  （服务端代理 + 多源尝试，见 app/api/favicon/route.ts）
- *   2. https://www.google.com/s2/favicons?domain=xxx&sz=64  （客户端兜底）
- *   3. null → 调用方渲染 Globe 占位图标
+ * 加载顺序：
+ *   1. /api/favicon?domain=xxx&v=2
+ *   2. Google s2 favicons
+ *   3. null → 调用方 Globe
  *
- * 同一 domain 在页面生命周期内只发一次主请求（模块级 Map）。
- *
- * @param domain 由 extractDomain() 提取的主域名，传 null 时直接返回 null
+ * ResultGrid 窗口化后首屏挂载量下降；此处再限制同时 in-flight ≤ 6。
  */
 
 const faviconCache = new Map<string, string | null>();
 const faviconInflight = new Map<string, Promise<string | null>>();
+const MAX_CONCURRENT = 6;
+let activeLoads = 0;
+const waitQueue: Array<() => void> = [];
+
+function acquireSlot(): Promise<void> {
+  if (activeLoads < MAX_CONCURRENT) {
+    activeLoads += 1;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    waitQueue.push(() => {
+      activeLoads += 1;
+      resolve();
+    });
+  });
+}
+
+function releaseSlot(): void {
+  activeLoads = Math.max(0, activeLoads - 1);
+  const next = waitQueue.shift();
+  if (next) next();
+}
 
 function loadImage(url: string): Promise<boolean> {
   return new Promise((resolve) => {
@@ -36,20 +56,25 @@ async function resolveFavicon(domain: string): Promise<string | null> {
   if (existing) return existing;
 
   const task = (async () => {
-    const proxyUrl = `/api/favicon?domain=${encodeURIComponent(domain)}&v=2`;
-    if (await loadImage(proxyUrl)) {
-      faviconCache.set(domain, proxyUrl);
-      return proxyUrl;
-    }
+    await acquireSlot();
+    try {
+      const proxyUrl = `/api/favicon?domain=${encodeURIComponent(domain)}&v=2`;
+      if (await loadImage(proxyUrl)) {
+        faviconCache.set(domain, proxyUrl);
+        return proxyUrl;
+      }
 
-    const fallbackUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
-    if (await loadImage(fallbackUrl)) {
-      faviconCache.set(domain, fallbackUrl);
-      return fallbackUrl;
-    }
+      const fallbackUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+      if (await loadImage(fallbackUrl)) {
+        faviconCache.set(domain, fallbackUrl);
+        return fallbackUrl;
+      }
 
-    faviconCache.set(domain, null);
-    return null;
+      faviconCache.set(domain, null);
+      return null;
+    } finally {
+      releaseSlot();
+    }
   })().finally(() => {
     faviconInflight.delete(domain);
   });

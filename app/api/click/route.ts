@@ -2,11 +2,15 @@ import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { getClientIp } from "@/lib/utils";
 import { clickSchema } from "@/lib/schemas";
-import { checkClickRateLimit, recordClick, incrementClickCount } from "@/lib/rate-limit";
+import { tryRecordClick, incrementClickCount } from "@/lib/rate-limit";
 import { findApprovedLinkByUrl } from "@/lib/repositories";
+import { checkOrigin } from "@/lib/csrf";
 
 export async function POST(request: Request) {
   try {
+    const csrfError = checkOrigin(request, "click-api");
+    if (csrfError) return csrfError;
+
     const ip = getClientIp(request);
 
     let body: unknown;
@@ -34,18 +38,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // IP+URL 去重：同一 IP 对同一链接 15 分钟内只计一次点击
-    const { allowed } = await checkClickRateLimit(ip, url);
-    if (!allowed) {
-      // 已记录过，静默返回成功（不阻断用户跳转）
+    // 先原子抢占去重槽，成功后再 +1（消除 check→increment→record TOCTOU）
+    const { inserted } = await tryRecordClick(ip, url);
+    if (!inserted) {
       return NextResponse.json({ success: true, deduplicated: true });
     }
 
-    // 点击数 +1（通过 RPC 原子递增）
     await incrementClickCount(url);
-
-    // 记录本次点击（用于后续去重判断）
-    await recordClick(ip, url);
 
     return NextResponse.json({ success: true });
   } catch (e) {

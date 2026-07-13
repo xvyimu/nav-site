@@ -36,6 +36,51 @@ export function InteractiveSurface({
   onBlur,
   ...props
 }: InteractiveSurfaceProps) {
+  // 无 spotlight 时不挂指针 state，避免密集网格 hover 触发重渲染
+  if (!spotlight) {
+    return (
+      <div
+        className={cn(
+          "relative overflow-hidden transition-[border-color,transform] duration-200 ease-out",
+          className
+        )}
+        style={style}
+        {...props}
+      >
+        <div className="relative">{children}</div>
+      </div>
+    );
+  }
+
+  return (
+    <InteractiveSurfaceSpotlight
+      className={className}
+      style={style}
+      glowColor={glowColor}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+      onPointerMove={onPointerMove}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      {...props}
+    >
+      {children}
+    </InteractiveSurfaceSpotlight>
+  );
+}
+
+function InteractiveSurfaceSpotlight({
+  children,
+  className,
+  style,
+  glowColor = "rgba(255, 255, 255, 0.22)",
+  onPointerEnter,
+  onPointerLeave,
+  onPointerMove,
+  onFocus,
+  onBlur,
+  ...props
+}: Omit<InteractiveSurfaceProps, "spotlight">) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(false);
 
@@ -89,7 +134,7 @@ export function InteractiveSurface({
       style={
         {
           "--surface-glow-color": glowColor,
-          "--surface-glow-opacity": spotlight && active ? 1 : 0,
+          "--surface-glow-opacity": active ? 1 : 0,
           "--surface-glow-x": "50%",
           "--surface-glow-y": "50%",
           ...style,
@@ -102,12 +147,10 @@ export function InteractiveSurface({
       onBlur={handleBlur}
       {...props}
     >
-      {spotlight && (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-[var(--surface-glow-opacity)] transition-opacity duration-300 [background:radial-gradient(circle_at_var(--surface-glow-x)_var(--surface-glow-y),var(--surface-glow-color),transparent_68%)]"
-        />
-      )}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-[var(--surface-glow-opacity)] transition-opacity duration-300 [background:radial-gradient(circle_at_var(--surface-glow-x)_var(--surface-glow-y),var(--surface-glow-color),transparent_68%)]"
+      />
       <div className="relative">{children}</div>
     </div>
   );

@@ -37,15 +37,32 @@ describe("admin-password", () => {
     ).toBe(false);
   });
 
-  it("falls back to timing-safe plaintext when only ADMIN_PASSWORD is set", async () => {
+  it("falls back to timing-safe plaintext when only ADMIN_PASSWORD is set (non-production)", async () => {
     expect(
       await verifyAdminPassword("plain", {
         ADMIN_PASSWORD: "plain",
+        NODE_ENV: "development",
       })
     ).toBe(true);
     expect(
       await verifyAdminPassword("nope", {
         ADMIN_PASSWORD: "plain",
+        NODE_ENV: "development",
+      })
+    ).toBe(false);
+  });
+
+  it("rejects plaintext ADMIN_PASSWORD in production / Vercel", async () => {
+    expect(
+      await verifyAdminPassword("plain", {
+        ADMIN_PASSWORD: "plain",
+        NODE_ENV: "production",
+      })
+    ).toBe(false);
+    expect(
+      await verifyAdminPassword("plain", {
+        ADMIN_PASSWORD: "plain",
+        VERCEL: "1",
       })
     ).toBe(false);
   });

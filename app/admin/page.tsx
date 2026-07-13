@@ -7,7 +7,7 @@ import { LinkForm } from "@/components/admin/LinkForm";
 import { LinkList } from "@/components/admin/LinkList";
 
 export default function AdminPage() {
-  const { links, categories, loading, loadData, handleDelete } = useAdminLinks();
+  const { links, categories, loading, error, loadData, handleDelete } = useAdminLinks();
   const [editingLink, setEditingLink] = useState<NavLinkWithCategory | null | undefined>(undefined);
 
   function handleEdit(link: NavLinkWithCategory) {
@@ -31,6 +31,22 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+        >
+          {error}
+          <button
+            type="button"
+            onClick={() => loadData()}
+            className="ml-3 underline underline-offset-2"
+          >
+            重试
+          </button>
+        </div>
+      )}
+
       {/* 操作栏 */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-white">

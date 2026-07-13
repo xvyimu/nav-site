@@ -171,7 +171,8 @@ export const searchQuerySchema = z.object({
 
 /** 工具列表查询参数 schema（用于 /api/tools GET） */
 export const toolsQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).optional(),
+  // 默认 50，上限 100，避免 Agent/爬虫无参全表拉取
+  limit: z.coerce.number().int().min(1).max(100).default(50),
   category: z.string().optional(),
   search: z.string().optional(),
   ids: z.string().optional(),

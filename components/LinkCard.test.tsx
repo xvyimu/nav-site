@@ -6,8 +6,26 @@ import type { NavLink } from "@/lib/types";
 
 vi.mock("@/components/FavoritesProvider", () => ({
   useFavoritesContext: () => ({
+    favorites: new Set<string>(),
     isFavorite: () => false,
     toggleFavorite: vi.fn(),
+    clearFavorites: vi.fn(),
+    count: 0,
+    mounted: true,
+    isAuthenticated: false,
+    favoriteIds: [],
+  }),
+  useFavoritesState: () => ({
+    favorites: new Set<string>(),
+    isFavorite: () => false,
+    count: 0,
+    mounted: true,
+    isAuthenticated: false,
+    favoriteIds: [],
+  }),
+  useFavoritesActions: () => ({
+    toggleFavorite: vi.fn(),
+    clearFavorites: vi.fn(),
   }),
 }));
 

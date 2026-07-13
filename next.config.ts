@@ -60,6 +60,9 @@ const nextConfig: NextConfig = {
   // 30 top-level package directories have leftover pnpm junction reparse points
   // that Turbopack cannot traverse. Use `next build --webpack` and `next dev --webpack`.
   // See CLAUDE-HANDOFF.md for details.
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
   async headers() {
     return [
       {

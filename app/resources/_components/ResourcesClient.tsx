@@ -222,7 +222,7 @@ export function ResourcesClient() {
         <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground/30" />
         <input
           ref={inputRef}
-          type="text"
+          type="search"
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
           placeholder={
@@ -232,6 +232,7 @@ export function ResourcesClient() {
                 ? "混合搜索：关键词 + 语义…"
                 : "搜索资源、站点或分类…"
           }
+          aria-label="搜索资源"
           className="w-full rounded-[24px] border border-input bg-background/80 py-2.5 pl-10 pr-24 text-sm text-foreground/80 placeholder:text-muted-foreground/40 outline-none backdrop-blur-sm transition-all focus:border-primary/60 focus:ring-[3px] focus:ring-primary/20"
           spellCheck={false}
         />
@@ -293,7 +294,9 @@ export function ResourcesClient() {
         {catCounts().map((cat) => (
           <button
             key={cat.value}
+            type="button"
             onClick={() => setFilterCat(cat.value)}
+            aria-pressed={activeFilterCat === cat.value}
             className={`rounded-full px-3 py-1 text-xs transition-colors ${
               activeFilterCat === cat.value
                 ? "bg-primary text-primary-foreground"

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export function Header() {
-  const { toggleSidebar } = useShell();
+  const { toggleSidebar, sidebarOpen } = useShell();
   const { count } = useFavoritesContext();
   const { data: session, status } = useSession();
   const { logout, loading: loggingOut } = useLogout();
@@ -35,6 +35,8 @@ export function Header() {
             onClick={toggleSidebar}
             className="md:hidden"
             aria-label="打开导航菜单"
+            aria-expanded={sidebarOpen}
+            aria-controls="mobile-nav-sheet"
           >
             <Menu className="h-[18px] w-[18px]" />
           </Button>

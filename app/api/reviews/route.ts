@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { getClientIp } from "@/lib/utils";
+import { checkOrigin } from "@/lib/csrf";
 import { reviewSchema, reviewsQuerySchema } from "@/lib/schemas";
 import {
   getToolReviews,
@@ -79,6 +80,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const csrfError = checkOrigin(request, "api-reviews");
+    if (csrfError) return csrfError;
+
     const ip = getClientIp(request);
 
     // 速率限制
@@ -119,7 +123,11 @@ export async function POST(request: NextRequest) {
     const review = await createReview(link_id, ip, rating, comment);
     await recordReviewAttempt(ip, link_id);
 
-    return NextResponse.json({ success: true, review });
+    return NextResponse.json({
+      success: true,
+      review,
+      message: "评价已提交，审核通过后展示",
+    });
   } catch (e) {
     if (e instanceof MissingDatabaseMigrationError) {
       logger.warn("Reviews POST unavailable until migration is applied", { source: "api-reviews" });
@@ -127,6 +135,21 @@ export async function POST(request: NextRequest) {
         { error: "Reviews database migration has not been applied" },
         { status: 503 }
       );
+    }
+
+    if (e instanceof Error) {
+      if (e.message === "review_duplicate") {
+        return NextResponse.json(
+          { error: "您已经评价过这个工具" },
+          { status: 409 }
+        );
+      }
+      if (e.message === "review_duplicate_check_failed") {
+        return NextResponse.json(
+          { error: "评价服务暂时不可用，请稍后重试" },
+          { status: 503 }
+        );
+      }
     }
 
     logger.error("Reviews POST error", { source: "api-reviews" }, e instanceof Error ? e : undefined);

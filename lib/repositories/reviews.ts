@@ -65,7 +65,8 @@ export async function hasUserReviewed(linkId: string, ip: string): Promise<boole
       linkId,
       error: error.message,
     });
-    return false;
+    // fail-close：查重失败视为「不可提交」，由路由返回 503
+    throw new Error("review_duplicate_check_failed");
   }
 
   return !!data;
@@ -88,7 +89,8 @@ export async function createReview(
       ip,
       rating,
       comment: comment || null,
-      approved: true,
+      // 默认进入审核队列，避免垃圾评价即时上架
+      approved: false,
     })
     .select("id, link_id, rating, comment, approved, created_at, updated_at")
     .single();
@@ -96,6 +98,10 @@ export async function createReview(
   if (error) {
     if (isMissingRelationError(error)) {
       throw new MissingDatabaseMigrationError("reviews", { cause: error });
+    }
+    // 23505 unique (link_id, ip)
+    if (error.code === "23505") {
+      throw new Error("review_duplicate");
     }
     logger.error("Failed to create review", { source: "repositories", linkId }, error);
     throw new Error("Failed to create review");

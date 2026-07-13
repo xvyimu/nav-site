@@ -90,12 +90,16 @@ function verifyPlaintext(password: string, expected: string): boolean {
   return timingSafeEqual(a, b);
 }
 
+function isProductionLike(env: EnvLike): boolean {
+  return env.NODE_ENV === "production" || env.VERCEL === "1";
+}
+
 /**
  * 校验管理员密码
  *
  * 1. 有 ADMIN_PASSWORD_HASH → 仅走 scrypt
- * 2. 否则有 ADMIN_PASSWORD → 明文 timingSafeEqual（迁移兼容）
- * 3. 都没有 → false
+ * 2. 否则有 ADMIN_PASSWORD → 仅非生产环境允许明文 timingSafeEqual
+ * 3. 生产缺 HASH → false（不可回退明文）
  */
 export async function verifyAdminPassword(
   password: string,
@@ -106,6 +110,11 @@ export async function verifyAdminPassword(
   const hash = env.ADMIN_PASSWORD_HASH?.trim();
   if (hash) {
     return verifyScryptHash(password, hash);
+  }
+
+  // 生产禁止明文口令路径
+  if (isProductionLike(env)) {
+    return false;
   }
 
   const plain = env.ADMIN_PASSWORD?.trim();

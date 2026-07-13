@@ -134,7 +134,7 @@ export function Sidebar({
   return (
     <>
       <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-        <SheetContent side="left" className="w-72 p-0 md:hidden" showClose>
+        <SheetContent side="left" className="w-72 p-0 md:hidden" showClose id="mobile-nav-sheet">
           <SheetHeader className="flex h-16 flex-row items-center justify-between space-y-0 border-b border-[var(--paper-line)] px-4">
             <SheetTitle className="nav-display flex items-center gap-2 text-sm font-medium text-[var(--paper-ink)]">
               <Compass className="h-5 w-5 text-[var(--paper-accent)]" />

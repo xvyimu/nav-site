@@ -413,13 +413,16 @@ describe("recordAttempt — 记录尝试", () => {
 describe("incrementClickCount — 递增点击计数", () => {
   it("正常递增不抛出异常", async () => {
     vi.resetModules();
-    vi.doMock("@/lib/supabase/server", () => ({
-      createClient: () => ({
-        from: () => ({
-          insert: () => Promise.resolve({ error: null }),
-        }),
-        rpc: () => Promise.resolve({ error: null }),
+    const client = {
+      from: () => ({
+        insert: () => Promise.resolve({ error: null }),
+        delete: () => ({ lt: () => Promise.resolve({ error: null }) }),
       }),
+      rpc: () => Promise.resolve({ error: null }),
+    };
+    vi.doMock("@/lib/supabase/server", () => ({
+      createClient: () => client,
+      createServiceRoleClient: () => client,
     }));
 
     const { incrementClickCount } = await import("@/lib/rate-limit");
@@ -428,13 +431,16 @@ describe("incrementClickCount — 递增点击计数", () => {
 
   it("RPC 失败时静默处理", async () => {
     vi.resetModules();
-    vi.doMock("@/lib/supabase/server", () => ({
-      createClient: () => ({
-        from: () => ({
-          insert: () => Promise.resolve({ error: null }),
-        }),
-        rpc: () => Promise.resolve({ error: new Error("RPC error") }),
+    const client = {
+      from: () => ({
+        insert: () => Promise.resolve({ error: null }),
+        delete: () => ({ lt: () => Promise.resolve({ error: null }) }),
       }),
+      rpc: () => Promise.resolve({ error: new Error("RPC error") }),
+    };
+    vi.doMock("@/lib/supabase/server", () => ({
+      createClient: () => client,
+      createServiceRoleClient: () => client,
     }));
 
     const { incrementClickCount } = await import("@/lib/rate-limit");

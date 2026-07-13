@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+﻿import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const supabaseSelect = vi.fn();
 const loggerWarn = vi.fn();
@@ -94,7 +94,7 @@ describe("/api/health", () => {
     expect(response.status).toBe(200);
     expect(body.checks.database.status).toBe("ok");
     expect(body.checks.embedding.status).toBe("ok");
-    expect(body.checks.embedding.detail).toBe("optional embed service reachable");
+    expect(body.checks.embedding.detail).toBe("embed service reachable");
   });
 
   it("keeps the app healthy but marks embedding as error when the embed service is down", async () => {
@@ -114,7 +114,7 @@ describe("/api/health", () => {
     expect(response.status).toBe(200);
     expect(body.status).toBe("healthy");
     expect(body.checks.embedding.status).toBe("error");
-    expect(body.checks.embedding.detail).toBe("optional embed service returned 503; semantic search will fall back");
+    expect(body.checks.embedding.detail).toBe("embed service returned 503; semantic search will fall back");
     expect(loggerWarn).not.toHaveBeenCalled();
   });
 

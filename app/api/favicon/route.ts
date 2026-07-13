@@ -85,12 +85,14 @@ export async function GET(request: NextRequest) {
 
   const dispatcherOption = await getProxyDispatcher();
 
+  // 仅走第三方 icon CDN，禁止 direct fetch(用户域名) 以消除 redirect/DNS SSRF 面。
   const sources = [
     { url: `https://favicon.cccyun.cc/${domain}`, label: "cccyun" },
     { url: `https://icons.duckduckgo.com/ip3/${domain}.ico`, label: "duckduckgo" },
     { url: `https://www.google.com/s2/favicons?domain=${domain}&sz=64`, label: "google-s2" },
-    { url: `https://${domain}/favicon.ico`, label: "direct" },
   ];
+
+  const MAX_BODY_BYTES = 512 * 1024;
 
   for (const { url, label } of sources) {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -101,8 +103,14 @@ export async function GET(request: NextRequest) {
       const res = await fetch(url, {
         signal: controller.signal,
         headers: { "User-Agent": "nav-site-favicon-proxy/1.0" },
+        redirect: "manual",
         ...dispatcherOption,
       });
+
+      // 不跟随跨源 3xx（CDN 偶发 302 时跳过该源）
+      if (res.status >= 300 && res.status < 400) {
+        continue;
+      }
 
       if (res.ok) {
         const contentType = res.headers.get("content-type") || "";
@@ -110,9 +118,13 @@ export async function GET(request: NextRequest) {
         if (!contentType.startsWith("image/")) {
           continue;
         }
+        const contentLength = Number(res.headers.get("content-length") || 0);
+        if (contentLength > MAX_BODY_BYTES) {
+          continue;
+        }
         // 跳过过小的响应（通常是占位图或错误图标）
         const buffer = await res.arrayBuffer();
-        if (buffer.byteLength < 100) {
+        if (buffer.byteLength < 100 || buffer.byteLength > MAX_BODY_BYTES) {
           continue;
         }
 
