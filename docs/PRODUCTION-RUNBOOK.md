@@ -181,7 +181,7 @@ https://nav-site-kappa.vercel.app/api/health
 - `/api/resource-search-status` → `{ "available": true, "vector": true, "rpc": true }`
 - `mode=vector` 不降级 FTS
 
-详见 `docs/embed-fly-deploy.md` · `docs/adr-005-remote-embed-endpoint.md`。
+详见 `docs/embed-fly-deploy.md` · `docs/adr-008-remote-embed-endpoint.md`。
 
 ## 生产探针
 

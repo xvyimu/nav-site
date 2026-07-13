@@ -1,4 +1,4 @@
-# ADR-005: 远程 Embedding 端点（HTTPS + API Key）
+# ADR-008: 远程 Embedding 端点（HTTPS + API Key）
 
 > 状态：Accepted  
 > 日期：2026-07-11  
