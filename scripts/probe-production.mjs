@@ -147,6 +147,9 @@ export function readConfigFromEnv(env = process.env, args = process.argv.slice(2
     expectEmbeddingSkipped:
       args.includes("--expect-embedding-skipped") ||
       parseBoolean(env.PRODUCTION_EXPECT_EMBEDDING_SKIPPED),
+    requireEmbedding:
+      args.includes("--require-embedding") ||
+      parseBoolean(env.PRODUCTION_REQUIRE_EMBEDDING),
     expectedCommit: readArgValue(args, "--expect-commit") || env.PRODUCTION_EXPECT_COMMIT || "",
     retries: parseNonNegativeInteger(
       readArgValue(args, "--retries") || env.PRODUCTION_PROBE_RETRIES,
@@ -288,6 +291,7 @@ async function probeEndpointOnce(endpoint, {
   baseUrl,
   timeoutMs,
   expectEmbeddingSkipped,
+  requireEmbedding,
   expectedCommit,
   fetchImpl = fetch,
 }) {
@@ -316,7 +320,7 @@ async function probeEndpointOnce(endpoint, {
       if (failure) {
         failures.push(failure);
       } else {
-        failures.push(...validateHealthPayload(payload, { expectEmbeddingSkipped }));
+        failures.push(...validateHealthPayload(payload, { expectEmbeddingSkipped, requireEmbedding }));
       }
     }
 

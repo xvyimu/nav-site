@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createRequire } from "node:module";
 import { faviconDomainSchema } from "@/lib/schemas";
-import { checkInMemoryRateLimit } from "@/lib/rate-limit";
+import { checkDistributedRateLimit } from "@/lib/rate-limit-distributed";
 import { getClientIp, isBlockedOutboundHost } from "@/lib/utils";
 
 /**
@@ -53,7 +53,7 @@ async function getProxyDispatcher(): Promise<{ dispatcher?: unknown }> {
 
 export async function GET(request: NextRequest) {
   const ip = getClientIp(request);
-  const { allowed } = checkInMemoryRateLimit(
+  const { allowed } = await checkDistributedRateLimit(
     `favicon:${ip}`,
     FAVICON_WINDOW_MS,
     FAVICON_MAX_PER_MIN

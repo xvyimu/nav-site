@@ -3,7 +3,7 @@ import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { getEmbedding } from "@/lib/search/semantic";
 import { mergeResourceHybrid } from "@/lib/resource-search-merge";
-import { checkInMemoryRateLimit } from "@/lib/rate-limit";
+import { checkDistributedRateLimit } from "@/lib/rate-limit-distributed";
 import { getClientIp } from "@/lib/utils";
 import type { ResourceItem } from "@/lib/types";
 
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
   }
 
   const ip = getClientIp(request);
-  const { allowed } = checkInMemoryRateLimit(
+  const { allowed } = await checkDistributedRateLimit(
     `resource-search:${ip}`,
     RESOURCE_SEARCH_WINDOW_MS,
     RESOURCE_SEARCH_MAX_PER_MIN

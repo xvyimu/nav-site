@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger";
 import { searchQuerySchema } from "@/lib/schemas";
 import { getRequestId, parseSearchParams } from "@/lib/search/params";
 import { executeSearch } from "@/lib/search/use-case";
-import { checkInMemoryRateLimit } from "@/lib/rate-limit";
+import { checkDistributedRateLimit } from "@/lib/rate-limit-distributed";
 import { getClientIp } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const ip = getClientIp(request);
     const semantic = request.nextUrl.searchParams.get("semantic") === "true";
     const max = semantic ? SEMANTIC_MAX_PER_MIN : SEARCH_MAX_PER_MIN;
-    const { allowed } = checkInMemoryRateLimit(
+    const { allowed } = await checkDistributedRateLimit(
       `search:${semantic ? "sem" : "fuse"}:${ip}`,
       SEARCH_WINDOW_MS,
       max
