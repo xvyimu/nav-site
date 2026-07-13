@@ -212,6 +212,23 @@ rtk pnpm run verify:launch-readiness
 - `sitemap` / `robots`：SEO 基础文件异常。
 - `build-info`：线上 commit 与预期不一致。
 
+## 审计 S0 迁移（2026-07-13 · 上线前必须执行）
+
+`7aa2baa7` 起的 S0 修复依赖两条 DB 约束，代码已上线但**约束需先在生产库执行**，否则线上行为与代码不匹配：
+
+- `lib/rate-limit.ts::tryRecordClick` 依赖 `click_rate_limits` 表 + `UNIQUE(ip, url, window_start)`（先插后计原子去重）。
+- `lib/repositories/submissions.ts::submitLink` 依赖 `nav_links.url` 唯一索引（重复提交 → 23505 → 409）。
+
+执行（Supabase SQL Editor 或有凭据者）：
+
+```text
+scripts/migration-audit-s0-constraints.sql
+```
+
+幂等（IF NOT EXISTS / DROP IF EXISTS）；PART 2 建唯一索引前会**先合并历史重复 URL**（保留最早一行）。末尾 SELECT 校验三项索引/表存在。
+
+**未执行时的降级行为（不崩）：** `click_rate_limits` 缺失 → 点击去重写失败仅 warn，计数可能重复但不 500；`nav_links.url` 无唯一索引 → 去重退化为应用层 `findExistingLinkByUrl` 查重（并发窗口可能漏）。执行后即恢复强一致。
+
 ## Resource Library 操作边界
 
 本项目只保留公开读路径的配置和验证，不在普通发布中直接操作资源库生产库。

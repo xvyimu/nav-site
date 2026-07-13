@@ -154,9 +154,9 @@
 | 项 | 内容 |
 |----|------|
 | **问题** | `enforceFavoritesRateLimit` → `checkRateLimit("favorites_rate_limits")` 默认 `createClient()`（anon）。`scripts/migration-favorites-rate-limits.sql` 仅 GRANT/policy **INSERT**，**无 SELECT** → count 报错 → **fail-open 恒 `allowed: true`**。随后 `recordAttempt(..., success)` insert `{ ip, success }`，表结构仅 `id, ip, created_at` → 写入失败（仅 warn）。 |
-| **位置** | `app/api/favorites/route.ts:30-37,93` · `lib/rate-limit.ts:109-167` · `scripts/migration-favorites-rate-limits.sql:7-35` |
+| **位置** | `app/api/favorites/route.ts:30-37,93` · `lib/rate-limit.ts:109-167` · `scripts/migration-favorites-rate-limits.sql:7-35` · `scripts/migration-audit-s0-constraints.sql` |
 | **影响** | 登录用户可无限刷 POST/DELETE favorites（绕过「15 分钟 30 次」），放大 service_role 写路径与 DB 负载。**限流代码存在但运行时无效。** |
-| **操作** | ① 限流读写传入 `createServiceRoleClient()`（与 reviews 一致），或补 SELECT policy + DELETE 给清理路径；② `recordAttempt` 按表裁剪字段（仅 `{ ip }`）或迁移加 `success boolean`；③ 写操作可对限流 DB 故障 fail-close。 |
+| **操作** | ① 限流读写传入 `createServiceRoleClient()`（与 reviews 一致）；② `recordAttempt` 已按表裁剪字段（仅 `{ ip }`）；③ 写操作对限流 DB 故障 fail-close；④ click 表和 nav_links URL 约束由 `scripts/migration-audit-s0-constraints.sql` 补齐。 |
 | **验证** | 连续 31 次已登录 POST `/api/favorites`：第 31 次 **429**；`favorites_rate_limits` 有对应 IP 行；单测 mock RLS 无 SELECT 时不得 fail-open（若改 fail-close）。 |
 | **收益** | 收藏写限流从「纸面」变为「可执行」。 |
 
@@ -167,9 +167,9 @@
 | 项 | 内容 |
 |----|------|
 | **问题** | `submitLink` / `findExistingLinkByUrl` 使用 `createClient()`（anon + cookies）。`scripts/rls-audit.sql` 预期 **anon 不能 INSERT `nav_links`**，且 anon SELECT 通常仅 `approved=true`。 |
-| **位置** | `lib/repositories/submissions.ts:7-36` · `app/api/submit/route.ts` · `scripts/rls-audit.sql` |
+| **位置** | `lib/repositories/submissions.ts:7-36` · `app/api/submit/route.ts` · `scripts/rls-audit.sql` · `scripts/migration-audit-s0-constraints.sql` |
 | **影响** | ① 若按审计加固 RLS：`/api/submit` 永久 500；② 若误开 anon INSERT：任意人可写业务表；③ pending URL 对 anon 不可见 → 去重失效 → 重复提交脏数据。 |
-| **操作** | ① 提交与去重改 `createServiceRoleClient()`；② 仅插入 `approved: false`；③ DB `UNIQUE(url)` 或 partial unique；④ 保持 anon 直连 PostgREST INSERT 失败。 |
+| **操作** | ① 提交与去重改 `createServiceRoleClient()`；② 仅插入 `approved: false`；③ DB `UNIQUE(url)` 已落为 `scripts/migration-audit-s0-constraints.sql`；④ 保持 anon 直连 PostgREST INSERT 失败。 |
 | **验证** | RLS 开启下 POST `/api/submit` → 200 且行 `approved=false`；anon key 直连 INSERT 失败；同 URL 再提交 → 409「等待审核」。 |
 | **收益** | 提交功能与最小权限模型同时成立。 |
 
