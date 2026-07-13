@@ -490,9 +490,22 @@ pnpm verify:production
 | FE-10 | 部分 | resources 搜索 aria-label + chip aria-pressed |
 | CFG-4 | ✅ | probe `--require-embedding`；health 可选 `HEALTH_REQUIRE_EMBEDDING=1` |
 | CFG-6 | ✅ | runbook 澄清本机 origin + 自启已卸 |
-| ARCH-2 | 部分 | CI Netlify job 标 Emergency + `ALLOW_NETLIFY_MIRROR` |
+| ARCH-2 | ✅ | CI Netlify job 标 Emergency + `ALLOW_NETLIFY_MIRROR` 双门控；headers 单源注释 |
 | ARCH-3 | 部分 | RL URL 可 env 覆盖 |
-| ARCH-1 | ⏳ | 嵌入迁常开 VPS（运维，非代码） |
-| BE-3 | ⏳ | 真·分布式限流（Upstash）未装；仍进程内+DB 表 |
+| ARCH-1 | ⏳ | 嵌入迁常开 VPS（纯运维，无代码可做；health/smoke 已可探测 SPOF） |
+
+## 10. S1/S2 批次（2026-07-13 第二轮）
+
+验证：`pnpm test` **419 passed** · `pnpm typecheck` 0 · `pnpm lint` 0 error · `pnpm build` 通过
+
+| ID | 状态 | 实现要点 |
+|----|------|----------|
+| BE-3 | ✅ | 新增 `lib/rate-limit-distributed.ts`：`checkDistributedRateLimit` 后端可插拔。配 `UPSTASH_REDIS_REST_URL/TOKEN` → Redis 固定窗口（INCR+EXPIRE NX，单次 pipeline），跨实例真限流；未配 / Redis 抖动 → 回退进程内桶。已接入 `/api/search`、`/api/favicon`、`/api/resource-search` |
+| CSRF 全量 | ✅ | 6 个公开写端点全部 `checkOrigin`：submit/click/reviews/favorites/resource-ratings/web-vitals |
+| FE-1 真·虚拟列表 | 决策：不上 windowing 库 | 响应式多列 CSS grid 虚拟化收益/复杂度不划算（列数随断点变、行高不定）。渐进挂载已把首屏 DOM 从 ~513 降到 40，达成同一目标。若目录破千再引 `@tanstack/react-virtual`。已记入「不在本轮做」 |
+| CFG-4 | ✅ | probe 新增 `--require-embedding` / `PRODUCTION_REQUIRE_EMBEDDING`；`validateHealthPayload` 支持 requireEmbedding；单测覆盖 |
+| ARCH-1 embed 常开 | ⏳ 阻塞于运维 | 无自主购机 / 云 deploy 权限。已交付的可观测手段：`HEALTH_REQUIRE_EMBEDDING=1` + smoke `--require-embedding` 可让 embed 掉线时告警而非静默降级 |
+
+新增测试：`tests/rate-limit-distributed.test.ts`（Upstash 命中 / 未配回退 / 抖动回退）。
 
 报告：`docs/full-stack-audit-2026-07-13.md`
