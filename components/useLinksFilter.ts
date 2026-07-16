@@ -41,6 +41,8 @@ export function useLinksFilter({
     search: filters.search,
     serverResults: serverSearch.serverResults,
     precomputed,
+    minRatingFilter: filters.minRatingFilter,
+    popularityFilter: filters.popularityFilter,
   });
   const keyboard = useKeyboardNav({
     flatResults: derived.flatResults,

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { signIn, useSession } from "next-auth/react";
 import { Code2, Compass, Heart, LogIn, LogOut, Menu, Plus, Settings } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { useFavoritesContext } from "@/components/FavoritesProvider";
+import { useFavoritesState } from "@/components/FavoritesProvider";
 import { useShell } from "@/components/Shell";
 import { useLogout } from "@/hooks/useLogout";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 
 export function Header() {
   const { toggleSidebar, sidebarOpen } = useShell();
-  const { count } = useFavoritesContext();
+  const { count } = useFavoritesState();
   const { data: session, status } = useSession();
   const { logout, loading: loggingOut } = useLogout();
   const [mounted, setMounted] = useState(false);

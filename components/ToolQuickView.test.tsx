@@ -15,6 +15,19 @@ vi.mock("@/components/FavoritesProvider", () => ({
     isFavorite: (id: string) => favoriteIds.has(id),
     toggleFavorite: toggleFavoriteMock,
   }),
+  useFavoritesActions: () => ({
+    toggleFavorite: toggleFavoriteMock,
+    clearFavorites: vi.fn(),
+  }),
+  useFavoriteMembership: (id: string) => favoriteIds.has(id),
+  useFavoritesState: () => ({
+    favorites: favoriteIds,
+    favoriteIds: [...favoriteIds],
+    count: favoriteIds.size,
+    mounted: true,
+    isAuthenticated: false,
+    isFavorite: (id: string) => favoriteIds.has(id),
+  }),
 }));
 
 function makeLink(overrides: Partial<NavLink> = {}): NavLink {

@@ -57,7 +57,7 @@ describe("useLinksFilter", () => {
     expect(result.current.hasResults).toBe(true);
   });
 
-  it("filters links by category when activeCategory is set", () => {
+  it("filters by category when activeCategory is set", () => {
     const links = [
       makeLink({ id: "l1", category_slug: "cloud-vps" }),
       makeLink({ id: "l2", category_slug: "free-relay" }),
@@ -66,6 +66,46 @@ describe("useLinksFilter", () => {
     act(() => result.current.setActiveCategory("cloud-vps"));
     expect(result.current.filtered).toHaveLength(1);
     expect(result.current.filtered[0].id).toBe("l1");
+  });
+
+  it("applies browse popularity and rating filters without a search query", () => {
+    const links = [
+      makeLink({ id: "l1", featured: true, avg_rating: 4.8, click_count: 1 }),
+      makeLink({ id: "l2", featured: false, avg_rating: 3.1, click_count: 20 }),
+      makeLink({ id: "l3", featured: false, paid: true, avg_rating: 4.9, click_count: 0 }),
+    ];
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
+
+    act(() => result.current.setPopularityFilter("featured"));
+    expect(result.current.filtered.map((link) => link.id).sort()).toEqual(["l1", "l3"]);
+
+    act(() => {
+      result.current.setPopularityFilter(null);
+      result.current.setMinRatingFilter(4.5);
+    });
+    expect(result.current.filtered.map((link) => link.id).sort()).toEqual(["l1", "l3"]);
+  });
+
+  it("keeps featured ids out of latest dual-track and unique flatResults", () => {
+    const links = [
+      makeLink({
+        id: "featured-new",
+        featured: true,
+        created_at: "2026-06-10T00:00:00Z",
+        category_slug: "cloud-vps",
+      }),
+      makeLink({
+        id: "plain-new",
+        featured: false,
+        created_at: "2026-06-09T00:00:00Z",
+        category_slug: "cloud-vps",
+      }),
+    ];
+    const { result } = renderHook(() => useLinksFilter({ categories, links }));
+    expect(result.current.featured.some((link) => link.id === "featured-new")).toBe(true);
+    expect(result.current.latest.some((link) => link.id === "featured-new")).toBe(false);
+    const ids = result.current.flatResults.map((item) => item.link.id);
+    expect(ids.filter((id) => id === "featured-new")).toHaveLength(1);
   });
 
   it("filters links by fuzzy search", async () => {

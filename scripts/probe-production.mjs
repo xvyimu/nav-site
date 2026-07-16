@@ -10,6 +10,19 @@ const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
 
 const NO_STORE_PATTERN = /(?:^|,)\s*no-store\b/i;
 
+/**
+ * @typedef {Object} ProbeEndpoint
+ * @property {string} name
+ * @property {string} path
+ * @property {RegExp} [contentType]
+ * @property {"health"|"search"|"build-info"} [json]
+ * @property {"sitemap"} [text]
+ * @property {boolean} [requireNoStore]
+ * @property {boolean} [cacheBust]
+ * @property {RegExp|string} [cacheControl]
+ */
+
+/** @type {ProbeEndpoint[]} */
 const ENDPOINTS = [
   { name: "home", path: "/", contentType: /text\/html/i },
   {
@@ -34,6 +47,7 @@ const ENDPOINTS = [
   { name: "robots", path: "/robots.txt", contentType: /text\/plain/i },
 ];
 
+/** @type {ProbeEndpoint} */
 const BUILD_INFO_ENDPOINT = {
   name: "build-info",
   path: "/build-info.json",

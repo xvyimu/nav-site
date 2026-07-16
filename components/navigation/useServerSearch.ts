@@ -103,7 +103,8 @@ export function useServerSearch(params: ServerSearchParams): ServerSearchState {
             paid: r.paid as boolean,
             featured: r.featured as boolean,
             click_count: r.click_count as number,
-            created_at: "",
+            created_at: typeof r.created_at === "string" ? r.created_at : "",
+            updated_at: typeof r.updated_at === "string" ? r.updated_at : undefined,
             score: r.score as number | undefined,
             similarity: r.similarity as number | undefined,
             avg_rating: r.avg_rating as number | undefined,
@@ -132,7 +133,7 @@ export function useServerSearch(params: ServerSearchParams): ServerSearchState {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [rawSearch, activeCategory, semanticSearch, activeTags, minRatingFilter, popularityFilter, links, setSearch]);
+  }, [rawSearch, activeCategory, semanticSearch, activeTags, minRatingFilter, popularityFilter, setSearch]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   return {

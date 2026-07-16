@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { getClientIp } from "@/lib/utils";
 import { checkOrigin } from "@/lib/csrf";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 import {
   createResourceLibraryPublicRatingStatsClient,
@@ -15,6 +16,8 @@ import {
 const RATING_TIMEOUT_MS = 5000;
 const RATING_STATS_CACHE_CONTROL =
   "public, max-age=30, s-maxage=60, stale-while-revalidate=300";
+const RATING_WINDOW_MS = 15 * 60 * 1000;
+const RATING_MAX_ATTEMPTS = 10;
 
 export const dynamic = "force-dynamic";
 
@@ -67,38 +70,28 @@ export async function POST(request: Request) {
 
     const { page_id, query_text, rating } = parsed.data;
     const ip = getClientIp(request);
+
+    // Atomic fixed-window quota (nav DB consume_rate_limit). Fail-close on outage.
+    const { allowed } = await checkRateLimit(
+      "resource_rating_attempts",
+      ip,
+      RATING_WINDOW_MS,
+      RATING_MAX_ATTEMPTS,
+      true
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "评分过于频繁，请 15 分钟后再试" },
+        { status: 429 }
+      );
+    }
+
     const supabase = createResourceLibraryServiceClient();
     if (!supabase) {
       logger.error("RESOURCE_LIBRARY_SERVICE_ROLE_KEY not configured", {
         source: "resource-ratings",
       });
       return NextResponse.json({ error: "评分服务未配置" }, { status: 503 });
-    }
-
-    // ── 速率限制：每 IP 每 15 分钟最多 10 次评分 ──
-    const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-    const { count, error: rateLimitErr } = await supabase
-      .from("ratings")
-      .select("id", { count: "exact", head: true })
-      .eq("ip", ip)
-      .gte("created_at", since)
-      .abortSignal(AbortSignal.timeout(RATING_TIMEOUT_MS));
-    if (rateLimitErr) {
-      logger.warn("Resource ratings rate-limit check failed", {
-        source: "resource-ratings",
-        error: rateLimitErr.message,
-      });
-      // fail-close：限流不可用时拒绝写
-      return NextResponse.json(
-        { error: "评分服务暂时不可用，请稍后重试" },
-        { status: 503 }
-      );
-    }
-    if ((count ?? 0) >= 10) {
-      return NextResponse.json(
-        { error: "评分过于频繁，请 15 分钟后再试" },
-        { status: 429 }
-      );
     }
 
     // 校验 pages 表中确实存在该 page_id

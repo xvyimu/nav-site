@@ -256,7 +256,7 @@ describe("scripts/probe-production", () => {
         retries: 1,
         retryDelayMs: 1,
       },
-      endpoints: [{ name: "health", path: "/api/health", contentType: /application\/json/i, json: "health", cacheControl: /no-store/ }],
+      endpoints: [{ name: "health", path: "/api/health", contentType: /application\/json/i, json: "health", requireNoStore: true }],
       fetchImpl,
       waitImpl: async () => {},
     });
@@ -291,7 +291,7 @@ describe("scripts/probe-production", () => {
         retries: 1,
         retryDelayMs: 1,
       },
-      endpoints: [{ name: "health", path: "/api/health", contentType: /application\/json/i, json: "health", cacheControl: /no-store/ }],
+      endpoints: [{ name: "health", path: "/api/health", contentType: /application\/json/i, json: "health", requireNoStore: true }],
       fetchImpl,
       waitImpl: async () => {},
     });
@@ -331,7 +331,7 @@ describe("scripts/probe-production", () => {
         retries: 1,
         retryDelayMs: 1,
       },
-      endpoints: [{ name: "health", path: "/api/health", contentType: /application\/json/i, json: "health", cacheControl: /no-store/ }],
+      endpoints: [{ name: "health", path: "/api/health", contentType: /application\/json/i, json: "health", requireNoStore: true }],
       fetchImpl,
       waitImpl: async () => {},
     });

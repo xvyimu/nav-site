@@ -7,6 +7,7 @@ import { linkIdsSchema } from "@/lib/schemas";
 import { checkRateLimit, recordAttempt } from "@/lib/rate-limit";
 import {
   getUserFavorites,
+  getUserFavoriteLinks,
   addUserFavorites,
   removeUserFavorite,
   clearUserFavorites,
@@ -44,12 +45,20 @@ async function recordFavoritesAttempt(ip: string, success: boolean): Promise<voi
   await recordAttempt("favorites_rate_limits", ip, success, undefined, supabase);
 }
 
-// GET /api/favorites — 获取当前用户的收藏列表
-export async function GET() {
+// GET /api/favorites — 获取当前用户的收藏
+//   ?detail=links → 返回 NavLink 投影（供 /favorites 页）
+//   默认 → { favorites: string[] } id 列表
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
+
+    const detail = request.nextUrl.searchParams.get("detail");
+    if (detail === "links") {
+      const links = await getUserFavoriteLinks(session.user.id);
+      return NextResponse.json({ links });
     }
 
     const favorites = await getUserFavorites(session.user.id);

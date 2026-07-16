@@ -61,26 +61,47 @@ export function extractDomain(url: string): string {
 }
 
 /**
- * 获取客户端 IP 地址
+ * 获取客户端 IP 地址（限流用）
  *
- * 顺序（平台约定）：
- * 1. Netlify `x-nf-client-connection-ip`（平台覆写，可信）
- * 2. `x-real-ip`（部分边缘 / 反代）
- * 3. `x-forwarded-for` 最左客户端（Vercel 等会覆写整条链）
+ * 顺序（平台约定，优先不可被浏览器直接伪造的平台头）：
+ * 1. Netlify `x-nf-client-connection-ip`
+ * 2. Vercel `x-vercel-forwarded-for` 最左段（平台注入）
+ * 3. 在 Vercel 上：`x-forwarded-for` **最右**段（平台追加的连接 IP）
+ * 4. 非 Vercel：`x-real-ip`，再 `x-forwarded-for` 最左段（兼容本地/反代）
  *
- * 生产主路径为 Vercel 时依赖 2/3；保留 1 以兼容 Netlify 历史部署。
+ * 避免裸信任客户端自带的 XFF 首跳导致限流桶可被轮换伪造。
  */
 export function getClientIp(request: Request): string {
   const nf = request.headers.get("x-nf-client-connection-ip")?.trim();
   if (nf) return nf;
 
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
+  const vercelXff = request.headers.get("x-vercel-forwarded-for")?.trim();
+  if (vercelXff) {
+    const first = vercelXff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+
+  const onVercel =
+    process.env.VERCEL === "1" ||
+    Boolean(request.headers.get("x-vercel-id")?.trim()) ||
+    Boolean(request.headers.get("x-vercel-deployment-url")?.trim());
 
   const xff = request.headers.get("x-forwarded-for");
   if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
+    const hops = xff
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (hops.length > 0) {
+      // Vercel appends the connecting IP; leftmost may be client-spoofed.
+      if (onVercel) return hops[hops.length - 1]!;
+      return hops[0]!;
+    }
+  }
+
+  if (!onVercel) {
+    const realIp = request.headers.get("x-real-ip")?.trim();
+    if (realIp) return realIp;
   }
 
   return "unknown";

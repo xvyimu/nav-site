@@ -51,12 +51,19 @@ export function useFavorites() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const ids = JSON.parse(raw) as string[];
+        const parsed = JSON.parse(raw) as unknown;
+        const ids = Array.isArray(parsed)
+          ? parsed.filter((value): value is string => typeof value === "string" && value.length > 0)
+          : [];
         // eslint-disable-next-line react-hooks/set-state-in-effect
         commitFavorites(new Set(ids));
       }
     } catch {
-      // 忽略解析错误
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
     }
     setMounted(true);
   }, [commitFavorites]);

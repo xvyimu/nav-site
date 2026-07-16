@@ -56,6 +56,7 @@ export {
 export {
   addUserFavorites,
   clearUserFavorites,
+  getUserFavoriteLinks,
   getUserFavorites,
   removeUserFavorite,
 } from "@/lib/repositories/favorites";

@@ -1,7 +1,10 @@
 "use client";
 
 import { ExternalLink, Globe, Heart, Sparkles, Star, Tags, X } from "lucide-react";
-import { useFavoritesContext } from "@/components/FavoritesProvider";
+import {
+  useFavoriteMembership,
+  useFavoritesActions,
+} from "@/components/FavoritesProvider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,13 +26,13 @@ interface ToolQuickViewProps {
 }
 
 export function ToolQuickView({ link, onClose }: ToolQuickViewProps) {
-  const { isFavorite, toggleFavorite } = useFavoritesContext();
+  const { toggleFavorite } = useFavoritesActions();
+  const favorite = useFavoriteMembership(link?.id ?? "");
 
   if (!link) return null;
 
   const domain = extractDomain(link.url);
   const safeUrl = isSafeUrl(link.url) ? link.url : "#";
-  const favorite = isFavorite(link.id);
   const rating = typeof link.avg_rating === "number" ? link.avg_rating : null;
   const tags = link.tags ?? [];
 

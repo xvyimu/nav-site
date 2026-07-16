@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   loggerError: vi.fn(),
   getEmbedding: vi.fn(),
   generateResourceEmbedding: vi.fn(),
+  checkRateLimit: vi.fn(async () => ({ allowed: true, count: 1 })),
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
@@ -30,6 +31,13 @@ vi.mock("@/lib/search/semantic", () => ({
 
 vi.mock("@/lib/search/embed-provider", () => ({
   generateResourceEmbedding: mocks.generateResourceEmbedding,
+}));
+
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: mocks.checkRateLimit,
+  recordAttempt: vi.fn(),
+  checkInMemoryRateLimit: vi.fn(() => ({ allowed: true, count: 1 })),
+  tryRecordClick: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -834,22 +842,18 @@ describe("resource library API routes", () => {
   });
 
   it("accepts a valid rating after rate-limit and page existence checks", async () => {
-    const rateLimit = query({ count: 0, error: null });
     const page = query({
       data: { id: "0194b64d-5cb6-7330-a273-1ab8f926e169" },
       error: null,
     });
     const insert = query({ error: null });
-    let ratingsCalls = 0;
     const from = vi.fn((table: string) => {
-      if (table === "ratings") {
-        ratingsCalls += 1;
-        return ratingsCalls === 1 ? rateLimit : insert;
-      }
+      if (table === "ratings") return insert;
       if (table === "pages") return page;
       return query({ error: null });
     });
     mocks.createClient.mockReturnValue({ from });
+    mocks.checkRateLimit.mockResolvedValue({ allowed: true, count: 1 });
 
     const { POST } = await importRoute<typeof import("@/app/api/resource-ratings/route")>(
       "@/app/api/resource-ratings/route"
@@ -871,13 +875,19 @@ describe("resource library API routes", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true });
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+      "resource_rating_attempts",
+      "203.0.113.10",
+      15 * 60 * 1000,
+      10,
+      true
+    );
     expect(insert.insert).toHaveBeenCalledWith({
       page_id: "0194b64d-5cb6-7330-a273-1ab8f926e169",
       query_text: "",
       rating: 5,
       ip: "203.0.113.10",
     });
-    expect(rateLimit.abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
     expect(page.abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
     expect(insert.abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
   });

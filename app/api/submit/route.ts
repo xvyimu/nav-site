@@ -13,8 +13,8 @@ export async function POST(request: Request) {
 
     const ip = getClientIp(request);
 
-    // 速率限制
-    const { allowed } = await checkRateLimit("submit_attempts", ip, 15 * 60 * 1000, 3);
+    // 速率限制：fail-close — DB/RPC 故障时拒绝写入，避免无限 pending 插入
+    const { allowed } = await checkRateLimit("submit_attempts", ip, 15 * 60 * 1000, 3, true);
     if (!allowed) {
       return NextResponse.json(
         { error: "提交过于频繁，请 15 分钟后再试" },

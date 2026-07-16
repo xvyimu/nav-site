@@ -11,6 +11,10 @@ import {
   type SidebarTabNode,
   type PrecomputedNavData,
 } from "@/lib/nav-derived-data";
+import {
+  applySearchFilters,
+  type PopularityFilter,
+} from "@/lib/search-experience";
 import type { LinkResultItem, LinkSection, SortMode } from "./types";
 
 export interface DerivedLinksParams {
@@ -22,6 +26,8 @@ export interface DerivedLinksParams {
   search: string;
   serverResults: NavLink[];
   precomputed?: PrecomputedNavData;
+  minRatingFilter?: number | null;
+  popularityFilter?: PopularityFilter | null;
 }
 
 export interface DerivedLinksState {
@@ -53,6 +59,8 @@ export function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
     search,
     serverResults,
     precomputed,
+    minRatingFilter = null,
+    popularityFilter = null,
   } = params;
 
   const q = search.trim().toLowerCase();
@@ -124,15 +132,25 @@ export function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
       }
     }
 
-    if (activeTags.length > 0) {
-      pool = pool.filter((link) => {
-        const linkTagSlugs = (link.tags ?? []).map((t) => t.slug);
-        return activeTags.every((slug) => linkTagSlugs.includes(slug));
-      });
-    }
+    // Shared filter semantics with server search (tags / rating / popularity).
+    pool = applySearchFilters(pool, {
+      tagSlugs: activeTags,
+      minRating: minRatingFilter,
+      popularity: popularityFilter,
+    });
 
     return pool;
-  }, [links, serverResults, activeCategory, q, sortMode, activeTags, descendantSlugsMap]);
+  }, [
+    links,
+    serverResults,
+    activeCategory,
+    q,
+    sortMode,
+    activeTags,
+    descendantSlugsMap,
+    minRatingFilter,
+    popularityFilter,
+  ]);
 
   const featured = useMemo(
     () =>
@@ -151,7 +169,9 @@ export function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
         .filter((l) => !l.featured && !l.paid)
         .slice(0, 6);
     }
+    // Exclude featured/paid so dual-track rows do not also appear in "最新".
     return [...links]
+      .filter((l) => !l.featured && !l.paid)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 6);
   }, [links, activeCategory, q, sortMode]);
@@ -216,13 +236,20 @@ export function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
 
   const flatResults = useMemo(() => {
     const items: LinkResultItem[] = [];
+    const seen = new Set<string>();
+    const pushUnique = (link: NavLink) => {
+      if (seen.has(link.id)) return;
+      seen.add(link.id);
+      items.push({ type: "link", link });
+    };
+
     if (showLinks) {
-      if (featured.length > 0) featured.forEach((l) => items.push({ type: "link", link: l }));
-      if (latest.length > 0) latest.forEach((l) => items.push({ type: "link", link: l }));
-      if (popular.length > 0) popular.forEach((l) => items.push({ type: "link", link: l }));
+      if (featured.length > 0) featured.forEach(pushUnique);
+      if (latest.length > 0) latest.forEach(pushUnique);
+      if (popular.length > 0) popular.forEach(pushUnique);
       for (const section of linkSections) {
         if (section.links.length > 0 && (activeCategory === "all" || activeCategory === section.key || q)) {
-          section.links.forEach((l) => items.push({ type: "link", link: l }));
+          section.links.forEach(pushUnique);
         }
       }
     }

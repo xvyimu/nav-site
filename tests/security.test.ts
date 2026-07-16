@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -870,7 +870,15 @@ describe("extractDomain — 域名提取", () => {
 });
 
 describe("getClientIp — 客户端 IP 提取", () => {
+  const originalVercel = process.env.VERCEL;
+
+  afterEach(() => {
+    if (originalVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = originalVercel;
+  });
+
   it("优先使用 x-nf-client-connection-ip", () => {
+    delete process.env.VERCEL;
     const req = new Request("http://localhost", {
       headers: {
         "x-nf-client-connection-ip": "10.0.0.1",
@@ -880,24 +888,47 @@ describe("getClientIp — 客户端 IP 提取", () => {
     expect(getClientIp(req)).toBe("10.0.0.1");
   });
 
-  it("其次使用 x-real-ip（优先于 x-forwarded-for）", () => {
+  it("优先使用 x-vercel-forwarded-for 最左段", () => {
+    process.env.VERCEL = "1";
     const req = new Request("http://localhost", {
       headers: {
-        "x-real-ip": "198.51.100.9",
+        "x-vercel-forwarded-for": "198.51.100.9, 203.0.113.1",
         "x-forwarded-for": "203.0.113.1, 198.51.100.1",
       },
     });
     expect(getClientIp(req)).toBe("198.51.100.9");
   });
 
-  it("回退到 x-forwarded-for", () => {
+  it("在 Vercel 上使用 x-forwarded-for 最右段（平台追加）", () => {
+    process.env.VERCEL = "1";
+    const req = new Request("http://localhost", {
+      headers: {
+        "x-forwarded-for": "203.0.113.1, 198.51.100.1",
+      },
+    });
+    expect(getClientIp(req)).toBe("198.51.100.1");
+  });
+
+  it("非 Vercel 回退到 x-forwarded-for 最左段", () => {
+    delete process.env.VERCEL;
     const req = new Request("http://localhost", {
       headers: { "x-forwarded-for": "203.0.113.1, 198.51.100.1" },
     });
     expect(getClientIp(req)).toBe("203.0.113.1");
   });
 
+  it("非 Vercel 可使用 x-real-ip", () => {
+    delete process.env.VERCEL;
+    const req = new Request("http://localhost", {
+      headers: {
+        "x-real-ip": "198.51.100.9",
+      },
+    });
+    expect(getClientIp(req)).toBe("198.51.100.9");
+  });
+
   it("无 IP 头时返回 unknown", () => {
+    delete process.env.VERCEL;
     const req = new Request("http://localhost");
     expect(getClientIp(req)).toBe("unknown");
   });

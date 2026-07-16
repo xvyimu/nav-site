@@ -1,5 +1,11 @@
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import {
+  mapLinkRow,
+  PUBLIC_LINK_SELECT,
+  type RawLinkRow,
+} from "@/lib/repositories/shared";
+import type { NavLink } from "@/lib/types";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -24,6 +30,37 @@ export async function getUserFavorites(userId: string): Promise<string[]> {
     return [];
   }
   return (data ?? []).map((r) => r.link_id as string);
+}
+
+/**
+ * 获取当前用户收藏对应的公开链接投影（NavLink 形）。
+ * 仅返回 approved 链接；已下架的收藏 id 会被静默跳过。
+ */
+export async function getUserFavoriteLinks(userId: string): Promise<NavLink[]> {
+  const linkIds = await getUserFavorites(userId);
+  if (linkIds.length === 0) return [];
+
+  const ids = linkIds.slice(0, 200);
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("nav_links")
+    .select(PUBLIC_LINK_SELECT)
+    .eq("approved", true)
+    .in("id", ids);
+
+  if (error) {
+    logger.error("getUserFavoriteLinks failed", { source: "repositories", userId }, error);
+    return [];
+  }
+
+  const byId = new Map(
+    ((data ?? []) as unknown as RawLinkRow[]).map((row) => {
+      const link = mapLinkRow(row);
+      return [link.id, link] as const;
+    })
+  );
+
+  return ids.map((id) => byId.get(id)).filter((link): link is NavLink => Boolean(link));
 }
 
 /** 批量添加收藏（去重） */

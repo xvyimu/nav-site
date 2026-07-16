@@ -1,10 +1,36 @@
 import { createClient } from "@supabase/supabase-js";
 
-/** 允许 env 覆盖；默认生产 RL 项目 */
-export const RESOURCE_LIBRARY_URL =
-  process.env.RESOURCE_LIBRARY_SUPABASE_URL ||
-  process.env.RESOURCE_LIBRARY_URL ||
-  "https://ihnmfsfbfnctgkhxmghk.supabase.co";
+const DEFAULT_RESOURCE_LIBRARY_URL = "https://ihnmfsfbfnctgkhxmghk.supabase.co";
+
+function isProductionRuntime(): boolean {
+  return process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+}
+
+/** 允许 env 覆盖；非生产可回落默认 RL 项目 URL 便于本地联调 */
+export function getResourceLibraryUrl(): string {
+  const fromEnv =
+    process.env.RESOURCE_LIBRARY_SUPABASE_URL?.trim() ||
+    process.env.RESOURCE_LIBRARY_URL?.trim() ||
+    "";
+  if (fromEnv) return fromEnv;
+  if (isProductionRuntime()) {
+    throw new Error(
+      "RESOURCE_LIBRARY_SUPABASE_URL (or RESOURCE_LIBRARY_URL) is required in production"
+    );
+  }
+  return DEFAULT_RESOURCE_LIBRARY_URL;
+}
+
+export const RESOURCE_LIBRARY_URL = (() => {
+  try {
+    return getResourceLibraryUrl();
+  } catch {
+    // Module evaluation must not throw during build when env is incomplete;
+    // call sites that need a live client use getResourceLibraryUrl() / create*.
+    return DEFAULT_RESOURCE_LIBRARY_URL;
+  }
+})();
+
 export const RESOURCE_LIBRARY_SAFE_PAGE_COLUMNS =
   "id,title,url,domain,summary,category,tags,crawled_at";
 
@@ -36,9 +62,14 @@ export function getResourceLibraryPublicRatingStatsRpc(): string {
 }
 
 function createResourceLibraryClient(key: string) {
-  return createClient(RESOURCE_LIBRARY_URL, key, SUPABASE_CLIENT_OPTIONS);
+  return createClient(getResourceLibraryUrl(), key, SUPABASE_CLIENT_OPTIONS);
 }
 
+/**
+ * 公开读路径：仅 anon。
+ * 生产禁止回落 service_role（避免误配时公开流量持有全库权限）。
+ * 非生产仍可回落 service_role 便于本地无 anon 调试。
+ */
 export function createResourceLibraryReadClient() {
   const anonKey = getResourceLibraryAnonKey();
   if (anonKey) {
@@ -47,6 +78,10 @@ export function createResourceLibraryReadClient() {
       credential: "anon" as const,
       pagesSource: getResourceLibraryPublicPagesSource(),
     };
+  }
+
+  if (isProductionRuntime()) {
+    return null;
   }
 
   const serviceRoleKey = getResourceLibraryServiceRoleKey();
