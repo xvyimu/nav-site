@@ -17,14 +17,17 @@ const ENDPOINTS = [
     path: "/api/health",
     contentType: /application\/json/i,
     json: "health",
-    cacheControl: NO_STORE_PATTERN,
+    requireNoStore: true,
+    // Bypass Cloudflare edge cache of pre-no-store responses.
+    cacheBust: true,
   },
   {
     name: "search",
     path: "/api/search?q=ai&limit=5",
     contentType: /application\/json/i,
     json: "search",
-    cacheControl: NO_STORE_PATTERN,
+    requireNoStore: true,
+    cacheBust: true,
   },
   { name: "tool-detail", path: "/tool/figma", contentType: /text\/html/i },
   { name: "sitemap", path: "/sitemap.xml", contentType: /(application|text)\/xml/i, text: "sitemap" },
@@ -36,6 +39,8 @@ const BUILD_INFO_ENDPOINT = {
   path: "/build-info.json",
   contentType: /application\/json/i,
   json: "build-info",
+  // Static assets can stick at CDN edges; bust with a unique query when probing commit.
+  cacheBust: true,
 };
 
 function normalize(value) {
@@ -176,15 +181,47 @@ export function readConfigFromEnv(env = process.env, args = process.argv.slice(2
   };
 }
 
-export function makeProbeUrl(baseUrl, path) {
+export function makeProbeUrl(baseUrl, path, { cacheBust = false } = {}) {
   const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   const normalizedPath = path.replace(/^\/+/, "");
-  return new URL(normalizedPath, normalizedBase).toString();
+  const url = new URL(normalizedPath, normalizedBase);
+  if (cacheBust) {
+    url.searchParams.set("_probe", `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
+  }
+  return url.toString();
 }
 
 function getHeader(headers, name) {
   if (typeof headers?.get === "function") return headers.get(name) || "";
   return headers?.[name] || headers?.[name.toLowerCase()] || "";
+}
+
+function hasNoStoreSemantics(headers) {
+  // Cloudflare/Vercel edges may rewrite Cache-Control to max-age while still
+  // honoring CDN-Cache-Control / Vercel-CDN-Cache-Control no-store. Accept either.
+  const candidates = [
+    getHeader(headers, "cache-control"),
+    getHeader(headers, "cdn-cache-control"),
+    getHeader(headers, "vercel-cdn-cache-control"),
+  ];
+  if (candidates.some((value) => NO_STORE_PATTERN.test(value || ""))) return true;
+
+  // Fallback: some undici/proxy paths expose custom headers only via iteration.
+  if (headers && typeof headers[Symbol.iterator] === "function") {
+    for (const entry of headers) {
+      const key = String(entry?.[0] ?? "").toLowerCase();
+      const value = String(entry?.[1] ?? "");
+      if (
+        (key === "cache-control" ||
+          key === "cdn-cache-control" ||
+          key === "vercel-cdn-cache-control") &&
+        NO_STORE_PATTERN.test(value)
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function errorMessage(error) {
@@ -341,12 +378,14 @@ async function probeEndpointOnce(endpoint, {
   expectedCommit,
   fetchImpl = fetch,
 }) {
-  const url = makeProbeUrl(baseUrl, endpoint.path);
+  const url = makeProbeUrl(baseUrl, endpoint.path, { cacheBust: Boolean(endpoint.cacheBust) });
 
   try {
     const response = await fetchImpl(url, {
       headers: {
         "User-Agent": "nav-site-production-probe",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
       },
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -362,13 +401,27 @@ async function probeEndpointOnce(endpoint, {
       failures.push(`unexpected content-type ${contentType || "missing"}`);
     }
 
-    if (endpoint.cacheControl) {
+    if (endpoint.requireNoStore || endpoint.cacheControl) {
       const pattern =
         endpoint.cacheControl instanceof RegExp
           ? endpoint.cacheControl
-          : new RegExp(String(endpoint.cacheControl), "i");
-      if (!pattern.test(cacheControl || "")) {
-        failures.push(`unexpected cache-control ${cacheControl || "missing"}`);
+          : endpoint.cacheControl
+            ? new RegExp(String(endpoint.cacheControl), "i")
+            : NO_STORE_PATTERN;
+      const ok = endpoint.requireNoStore
+        ? hasNoStoreSemantics(response.headers)
+        : pattern.test(cacheControl || "");
+      if (!ok) {
+        const observed = [
+          cacheControl && `cache-control=${cacheControl}`,
+          getHeader(response.headers, "cdn-cache-control") &&
+            `cdn-cache-control=${getHeader(response.headers, "cdn-cache-control")}`,
+          getHeader(response.headers, "vercel-cdn-cache-control") &&
+            `vercel-cdn-cache-control=${getHeader(response.headers, "vercel-cdn-cache-control")}`,
+        ]
+          .filter(Boolean)
+          .join("; ");
+        failures.push(`unexpected cache-control ${observed || "missing"}`);
       }
     }
 

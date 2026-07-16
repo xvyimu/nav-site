@@ -33,10 +33,42 @@ function textResponse(
 
 function makeFetch(fixtures: Record<string, Response>) {
   return vi.fn(async (input: URL | RequestInfo) => {
-    const url = input.toString();
-    const response = fixtures[url];
-    if (!response) return textResponse("not found", "text/plain", 404);
-    return response.clone();
+    const raw = input.toString();
+    const exact = fixtures[raw];
+    if (exact) return exact.clone();
+
+    // Support cache-busted probe URLs (e.g. /api/health?_probe=... or existing query + _probe).
+    try {
+      const url = new URL(raw);
+      url.searchParams.delete("_probe");
+      const withoutProbe = url.toString().replace(/\?$/, "");
+      if (fixtures[withoutProbe]) return fixtures[withoutProbe].clone();
+
+      // Match fixture keys that already include a query string by pathname+original params minus _probe.
+      for (const [key, response] of Object.entries(fixtures)) {
+        try {
+          const fixtureUrl = new URL(key);
+          if (fixtureUrl.origin !== url.origin || fixtureUrl.pathname !== url.pathname) continue;
+          const fixtureParams = new URLSearchParams(fixtureUrl.search);
+          const actualParams = new URLSearchParams(url.search);
+          actualParams.delete("_probe");
+          let matches = true;
+          for (const [k, v] of fixtureParams.entries()) {
+            if (actualParams.get(k) !== v) {
+              matches = false;
+              break;
+            }
+          }
+          if (matches) return response.clone();
+        } catch {
+          // ignore invalid fixture keys
+        }
+      }
+    } catch {
+      // ignore invalid URLs and fall through to 404
+    }
+
+    return textResponse("not found", "text/plain", 404);
   }) as unknown as typeof fetch;
 }
 
@@ -46,6 +78,9 @@ describe("scripts/probe-production", () => {
 
     expect(makeProbeUrl("https://example.com", "/api/health")).toBe("https://example.com/api/health");
     expect(makeProbeUrl("https://example.com/", "api/search?q=ai")).toBe("https://example.com/api/search?q=ai");
+    expect(makeProbeUrl("https://example.com", "/build-info.json", { cacheBust: true })).toMatch(
+      /^https:\/\/example\.com\/build-info\.json\?_probe=[a-z0-9]+$/i
+    );
   });
 
   it("passes the production smoke endpoints when responses are healthy", async () => {
@@ -144,13 +179,57 @@ describe("scripts/probe-production", () => {
         path: "/api/search?q=ai&limit=5",
         contentType: /application\/json/i,
         json: "search",
-        cacheControl: /(?:^|,)\s*no-store\b/i,
+        requireNoStore: true,
       }],
       fetchImpl,
     });
 
     expect(results[0]?.ok).toBe(false);
     expect(results[0]?.detail).toContain("unexpected cache-control");
+  });
+
+  it("accepts CDN no-store when Cache-Control is rewritten by the edge", async () => {
+    const { runProductionProbe } = await importProbeModule();
+    const baseUrl = "https://nav-site.example";
+    const fetchImpl = makeFetch({
+      [`${baseUrl}/api/health`]: jsonResponse(
+        {
+          status: "healthy",
+          checks: {
+            database: { status: "ok" },
+            env: { status: "ok" },
+            embedding: { status: "skipped" },
+          },
+        },
+        200,
+        {
+          "cache-control": "max-age=14400, must-revalidate",
+          "cdn-cache-control": "no-store",
+        }
+      ),
+    });
+
+    const results = await runProductionProbe({
+      config: {
+        baseUrl,
+        timeoutMs: 1000,
+        expectEmbeddingSkipped: true,
+        requireEmbedding: false,
+        expectedCommit: "",
+        retries: 0,
+        retryDelayMs: 1,
+      },
+      endpoints: [{
+        name: "health",
+        path: "/api/health",
+        contentType: /application\/json/i,
+        json: "health",
+        requireNoStore: true,
+      }],
+      fetchImpl,
+    });
+
+    expect(results[0]?.ok).toBe(true);
   });
 
   it("flags an old deployment when latest health semantics are expected", async () => {
