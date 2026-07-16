@@ -27,6 +27,7 @@ vi.mock("@/components/FavoritesProvider", () => ({
     toggleFavorite: vi.fn(),
     clearFavorites: vi.fn(),
   }),
+  useFavoriteMembership: () => false,
 }));
 
 function makeLink(overrides: Partial<NavLink> & { id: string; title: string }): NavLink {

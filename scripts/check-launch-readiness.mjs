@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { runProductionProbe } from "./probe-production.mjs";
 
 const execFile = promisify(execFileCallback);
-const DEFAULT_BASE_URL = "https://nav-site.netlify.app";
+const DEFAULT_BASE_URL = "https://yuanjia1314.ccwu.cc";
 const DEFAULT_ALLOWED_DIRTY_PATHS = [".planning/"];
 
 function readArgValue(args, name) {

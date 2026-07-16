@@ -198,19 +198,8 @@ describe("checkMemoryRateLimit — 内存级备用速率限制", () => {
     // 避免直接测试内部内存 Map 的竞态，通过 mock Supabase 失败+ failClose 触发备用
     vi.resetModules();
     vi.doMock("@/lib/supabase/server", () => ({
-      createClient: () => ({
-        from: () => ({
-          select: () => ({
-            eq: () => ({
-              gte: () => Promise.resolve({ count: null, error: new Error("DB down") }),
-            }),
-          }),
-          delete: () => ({
-            lt: () => Promise.resolve({ error: null }),
-          }),
-          insert: () => Promise.resolve({ error: null }),
-        }),
-        rpc: () => Promise.resolve({ error: null }),
+      createServiceRoleClient: () => ({
+        rpc: () => Promise.resolve({ data: null, error: { message: "DB down" } }),
       }),
     }));
 
@@ -222,19 +211,8 @@ describe("checkMemoryRateLimit — 内存级备用速率限制", () => {
   it("超过内存桶上限后拒绝（failClose 模式）", async () => {
     vi.resetModules();
     vi.doMock("@/lib/supabase/server", () => ({
-      createClient: () => ({
-        from: () => ({
-          select: () => ({
-            eq: () => ({
-              gte: () => Promise.resolve({ count: null, error: new Error("DB down") }),
-            }),
-          }),
-          delete: () => ({
-            lt: () => Promise.resolve({ error: null }),
-          }),
-          insert: () => Promise.resolve({ error: null }),
-        }),
-        rpc: () => Promise.resolve({ error: null }),
+      createServiceRoleClient: () => ({
+        rpc: () => Promise.resolve({ data: null, error: { message: "DB down" } }),
       }),
     }));
 
@@ -250,19 +228,8 @@ describe("checkMemoryRateLimit — 内存级备用速率限制", () => {
   it("failOpen 模式下数据库故障时放行", async () => {
     vi.resetModules();
     vi.doMock("@/lib/supabase/server", () => ({
-      createClient: () => ({
-        from: () => ({
-          select: () => ({
-            eq: () => ({
-              gte: () => Promise.resolve({ count: null, error: new Error("DB down") }),
-            }),
-          }),
-          delete: () => ({
-            lt: () => Promise.resolve({ error: null }),
-          }),
-          insert: () => Promise.resolve({ error: null }),
-        }),
-        rpc: () => Promise.resolve({ error: null }),
+      createServiceRoleClient: () => ({
+        rpc: () => Promise.resolve({ data: null, error: { message: "DB down" } }),
       }),
     }));
 
@@ -276,19 +243,11 @@ describe("checkRateLimit — 数据库速率限制", () => {
   it("未超限时放行", async () => {
     vi.resetModules();
     vi.doMock("@/lib/supabase/server", () => ({
-      createClient: () => ({
-        from: () => ({
-          select: () => ({
-            eq: () => ({
-              gte: () => Promise.resolve({ count: 2, error: null }),
-            }),
-          }),
-          delete: () => ({
-            lt: () => Promise.resolve({ error: null }),
-          }),
-          insert: () => Promise.resolve({ error: null }),
+      createServiceRoleClient: () => ({
+        rpc: () => Promise.resolve({
+          data: [{ allowed: true, current_count: 2 }],
+          error: null,
         }),
-        rpc: () => Promise.resolve({ error: null }),
       }),
     }));
 
@@ -301,19 +260,11 @@ describe("checkRateLimit — 数据库速率限制", () => {
   it("超过上限时拒绝", async () => {
     vi.resetModules();
     vi.doMock("@/lib/supabase/server", () => ({
-      createClient: () => ({
-        from: () => ({
-          select: () => ({
-            eq: () => ({
-              gte: () => Promise.resolve({ count: 5, error: null }),
-            }),
-          }),
-          delete: () => ({
-            lt: () => Promise.resolve({ error: null }),
-          }),
-          insert: () => Promise.resolve({ error: null }),
+      createServiceRoleClient: () => ({
+        rpc: () => Promise.resolve({
+          data: [{ allowed: false, current_count: 5 }],
+          error: null,
         }),
-        rpc: () => Promise.resolve({ error: null }),
       }),
     }));
 

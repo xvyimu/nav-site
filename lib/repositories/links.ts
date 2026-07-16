@@ -1,9 +1,15 @@
 import { cache } from "react";
-import { createClient } from "@/lib/supabase/server";
+import { createStaticClient } from "@/lib/supabase/server";
 import type { NavLink } from "@/lib/types";
 import { slugify } from "@/lib/slugify";
 import { logger } from "@/lib/logger";
-import { mapLinkRow, type RawLinkRow, type SupabaseServerClient } from "./shared";
+import {
+  mapLinkRow,
+  PUBLIC_LINK_SELECT,
+  PUBLIC_LINK_SELECT_INNER_CATEGORY,
+  type RawLinkRow,
+  type SupabaseServerClient,
+} from "./shared";
 import { attachTagsToLinks } from "./tags";
 
 interface GetApprovedLinksOpts {
@@ -23,9 +29,7 @@ async function getApprovedLinksImpl(options?: GetApprovedLinksOpts): Promise<Nav
     }
 
     try {
-      const supabase = await createClient();
-      const selectBasic = "*, nav_categories(name, slug)";
-
+      const supabase = createStaticClient();
       const buildQuery = (select: string) => {
         let query = supabase
           .from("nav_links")
@@ -49,7 +53,7 @@ async function getApprovedLinksImpl(options?: GetApprovedLinksOpts): Promise<Nav
         return query;
       };
 
-      const { data, error } = await buildQuery(selectBasic);
+      const { data, error } = await buildQuery(PUBLIC_LINK_SELECT);
 
       if (error) {
         logger.error("Failed to fetch links", { source: "repositories", attempt }, error);
@@ -92,11 +96,11 @@ export const getApprovedLinks = cache(getApprovedLinksImpl);
  * 仅按 DB slug 列查询，不做全表 title→slugify 扫描。
  */
 async function getApprovedLinkBySlugImpl(slug: string): Promise<NavLink | null> {
-  const supabase = await createClient();
+  const supabase = createStaticClient();
 
   const { data: bySlug, error: slugErr } = await supabase
     .from("nav_links")
-    .select("*, nav_categories(name, slug)")
+    .select(PUBLIC_LINK_SELECT)
     .eq("approved", true)
     .eq("slug", slug)
     .maybeSingle();
@@ -116,7 +120,7 @@ export const getApprovedLinkBySlug = cache(getApprovedLinkBySlugImpl);
  * 获取所有已批准链接的 slug 列表（用于 generateStaticParams / sitemap）。
  */
 async function getAllApprovedLinkSlugsImpl(client?: SupabaseServerClient): Promise<string[]> {
-  const supabase = client ?? await createClient();
+  const supabase = client ?? createStaticClient();
 
   const { data, error } = await supabase
     .from("nav_links")
@@ -145,10 +149,10 @@ async function getRelatedLinksImpl(
 ): Promise<NavLink[]> {
   if (!categoryId) return [];
 
-  const supabase = await createClient();
+  const supabase = createStaticClient();
   const { data, error } = await supabase
     .from("nav_links")
-    .select("*, nav_categories(name, slug)")
+    .select(PUBLIC_LINK_SELECT)
     .eq("approved", true)
     .eq("category_id", categoryId)
     .neq("url", excludeUrl)
@@ -169,12 +173,12 @@ export const getRelatedLinks = cache(getRelatedLinksImpl);
  * 获取所有已批准链接（用于 Agent API 端点），支持分类过滤。
  */
 export async function getApprovedLinksForApi(categorySlug?: string): Promise<NavLink[]> {
-  const supabase = await createClient();
+  const supabase = createStaticClient();
 
   if (categorySlug && categorySlug !== "all") {
     const { data, error } = await supabase
       .from("nav_links")
-      .select("*, nav_categories(name, slug)")
+      .select(PUBLIC_LINK_SELECT_INNER_CATEGORY)
       .eq("approved", true)
       .eq("nav_categories.slug", categorySlug)
       .order("featured", { ascending: false })
@@ -189,4 +193,94 @@ export async function getApprovedLinksForApi(categorySlug?: string): Promise<Nav
   }
 
   return getApprovedLinks();
+}
+
+export interface ApprovedLinksApiQuery {
+  category?: string;
+  search?: string;
+  ids?: string[];
+  limit?: number;
+}
+
+export interface ApprovedLinksApiResult {
+  links: NavLink[];
+  total: number;
+}
+
+interface PublicToolRpcRow extends RawLinkRow {
+  category_name?: string | null;
+  category_slug?: string | null;
+  total_count?: number | string | null;
+}
+
+function isMissingToolsRpc(error: { code?: string; message?: string }): boolean {
+  return (
+    error.code === "PGRST202" ||
+    error.code === "42883" ||
+    /list_public_tools/i.test(error.message ?? "") && /not found|does not exist/i.test(error.message ?? "")
+  );
+}
+
+function mapPublicToolRpcRow(row: PublicToolRpcRow): NavLink {
+  const category = row.category_name && row.category_slug
+    ? { name: row.category_name, slug: row.category_slug }
+    : null;
+  return mapLinkRow({ ...row, nav_categories: category });
+}
+
+/**
+ * Query the public tools API projection in one database call.
+ *
+ * `list_public_tools` applies filters, limit, and window-counting in Postgres.
+ * During rolling deployment, a missing RPC falls back to the legacy read path.
+ */
+export async function queryApprovedLinksForApi(
+  options: ApprovedLinksApiQuery = {}
+): Promise<ApprovedLinksApiResult> {
+  const supabase = createStaticClient();
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 100);
+  const category = options.category && options.category !== "all" ? options.category : null;
+  const search = options.search?.trim() || null;
+  const ids = options.ids && options.ids.length > 0 ? options.ids : null;
+
+  const { data, error } = await supabase.rpc("list_public_tools", {
+    p_category_slug: category,
+    p_ids: ids,
+    p_search: search,
+    p_limit: limit,
+  });
+
+  if (!error) {
+    const rows = (data ?? []) as unknown as PublicToolRpcRow[];
+    const totalValue = rows[0]?.total_count ?? 0;
+    const total = Number(totalValue);
+    return {
+      links: rows.map(mapPublicToolRpcRow),
+      total: Number.isFinite(total) ? total : 0,
+    };
+  }
+
+  if (!isMissingToolsRpc(error)) {
+    logger.error("Failed to query links for tools API", { source: "repositories" }, error);
+    return { links: [], total: 0 };
+  }
+
+  logger.warn("list_public_tools RPC unavailable; using compatibility query", {
+    source: "repositories",
+  });
+  let links = await getApprovedLinksForApi(category ?? undefined);
+  if (search) {
+    const normalizedSearch = search.toLowerCase();
+    links = links.filter((link) =>
+      link.title.toLowerCase().includes(normalizedSearch) ||
+      link.description?.toLowerCase().includes(normalizedSearch) ||
+      link.category_name?.toLowerCase().includes(normalizedSearch)
+    );
+  }
+  if (ids) {
+    const idSet = new Set(ids);
+    links = links.filter((link) => idSet.has(link.id));
+  }
+
+  return { links: links.slice(0, limit), total: links.length };
 }

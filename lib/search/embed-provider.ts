@@ -110,7 +110,7 @@ async function embedViaCloudflare(
 export function getEmbedServerEndpoint(env: EnvLike = process.env): string | null {
   const { endpoint, reason } = resolveEmbedEndpoint({
     raw: env.EMBED_SERVER_URL,
-    fallback: DEFAULT_EMBED_SERVER_URL,
+    fallback: resolveEmbedProvider(env) !== "embed-server" ? undefined : DEFAULT_EMBED_SERVER_URL,
     path: "/embed-query",
     env,
   });
@@ -122,6 +122,20 @@ export function getEmbedServerEndpoint(env: EnvLike = process.env): string | nul
     });
   }
   return null;
+}
+
+export function getEmbeddingCacheEndpoint(env: EnvLike = process.env): string | null {
+  if (resolveEmbedProvider(env) !== "embed-server") {
+    return `cloudflare:${CF_MODEL}`;
+  }
+
+  const { endpoint } = resolveEmbedEndpoint({
+    raw: env.EMBED_SERVER_URL,
+    fallback: undefined,
+    path: "/embed-query",
+    env,
+  });
+  return endpoint;
 }
 
 async function embedViaEmbedServer(

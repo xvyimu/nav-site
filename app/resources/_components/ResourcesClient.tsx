@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { Loader2, Search, Sparkles, X } from "lucide-react";
 import type { ResourceItem } from "@/lib/types";
@@ -28,17 +28,24 @@ interface CategoryOption {
 
 type SearchMode = "fts" | "vector" | "hybrid";
 
-export function ResourcesClient() {
+export function ResourcesClient({
+  initialResults,
+  initialError = null,
+}: {
+  initialResults?: ResourceItem[];
+  initialError?: string | null;
+}) {
   const [query, setQuery] = useState("");
   // 默认 hybrid：vector 可用时 RRF 混排；不可用则服务端/探测回落到 fts
   const [searchMode, setSearchMode] = useState<SearchMode>("hybrid");
   const [vectorAvailable, setVectorAvailable] = useState<boolean | null>(null);
   const [activeMode, setActiveMode] = useState<SearchMode>("fts");
-  const [results, setResults] = useState<ResourceItem[]>([]);
+  const [results, setResults] = useState<ResourceItem[]>(initialResults ?? []);
   const [loading, setLoading] = useState(false);
-  const [total, setTotal] = useState(0);
+  const [error, setError] = useState<string | null>(initialError);
+  const [total, setTotal] = useState(initialResults?.length ?? 0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const initialLoad = useRef(true);
+  const initialLoad = useRef(initialResults === undefined);
   const requestSeq = useRef(0);
   // 用 ref 避免防抖闭包拿到过期的 mode（在 effect 中同步，不在 render 写 ref）
   const searchModeRef = useRef<SearchMode>("hybrid");
@@ -51,6 +58,7 @@ export function ResourcesClient() {
   const browse = useCallback(async () => {
     const requestId = ++requestSeq.current;
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/resource-browse?limit=80");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -65,6 +73,7 @@ export function ResourcesClient() {
       console.error("资源库浏览失败:", e);
       setResults([]);
       setTotal(0);
+      setError("资源库暂时不可用，请稍后重试");
     } finally {
       if (requestId === requestSeq.current) setLoading(false);
     }
@@ -79,6 +88,7 @@ export function ResourcesClient() {
       limit: 50,
     };
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/resource-search", {
         method: "POST",
@@ -105,6 +115,7 @@ export function ResourcesClient() {
       console.error("资源库搜索失败:", e);
       setResults([]);
       setTotal(0);
+      setError("搜索暂时不可用，请稍后重试");
     } finally {
       if (requestId === requestSeq.current) setLoading(false);
     }
@@ -170,7 +181,7 @@ export function ResourcesClient() {
   };
 
   // ── 分类筛选 ──────────────────────────────────
-  const catCounts = useCallback((): CategoryOption[] => {
+  const catCounts = useMemo((): CategoryOption[] => {
     const map = new Map<string, number>();
     for (const r of results) {
       const cat = r.category || "Other";
@@ -291,7 +302,7 @@ export function ResourcesClient() {
 
       {/* 分类筛选 */}
       <div className="flex flex-wrap gap-2">
-        {catCounts().map((cat) => (
+        {catCounts.map((cat) => (
           <button
             key={cat.value}
             type="button"
@@ -313,6 +324,10 @@ export function ResourcesClient() {
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
+      ) : error ? (
+        <p role="alert" className="py-12 text-center text-sm text-destructive">
+          {error}
+        </p>
       ) : filtered.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
           没有找到匹配的资源

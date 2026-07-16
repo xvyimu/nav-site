@@ -114,17 +114,20 @@ export async function checkRateLimit(
   failClose: boolean = false,
   client?: SupabaseClient
 ): Promise<{ allowed: boolean; count: number }> {
-  const supabase = client ?? await createClient();
-  const since = new Date(Date.now() - windowMs).toISOString();
-
-  // 惰性清理过期记录
-  await cleanupOldAttempts(supabase, table);
-
-  const { count, error } = await supabase
-    .from(table)
-    .select("id", { count: "exact", head: true })
-    .eq("ip", ip)
-    .gte("created_at", since);
+  const supabase = client ?? createServiceRoleClient();
+  let data: unknown = null;
+  let error: { message: string } | null = null;
+  try {
+    const result = await supabase.rpc("consume_rate_limit", {
+      p_bucket_key: `${table}:${ip}`,
+      p_window_seconds: Math.max(1, Math.ceil(windowMs / 1000)),
+      p_max_attempts: maxAttempts,
+    });
+    data = result.data;
+    error = result.error;
+  } catch (e) {
+    error = { message: e instanceof Error ? e.message : String(e) };
+  }
 
   if (error) {
     // 数据库故障时，对敏感操作使用内存备用限制（fail-close）
@@ -145,7 +148,26 @@ export async function checkRateLimit(
     return { allowed: true, count: 0 };
   }
 
-  return { allowed: (count ?? 0) < maxAttempts, count: count ?? 0 };
+  const row = Array.isArray(data) ? data[0] : data;
+  if (
+    !row ||
+    typeof row !== "object" ||
+    typeof (row as { allowed?: unknown }).allowed !== "boolean" ||
+    typeof (row as { current_count?: unknown }).current_count !== "number"
+  ) {
+    logger.warn("Rate limit RPC returned an invalid payload", { table, ip });
+    if (failClose) {
+      cleanupMemoryBuckets(windowMs);
+      const allowed = checkMemoryRateLimit(`${table}:${ip}`, windowMs, maxAttempts);
+      return { allowed, count: 0 };
+    }
+    return { allowed: true, count: 0 };
+  }
+
+  return {
+    allowed: (row as { allowed: boolean }).allowed,
+    count: (row as { current_count: number }).current_count,
+  };
 }
 
 /** 仅有 ip/created_at、无 success 列的限流表 */

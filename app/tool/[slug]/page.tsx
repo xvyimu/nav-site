@@ -11,7 +11,6 @@ import { ReviewSection } from "@/components/ReviewSection";
 import { logger } from "@/lib/logger";
 
 export const revalidate = 60;
-export const dynamic = "force-dynamic";
 
 const FETCH_TIMEOUT = 8000;
 
@@ -21,7 +20,7 @@ interface PageProps {
 
 /**
  * 预生成所有工具详情页的静态参数
- * 返回空数组 — 页面通过 ISR 按需生成（Supabase server client 使用 cookies()，不能在 build 时调用）
+ * 返回空数组 — 页面通过 ISR 按需生成，公开数据使用无 cookie 的静态客户端。
  */
 export async function generateStaticParams() {
   return [];

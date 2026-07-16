@@ -1,6 +1,11 @@
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
-import { generateEmbedding, resolveEmbedProvider } from "./embed-provider";
+import {
+  generateEmbedding,
+  getEmbeddingCacheEndpoint,
+  resolveEmbedProvider,
+  resolveExpectedDim,
+} from "./embed-provider";
 import type { NavLink } from "@/lib/types";
 import type { SearchResult, SemanticRow } from "./types";
 
@@ -51,7 +56,11 @@ function clearTemporarilyUnavailable(endpoint: string): void {
 }
 
 function getSemanticRpcName(): string {
-  return process.env.EMBED_SEMANTIC_RPC?.trim() || DEFAULT_SEMANTIC_RPC;
+  const configured = process.env.EMBED_SEMANTIC_RPC?.trim();
+  if (configured) return configured;
+  return resolveEmbedProvider() === "cloudflare"
+    ? "search_links_semantic_v2"
+    : DEFAULT_SEMANTIC_RPC;
 }
 
 /**
@@ -67,42 +76,57 @@ function getSemanticRpcName(): string {
  */
 export async function getEmbedding(text: string): Promise<number[] | null> {
   const provider = resolveEmbedProvider();
+  const cacheEndpoint = getEmbeddingCacheEndpoint();
+
+  if (cacheEndpoint && isTemporarilyUnavailable(cacheEndpoint)) return null;
 
   try {
     const { vector, endpoint } = await generateEmbedding(text);
+    const cacheKey = endpoint ?? cacheEndpoint;
 
-    if (endpoint && isTemporarilyUnavailable(endpoint)) return null;
+    const expectedDim = resolveExpectedDim();
+    const validVector =
+      Array.isArray(vector) &&
+      vector.length === expectedDim &&
+      vector.every((value) => typeof value === "number" && Number.isFinite(value));
 
-    if (!vector || vector.length === 0) {
-      if (endpoint) {
-        markTemporarilyUnavailable(endpoint);
-        warnThrottled(`embed:${endpoint}:payload`, "Embed backend returned no vector", {
+    if (!validVector) {
+      if (cacheKey) {
+        markTemporarilyUnavailable(cacheKey);
+        warnThrottled(`embed:${cacheKey}:payload`, "Embed backend returned no vector", {
           source: "api-search",
           provider,
+          expectedDim,
+          actualDim: Array.isArray(vector) ? vector.length : 0,
           retryAfterMs: EMBED_UNAVAILABLE_TTL_MS,
         });
       }
       return null;
     }
 
-    if (endpoint) clearTemporarilyUnavailable(endpoint);
+    if (cacheKey) clearTemporarilyUnavailable(cacheKey);
     return vector;
   } catch (e) {
-    warnThrottled(`embed:${provider}:request`, "Embed backend request failed", {
-      source: "api-search",
-      provider,
-      error: e instanceof Error ? e.message : String(e),
-      retryAfterMs: EMBED_UNAVAILABLE_TTL_MS,
-    });
+    if (cacheEndpoint) markTemporarilyUnavailable(cacheEndpoint);
+    warnThrottled(
+      `embed:${provider}:request`,
+      provider === "embed-server" ? "Embed server request failed" : "Embed backend request failed",
+      {
+        source: "api-search",
+        provider,
+        error: e instanceof Error ? e.message : String(e),
+        retryAfterMs: EMBED_UNAVAILABLE_TTL_MS,
+      }
+    );
     return null;
   }
 }
 
 /**
- * 传入 512 维向量，调用 pgvector 语义搜索
+ * 传入 provider 对应维度向量，调用 pgvector 语义搜索
  *
- * 使用 service_role 客户端调用 search_links_semantic RPC，
- * 该函数需要 SELECT 权限遍历 nav_links 表。
+ * 使用 service_role 客户端调用 EMBED_SEMANTIC_RPC 指向的 RPC，
+ * 默认 search_links_semantic；Cloudflare 1024-d 使用 search_links_semantic_v2。
  */
 export async function searchSemantic(
   embedding: number[],
@@ -117,7 +141,7 @@ export async function searchSemantic(
         ? Math.min(Math.max(limit * 10, 50), 200)
         : limit;
 
-    const { data, error } = await supabase.rpc("search_links_semantic", {
+    const { data, error } = await supabase.rpc(getSemanticRpcName(), {
       query_embedding: embedding,
       match_count: matchCount,
     });

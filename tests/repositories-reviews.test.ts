@@ -132,7 +132,7 @@ describe("repositories/reviews", () => {
       "127.0.0.1",
       15 * 60 * 1000,
       3,
-      false,
+      true,
       mockDb,
     );
     expect(cleanupOldAttempts).toHaveBeenCalledWith(mockDb, "review_rate_limits");

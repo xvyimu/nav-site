@@ -7,6 +7,14 @@ async function importReadinessModule(): Promise<ReadinessModule> {
 }
 
 describe("scripts/check-launch-readiness", () => {
+  it("defaults to the verified custom Vercel production domain", async () => {
+    const { readConfigFromEnv } = await importReadinessModule();
+
+    expect(readConfigFromEnv({} as NodeJS.ProcessEnv, []).baseUrl).toBe(
+      "https://yuanjia1314.ccwu.cc"
+    );
+  });
+
   it("parses branch ahead state and ignores allowed local planning files", async () => {
     const { parseGitStatus } = await importReadinessModule();
 

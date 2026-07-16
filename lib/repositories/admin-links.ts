@@ -1,6 +1,11 @@
 import type { NavLink } from "@/lib/types";
 import { logger } from "@/lib/logger";
-import { createAdminClient, mapLinkRow, type SupabaseDataClient } from "./shared";
+import {
+  createAdminClient,
+  mapLinkRow,
+  PUBLIC_LINK_SELECT,
+  type SupabaseDataClient,
+} from "./shared";
 import { syncLinkTags } from "./tags";
 
 /**
@@ -10,7 +15,7 @@ export async function getAllLinksForAdmin(): Promise<NavLink[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("nav_links")
-    .select("*, nav_categories(name, slug)")
+    .select(PUBLIC_LINK_SELECT)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -27,7 +32,7 @@ async function fetchLinkWithTags(
 ): Promise<NavLink> {
   const { data, error } = await supabase
     .from("nav_links")
-    .select("*, nav_categories(name, slug)")
+    .select(PUBLIC_LINK_SELECT)
     .eq("id", id)
     .maybeSingle();
 

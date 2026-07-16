@@ -18,6 +18,7 @@ interface CategorySectionProps {
   onKeyDown: (e: KeyboardEvent<HTMLElement>, index: number) => void;
   searchQuery?: string;
   onPreview?: (link: NavLink) => void;
+  initialVisible?: number;
 }
 
 export function CategorySection({
@@ -29,6 +30,7 @@ export function CategorySection({
   onKeyDown,
   searchQuery = "",
   onPreview,
+  initialVisible,
 }: CategorySectionProps) {
   if (section.links.length === 0) return null;
   const isSearchSection = section.key === "search-results" || section.key === "zero-result-recommendations";
@@ -50,6 +52,7 @@ export function CategorySection({
         onKeyDown={onKeyDown}
         searchQuery={searchQuery}
         onPreview={onPreview}
+        initialVisible={initialVisible}
       />
     </section>
   );

@@ -6,20 +6,27 @@ async function importProbeModule(): Promise<ProbeModule> {
   return import("../scripts/probe-production.mjs");
 }
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(body: unknown, status = 200, headers: HeadersInit = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
+      ...headers,
     },
   });
 }
 
-function textResponse(body: string, contentType: string, status = 200): Response {
+function textResponse(
+  body: string,
+  contentType: string,
+  status = 200,
+  headers: HeadersInit = {}
+): Response {
   return new Response(body, {
     status,
     headers: {
       "content-type": contentType,
+      ...headers,
     },
   });
 }
@@ -46,25 +53,36 @@ describe("scripts/probe-production", () => {
     const baseUrl = "https://nav-site.example";
     const fetchImpl = makeFetch({
       [`${baseUrl}/`]: textResponse("<html></html>", "text/html; charset=utf-8"),
-      [`${baseUrl}/api/health`]: jsonResponse({
-        status: "healthy",
-        version: {
-          commit: "65031ff027e610e7734da2b5d8c82e708144cdd7",
+      [`${baseUrl}/api/health`]: jsonResponse(
+        {
+          status: "healthy",
+          version: {
+            commit: "65031ff027e610e7734da2b5d8c82e708144cdd7",
+          },
+          checks: {
+            database: { status: "ok" },
+            env: { status: "ok" },
+            embedding: { status: "skipped" },
+            resourceLibrarySearch: { status: "skipped" },
+          },
         },
-        checks: {
-          database: { status: "ok" },
-          env: { status: "ok" },
-          embedding: { status: "skipped" },
-          resourceLibrarySearch: { status: "skipped" },
+        200,
+        { "cache-control": "no-store" }
+      ),
+      [`${baseUrl}/api/search?q=ai&limit=5`]: jsonResponse(
+        {
+          results: [{ id: "550e8400-e29b-41d4-a716-446655440000" }],
+          total: 1,
+          mode: "fuse",
         },
-      }),
-      [`${baseUrl}/api/search?q=ai&limit=5`]: jsonResponse({
-        results: [],
-        total: 0,
-        mode: "fuse",
-      }),
+        200,
+        { "cache-control": "no-store" }
+      ),
       [`${baseUrl}/tool/figma`]: textResponse("<html></html>", "text/html; charset=utf-8"),
-      [`${baseUrl}/sitemap.xml`]: textResponse("<urlset></urlset>", "application/xml"),
+      [`${baseUrl}/sitemap.xml`]: textResponse(
+        `<urlset><url><loc>${baseUrl}/tool/figma</loc></url></urlset>`,
+        "application/xml"
+      ),
       [`${baseUrl}/robots.txt`]: textResponse("User-agent: *", "text/plain"),
       [`${baseUrl}/build-info.json`]: jsonResponse({
         commit: "65031ff027e610e7734da2b5d8c82e708144cdd7",
@@ -87,6 +105,52 @@ describe("scripts/probe-production", () => {
 
     expect(results.every((result) => result.ok)).toBe(true);
     expect(() => assertProbePassed(results)).not.toThrow();
+  });
+
+  it("rejects false-green search and sitemap payloads without production data", async () => {
+    const { validateSearchPayload, validateSitemapPayload } = await importProbeModule();
+
+    expect(validateSearchPayload({ results: [], total: 0, mode: "fuse" })).toContain(
+      "expected at least one production search result"
+    );
+    expect(validateSitemapPayload("<urlset></urlset>")).toContain(
+      "expected sitemap to include at least one tool URL"
+    );
+  });
+
+  it("enforces no-store on dynamic health and search responses", async () => {
+    const { runProductionProbe } = await importProbeModule();
+    const baseUrl = "https://nav-site.example";
+    const fetchImpl = makeFetch({
+      [`${baseUrl}/api/search?q=ai&limit=5`]: jsonResponse({
+        results: [{ id: "550e8400-e29b-41d4-a716-446655440000" }],
+        total: 1,
+        mode: "fuse",
+      }),
+    });
+
+    const results = await runProductionProbe({
+      config: {
+        baseUrl,
+        timeoutMs: 1000,
+        expectEmbeddingSkipped: false,
+        requireEmbedding: false,
+        expectedCommit: "",
+        retries: 0,
+        retryDelayMs: 1,
+      },
+      endpoints: [{
+        name: "search",
+        path: "/api/search?q=ai&limit=5",
+        contentType: /application\/json/i,
+        json: "search",
+        cacheControl: /(?:^|,)\s*no-store\b/i,
+      }],
+      fetchImpl,
+    });
+
+    expect(results[0]?.ok).toBe(false);
+    expect(results[0]?.detail).toContain("unexpected cache-control");
   });
 
   it("flags an old deployment when latest health semantics are expected", async () => {
@@ -113,7 +177,7 @@ describe("scripts/probe-production", () => {
         retries: 1,
         retryDelayMs: 1,
       },
-      endpoints: [{ name: "health", path: "/api/health", contentType: /application\/json/i, json: "health" }],
+      endpoints: [{ name: "health", path: "/api/health", contentType: /application\/json/i, json: "health", cacheControl: /no-store/ }],
       fetchImpl,
       waitImpl: async () => {},
     });
@@ -148,7 +212,7 @@ describe("scripts/probe-production", () => {
         retries: 1,
         retryDelayMs: 1,
       },
-      endpoints: [{ name: "health", path: "/api/health", contentType: /application\/json/i, json: "health" }],
+      endpoints: [{ name: "health", path: "/api/health", contentType: /application\/json/i, json: "health", cacheControl: /no-store/ }],
       fetchImpl,
       waitImpl: async () => {},
     });
@@ -188,7 +252,7 @@ describe("scripts/probe-production", () => {
         retries: 1,
         retryDelayMs: 1,
       },
-      endpoints: [{ name: "health", path: "/api/health", contentType: /application\/json/i, json: "health" }],
+      endpoints: [{ name: "health", path: "/api/health", contentType: /application\/json/i, json: "health", cacheControl: /no-store/ }],
       fetchImpl,
       waitImpl: async () => {},
     });

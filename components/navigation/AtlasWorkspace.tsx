@@ -8,6 +8,9 @@ import { CategorySection } from "@/components/CategorySection";
 import { DualTrackSection } from "@/components/DualTrackSection";
 import { SearchExperiencePanel } from "@/components/SearchExperiencePanel";
 import { Button } from "@/components/ui/button";
+import { allocateSectionMountBudget } from "./mount-budget";
+
+const INITIAL_LINK_CARD_BUDGET = 24;
 
 const emptyClearClass =
   "h-auto p-0 text-xs text-[var(--paper-muted)] underline underline-offset-2 hover:text-[var(--paper-accent)]";
@@ -102,6 +105,15 @@ export function AtlasWorkspace({
     [flatResults],
   );
 
+  const sectionInitialCounts = useMemo(() => {
+    const counts = allocateSectionMountBudget(
+      linkSections.map((section) => section.links.length),
+      INITIAL_LINK_CARD_BUDGET,
+      featured.length + latest.length + popular.length
+    );
+    return new Map(linkSections.map((section, index) => [section.key, counts[index] ?? 0]));
+  }, [featured.length, latest.length, popular.length, linkSections]);
+
   const clearBase = () => {
     setRawSearch("");
     setSearch("");
@@ -177,6 +189,7 @@ export function AtlasWorkspace({
               onKeyDown={handleResultKeyDown}
               searchQuery={q}
               onPreview={openPreview}
+              initialVisible={sectionInitialCounts.get(section.key) ?? 0}
             />
           ))}
 
@@ -195,6 +208,7 @@ export function AtlasWorkspace({
               onKeyDown={() => {}}
               searchQuery={q}
               onPreview={openPreview}
+              initialVisible={Math.min(INITIAL_LINK_CARD_BUDGET, zeroResultRecommendations.length)}
             />
           )}
         </div>

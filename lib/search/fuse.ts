@@ -18,6 +18,15 @@ const CACHE_TTL_MS = 60_000; // 60 秒
 
 let fuseCache: FuseCache | null = null;
 
+function hasActiveFilters(filters?: SearchFilters): boolean {
+  return Boolean(
+    (filters?.category && filters.category !== "all") ||
+    filters?.tagSlugs.length ||
+    filters?.minRating !== null && filters?.minRating !== undefined ||
+    filters?.popularity
+  );
+}
+
 function createFuse(FuseModule: typeof Fuse, links: NavLink[]): Fuse<NavLink> {
   return new FuseModule(links, {
     keys: [
@@ -68,8 +77,10 @@ export async function getSearchPool(
   }
   pool = applySearchFilters(pool, filters);
 
+  const isFullPool = (!category || category === "all") && !hasActiveFilters(filters);
+
   return {
-    fuse: createFuse(FuseModule, pool),
+    fuse: isFullPool && fuseCache ? fuseCache.fuse : createFuse(FuseModule, pool),
     links: pool,
     allLinks,
   };

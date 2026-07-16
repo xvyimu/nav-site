@@ -26,6 +26,8 @@ const eslintConfig = defineConfig([
     ".workbuddy/**",
     "next-phase-tasks/**",
     ".pipeline/**",
+    ".pytest_cache/**",
+    "**/__pycache__/**",
   ]),
 ]);
 

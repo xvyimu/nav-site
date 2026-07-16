@@ -17,6 +17,7 @@ import type { SearchParams } from "./types";
 export const MAX_QUERY_LENGTH = 120;
 export const MAX_LIMIT = 100;
 export const CATEGORY_SLUG_RE = /^[a-z0-9-]{1,50}$/;
+const REQUEST_ID_RE = /^[A-Za-z0-9._:-]{1,64}$/;
 
 export function badRequest(message: string, requestId?: string): NextResponse {
   return NextResponse.json(
@@ -29,7 +30,8 @@ export function badRequest(message: string, requestId?: string): NextResponse {
 }
 
 export function getRequestId(request: NextRequest): string {
-  return request.headers.get("x-request-id") || randomUUID();
+  const candidate = request.headers.get("x-request-id")?.trim();
+  return candidate && REQUEST_ID_RE.test(candidate) ? candidate : randomUUID();
 }
 
 export function hashQuery(q: string): string {

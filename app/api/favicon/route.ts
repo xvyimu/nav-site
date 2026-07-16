@@ -30,6 +30,9 @@ let proxyInitialized = false;
 
 const FAVICON_WINDOW_MS = 60_000;
 const FAVICON_MAX_PER_MIN = 120;
+const MAX_BODY_BYTES = 512 * 1024;
+const MIN_BODY_BYTES = 100;
+const UPSTREAM_TIMEOUT_MS = 3000;
 
 export const runtime = "nodejs";
 
@@ -49,6 +52,96 @@ async function getProxyDispatcher(): Promise<{ dispatcher?: unknown }> {
     }
   }
   return proxyDispatcher ? { dispatcher: proxyDispatcher } : {};
+}
+
+async function cancelBody(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // The body may already be closed or aborted.
+  }
+}
+
+async function readBodyWithinLimit(response: Response): Promise<Uint8Array> {
+  if (!response.body) throw new Error("favicon_body_missing");
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_BODY_BYTES) {
+        await reader.cancel("favicon_body_too_large");
+        throw new Error("favicon_body_too_large");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (total < MIN_BODY_BYTES) throw new Error("favicon_body_too_small");
+
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
+interface FaviconSource {
+  url: string;
+  label: string;
+}
+
+async function fetchFaviconSource(
+  source: FaviconSource,
+  dispatcherOption: { dispatcher?: unknown },
+  controllers: AbortController[]
+): Promise<{ body: Uint8Array; contentType: string; label: string }> {
+  const controller = new AbortController();
+  controllers.push(controller);
+  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(source.url, {
+      signal: controller.signal,
+      headers: { "User-Agent": "nav-site-favicon-proxy/1.0" },
+      redirect: "manual",
+      ...dispatcherOption,
+    });
+
+    if (!response.ok || (response.status >= 300 && response.status < 400)) {
+      await cancelBody(response);
+      throw new Error("favicon_upstream_invalid_status");
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.startsWith("image/")) {
+      await cancelBody(response);
+      throw new Error("favicon_upstream_invalid_type");
+    }
+
+    const contentLength = Number(response.headers.get("content-length") || 0);
+    if (contentLength > MAX_BODY_BYTES) {
+      await cancelBody(response);
+      throw new Error("favicon_body_too_large");
+    }
+
+    return {
+      body: await readBodyWithinLimit(response),
+      contentType,
+      label: source.label,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -92,56 +185,24 @@ export async function GET(request: NextRequest) {
     { url: `https://www.google.com/s2/favicons?domain=${domain}&sz=64`, label: "google-s2" },
   ];
 
-  const MAX_BODY_BYTES = 512 * 1024;
+  const controllers: AbortController[] = [];
+  try {
+    const result = await Promise.any(
+      sources.map((source) => fetchFaviconSource(source, dispatcherOption, controllers))
+    );
 
-  for (const { url, label } of sources) {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      const controller = new AbortController();
-      timer = setTimeout(() => controller.abort(), 3000);
-
-      const res = await fetch(url, {
-        signal: controller.signal,
-        headers: { "User-Agent": "nav-site-favicon-proxy/1.0" },
-        redirect: "manual",
-        ...dispatcherOption,
-      });
-
-      // 不跟随跨源 3xx（CDN 偶发 302 时跳过该源）
-      if (res.status >= 300 && res.status < 400) {
-        continue;
-      }
-
-      if (res.ok) {
-        const contentType = res.headers.get("content-type") || "";
-        // 仅放行 image/* 类型，防止非图片内容透传
-        if (!contentType.startsWith("image/")) {
-          continue;
-        }
-        const contentLength = Number(res.headers.get("content-length") || 0);
-        if (contentLength > MAX_BODY_BYTES) {
-          continue;
-        }
-        // 跳过过小的响应（通常是占位图或错误图标）
-        const buffer = await res.arrayBuffer();
-        if (buffer.byteLength < 100 || buffer.byteLength > MAX_BODY_BYTES) {
-          continue;
-        }
-
-        return new NextResponse(buffer, {
-          status: 200,
-          headers: {
-            "Content-Type": contentType,
-            "Cache-Control": "public, max-age=86400, s-maxage=604800",
-            "X-Favicon-Source": label,
-          },
-        });
-      }
-    } catch {
-      // 继续尝试下一个源
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
+    return new NextResponse(result.body, {
+      status: 200,
+      headers: {
+        "Content-Type": result.contentType,
+        "Cache-Control": "public, max-age=86400, s-maxage=604800",
+        "X-Favicon-Source": result.label,
+      },
+    });
+  } catch {
+    // All fixed upstream sources failed validation or timed out.
+  } finally {
+    for (const controller of controllers) controller.abort();
   }
 
   // 所有源都失败 — 返回 404，客户端显示 Globe 图标

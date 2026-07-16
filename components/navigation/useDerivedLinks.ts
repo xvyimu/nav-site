@@ -57,22 +57,19 @@ export function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
 
   const q = search.trim().toLowerCase();
 
-  const clientDescMap = useMemo(() => {
+  const descendantSlugsMap: Map<string, Set<string>> = useMemo(() => {
     const map = new Map<string, Set<string>>();
+    if (precomputed) {
+      for (const [slug, arr] of Object.entries(precomputed.descendantSlugsMap)) {
+        map.set(slug, new Set(arr));
+      }
+      return map;
+    }
     for (const cat of categories) {
       map.set(cat.slug, new Set(getDescendantSlugs(categories, cat.slug)));
     }
     return map;
-  }, [categories]);
-
-  const descendantSlugsMap: Map<string, Set<string>> = useMemo(() => {
-    if (!precomputed) return clientDescMap;
-    const map = new Map<string, Set<string>>();
-    for (const [slug, arr] of Object.entries(precomputed.descendantSlugsMap)) {
-      map.set(slug, new Set(arr));
-    }
-    return map;
-  }, [precomputed, clientDescMap]);
+  }, [precomputed, categories]);
 
   const tabKeys = useMemo(
     () => precomputed?.tabKeys ?? [
@@ -86,16 +83,16 @@ export function useDerivedLinks(params: DerivedLinksParams): DerivedLinksState {
 
   const tabCounts = useMemo(
     () => precomputed?.tabCounts ?? clientTabCounts(tabKeys, links, Object.fromEntries(
-      Array.from(clientDescMap.entries()).map(([k, v]) => [k, Array.from(v)])
+      Array.from(descendantSlugsMap.entries()).map(([k, v]) => [k, Array.from(v)])
     )),
-    [precomputed, tabKeys, links, clientDescMap],
+    [precomputed, tabKeys, links, descendantSlugsMap],
   );
 
   const tabTree = useMemo<SidebarTabNode[]>(
     () => precomputed?.tabTree ?? clientTabTree(categories, links, Object.fromEntries(
-      Array.from(clientDescMap.entries()).map(([k, v]) => [k, Array.from(v)])
+      Array.from(descendantSlugsMap.entries()).map(([k, v]) => [k, Array.from(v)])
     )),
-    [precomputed, categories, links, clientDescMap],
+    [precomputed, categories, links, descendantSlugsMap],
   );
 
   const availableTags = useMemo(

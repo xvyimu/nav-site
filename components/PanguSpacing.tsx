@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
+import pangu from "pangu/browser";
 
 /**
  * pangu.js — 自动在中英文之间添加空格
@@ -32,12 +33,11 @@ export function PanguSpacing() {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingTargets = useRef<Set<Element>>(new Set());
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false;
+    let observer: MutationObserver | null = null;
 
-    async function init() {
-      try {
-        const { default: pangu } = await import("pangu/browser");
+    try {
 
         function getObserverRoot() {
           return (
@@ -97,6 +97,10 @@ export function PanguSpacing() {
             }
           } catch {
             // 忽略个别节点的间距错误
+          } finally {
+            performance.clearMarks(`${label}-start`);
+            performance.clearMarks(`${label}-end`);
+            performance.clearMeasures(label);
           }
         }
 
@@ -108,7 +112,7 @@ export function PanguSpacing() {
         });
 
         // 监听动态内容变化（如搜索、筛选、路由切换），限定到主内容区。
-        const observer = new MutationObserver((mutations) => {
+        observer = new MutationObserver((mutations) => {
           if (cancelled) return;
           const root = getObserverRoot();
 
@@ -143,26 +147,20 @@ export function PanguSpacing() {
           childList: true,
           subtree: true,
         });
-
-        return () => {
-          observer.disconnect();
-          if (debounceTimer.current) clearTimeout(debounceTimer.current);
-        };
       } catch (e) {
         if (process.env.NODE_ENV === "development") {
           console.warn("[pangu]", e);
         }
       }
-    }
-
-    init();
 
     return () => {
       cancelled = true;
+      observer?.disconnect();
       if (rafId.current !== null) {
         cancelAnimationFrame(rafId.current);
       }
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      pendingTargets.current.clear();
     };
   }, []);
 

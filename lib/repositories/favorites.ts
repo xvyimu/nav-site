@@ -33,15 +33,16 @@ export async function addUserFavorites(
   linkIds: string[]
 ): Promise<{ added: number } | { error: string }> {
   const rows = linkIds.map((link_id) => ({ user_id: userId, link_id }));
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("user_favorites")
-    .upsert(rows, { onConflict: "user_id,link_id", ignoreDuplicates: true });
+    .upsert(rows, { onConflict: "user_id,link_id", ignoreDuplicates: true })
+    .select("link_id");
 
   if (error) {
     logger.error("addUserFavorites failed", { source: "repositories", userId, count: linkIds.length }, error);
     return { error: "添加收藏失败" };
   }
-  return { added: linkIds.length };
+  return { added: data?.length ?? 0 };
 }
 
 /** 删除单条收藏 */

@@ -7,8 +7,7 @@ import { useEffect, useState } from "react";
  *
  * 加载顺序：
  *   1. /api/favicon?domain=xxx&v=2
- *   2. Google s2 favicons
- *   3. null → 调用方 Globe
+ *   2. null → 调用方 Globe
  *
  * ResultGrid 窗口化后首屏挂载量下降；此处再限制同时 in-flight ≤ 6。
  */
@@ -62,12 +61,6 @@ async function resolveFavicon(domain: string): Promise<string | null> {
       if (await loadImage(proxyUrl)) {
         faviconCache.set(domain, proxyUrl);
         return proxyUrl;
-      }
-
-      const fallbackUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
-      if (await loadImage(fallbackUrl)) {
-        faviconCache.set(domain, fallbackUrl);
-        return fallbackUrl;
       }
 
       faviconCache.set(domain, null);

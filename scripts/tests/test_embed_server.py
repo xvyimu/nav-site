@@ -50,7 +50,7 @@ _single = _FakeEmbedArray([[0.1] * 512])
 _batch = _FakeEmbedArray([[0.1] * 512, [0.2] * 512])
 
 _fake_model = MagicMock()
-_fake_model.get_embedding_dimension.return_value = 512
+_fake_model.get_sentence_embedding_dimension.return_value = 512
 _fake_model.encode.return_value = _single
 
 
@@ -124,6 +124,9 @@ class TestEmbedQueryEndpoint:
 
 
 class TestHealthEndpoint:
+    def test_uses_lifespan_instead_of_deprecated_startup_handlers(self):
+        assert embed_server.app.router.on_startup == []
+
     def test_health_returns_model_info(self):
         _fake_model.reset_mock()
         resp = client.get("/health")

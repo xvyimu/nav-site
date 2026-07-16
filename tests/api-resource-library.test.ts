@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   loggerWarn: vi.fn(),
   loggerError: vi.fn(),
   getEmbedding: vi.fn(),
+  generateResourceEmbedding: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
@@ -25,6 +26,10 @@ vi.mock("@/lib/logger", () => ({
 
 vi.mock("@/lib/search/semantic", () => ({
   getEmbedding: mocks.getEmbedding,
+}));
+
+vi.mock("@/lib/search/embed-provider", () => ({
+  generateResourceEmbedding: mocks.generateResourceEmbedding,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -97,6 +102,7 @@ describe("resource library API routes", () => {
     mocks.loggerWarn.mockReset();
     mocks.loggerError.mockReset();
     mocks.getEmbedding.mockReset();
+    mocks.generateResourceEmbedding.mockReset();
   });
 
   afterEach(() => {
@@ -428,7 +434,7 @@ describe("resource library API routes", () => {
   it("embeds the query and proxies vector search with query_embedding", async () => {
     vi.stubEnv("RESOURCE_LIBRARY_API_KEY", "server-search-key");
     const embedding = makeEmbedding(512);
-    mocks.getEmbedding.mockResolvedValue(embedding);
+    mocks.generateResourceEmbedding.mockResolvedValue(embedding);
 
     const upstreamResults = [
       {
@@ -479,7 +485,8 @@ describe("resource library API routes", () => {
         rank: 0.87,
       },
     ]);
-    expect(mocks.getEmbedding).toHaveBeenCalledWith("好看的设计系统");
+    expect(mocks.generateResourceEmbedding).toHaveBeenCalledWith("好看的设计系统");
+    expect(mocks.getEmbedding).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(requestBodyFromFetchMock(fetchMock)).toEqual({
       query: "好看的设计系统",
@@ -492,7 +499,7 @@ describe("resource library API routes", () => {
   it("merges vector and FTS via RRF when mode is hybrid", async () => {
     vi.stubEnv("RESOURCE_LIBRARY_API_KEY", "server-search-key");
     const embedding = makeEmbedding(512);
-    mocks.getEmbedding.mockResolvedValue(embedding);
+    mocks.generateResourceEmbedding.mockResolvedValue(embedding);
 
     const vectorOnly = {
       id: "vector-only",
@@ -580,7 +587,7 @@ describe("resource library API routes", () => {
 
   it("falls back to FTS when vector mode cannot obtain a valid embedding", async () => {
     vi.stubEnv("RESOURCE_LIBRARY_API_KEY", "server-search-key");
-    mocks.getEmbedding.mockResolvedValue(null);
+    mocks.generateResourceEmbedding.mockResolvedValue(null);
 
     const fetchMock = vi.fn(async () =>
       new Response(

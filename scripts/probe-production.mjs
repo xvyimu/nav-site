@@ -8,12 +8,26 @@ const DEFAULT_RETRIES = 1;
 const DEFAULT_RETRY_DELAY_MS = 750;
 const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
 
+const NO_STORE_PATTERN = /(?:^|,)\s*no-store\b/i;
+
 const ENDPOINTS = [
   { name: "home", path: "/", contentType: /text\/html/i },
-  { name: "health", path: "/api/health", contentType: /application\/json/i, json: "health" },
-  { name: "search", path: "/api/search?q=ai&limit=5", contentType: /application\/json/i, json: "search" },
+  {
+    name: "health",
+    path: "/api/health",
+    contentType: /application\/json/i,
+    json: "health",
+    cacheControl: NO_STORE_PATTERN,
+  },
+  {
+    name: "search",
+    path: "/api/search?q=ai&limit=5",
+    contentType: /application\/json/i,
+    json: "search",
+    cacheControl: NO_STORE_PATTERN,
+  },
   { name: "tool-detail", path: "/tool/figma", contentType: /text\/html/i },
-  { name: "sitemap", path: "/sitemap.xml", contentType: /(application|text)\/xml/i },
+  { name: "sitemap", path: "/sitemap.xml", contentType: /(application|text)\/xml/i, text: "sitemap" },
   { name: "robots", path: "/robots.txt", contentType: /text\/plain/i },
 ];
 
@@ -257,8 +271,32 @@ export function validateSearchPayload(payload) {
     failures.push("expected numeric search total");
   }
 
+  if (payload?.total === 0) {
+    failures.push("expected at least one production search result");
+  }
+
   if (payload?.mode !== "fuse" && payload?.mode !== "semantic") {
     failures.push(`expected search mode fuse or semantic, got ${payload?.mode ?? "missing"}`);
+  }
+
+  return failures;
+}
+
+export function validateSitemapPayload(body) {
+  const failures = [];
+
+  if (!body || typeof body !== "string") {
+    failures.push("expected non-empty sitemap body string");
+    return failures;
+  }
+
+  if (!/<loc>/i.test(body)) {
+    failures.push("expected sitemap to include at least one URL");
+  }
+
+  const toolUrls = body.match(/<loc>[^<]*\/tool\/[^<]*<\/loc>/gi);
+  if (!toolUrls || toolUrls.length === 0) {
+    failures.push("expected sitemap to include at least one tool URL");
   }
 
   return failures;
@@ -287,6 +325,14 @@ async function readJson(response) {
   }
 }
 
+async function readText(response) {
+  try {
+    return { body: await response.text() };
+  } catch (error) {
+    return { failure: `invalid text response: ${errorMessage(error)}` };
+  }
+}
+
 async function probeEndpointOnce(endpoint, {
   baseUrl,
   timeoutMs,
@@ -305,6 +351,7 @@ async function probeEndpointOnce(endpoint, {
       signal: AbortSignal.timeout(timeoutMs),
     });
     const contentType = getHeader(response.headers, "content-type");
+    const cacheControl = getHeader(response.headers, "cache-control");
     const failures = [];
 
     if (!response.ok) {
@@ -313,6 +360,16 @@ async function probeEndpointOnce(endpoint, {
 
     if (endpoint.contentType && !endpoint.contentType.test(contentType)) {
       failures.push(`unexpected content-type ${contentType || "missing"}`);
+    }
+
+    if (endpoint.cacheControl) {
+      const pattern =
+        endpoint.cacheControl instanceof RegExp
+          ? endpoint.cacheControl
+          : new RegExp(String(endpoint.cacheControl), "i");
+      if (!pattern.test(cacheControl || "")) {
+        failures.push(`unexpected cache-control ${cacheControl || "missing"}`);
+      }
     }
 
     if (endpoint.json === "health") {
@@ -339,6 +396,15 @@ async function probeEndpointOnce(endpoint, {
         failures.push(failure);
       } else {
         failures.push(...validateSearchPayload(payload));
+      }
+    }
+
+    if (endpoint.text === "sitemap") {
+      const { body, failure } = await readText(response);
+      if (failure) {
+        failures.push(failure);
+      } else {
+        failures.push(...validateSitemapPayload(body));
       }
     }
 

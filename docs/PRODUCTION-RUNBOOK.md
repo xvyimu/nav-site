@@ -183,6 +183,114 @@ https://nav-site-kappa.vercel.app/api/health
 
 详见 `docs/embed-fly-deploy.md` · `docs/adr-008-remote-embed-endpoint.md`。
 
+### Cloudflare Workers AI 切换（nav 语义搜索 · S3）
+
+当前 512 维 embed-server 路径仍是默认回滚路径。切到 Cloudflare Workers AI 前，先执行 `scripts/migration-audit-s0-constraints.sql`，确认它已创建：
+
+- `nav_links.embedding_1024`
+- `idx_nav_links_embedding_1024`
+- `search_links_semantic_v2`
+- `batch_update_embeddings_v2`
+
+Vercel Production env（encrypted）：
+
+```text
+EMBED_PROVIDER=cloudflare
+CF_ACCOUNT_ID=<Cloudflare account id>
+CF_AI_API_TOKEN=<Workers AI token with ai:run>
+EMBED_DIM=1024
+EMBED_SEMANTIC_RPC=search_links_semantic_v2
+```
+
+回填顺序：
+
+```powershell
+rtk python scripts/backfill-embeddings.py --provider cloudflare --limit 5 --dry-run
+rtk python scripts/backfill-embeddings.py --provider cloudflare --dry-run
+# 确认目标库、env、费用和输出后再写入：
+rtk python scripts/backfill-embeddings.py --provider cloudflare --apply
+```
+
+### 回填命令参考
+
+```powershell
+# 默认 dry-run：不写入，仅打印行数
+python scripts/backfill-embeddings.py
+
+# 增量写入全部链接
+python scripts/backfill-embeddings.py --apply
+
+# 限制 N 条（调试用）
+python scripts/backfill-embeddings.py --apply --limit 50
+
+# 指定 provider（local / embed-server / cloudflare）
+python scripts/backfill-embeddings.py --provider cloudflare --apply
+
+# 覆盖维度与 RPC 名称
+python scripts/backfill-embeddings.py --dim 1024 --rpc batch_update_embeddings_v2 --apply
+
+# 覆盖 batch size（cloudflare 默认 25，local 默认 50）
+python scripts/backfill-embeddings.py --batch-size 10 --apply
+
+# 使用 checkpoint 续跑（自动检测 provider/RPC/dim 一致性）
+python scripts/backfill-embeddings.py --resume --apply
+# 默认 checkpoint 路径：.backfill-embeddings.checkpoint.json
+# 自定义路径：--checkpoint my-checkpoint.json
+
+# 忽略已有 checkpoint 强制重跑
+python scripts/backfill-embeddings.py --reset-checkpoint --apply
+
+# 指定 model 名称（override 默认模型名）
+python scripts/backfill-embeddings.py --provider local --model BAAI/bge-m3 --apply
+```
+
+### Checkpoint 机制
+
+- 每次成功 RPC write 后自动保存 `last_id` + `processed` 计数。
+- `--resume` 加载 checkpoint 时校验 provider / RPC 名 / dim 三者一致，不一致则报错拒绝续跑（防止误切背景后错误续跑）。
+- 追加 `--reset-checkpoint` 即可忽略已有 checkpoint 从头开始。
+- Checkpoint 文件不会自动删除，手动清理：`rm .backfill-embeddings.checkpoint.json`。
+
+### 回滚
+
+回填本质是幂等更新（`batch_update_embeddings` / `batch_update_embeddings_v2` RPC 写固定列）。如需回滚到旧嵌入：
+
+1. **Cloudflare 1024-d → 回退 embed-server 512-d：**
+   - 设置 Vercel env 为 `EMBED_PROVIDER=embed-server`、`EMBED_DIM=512`、`EMBED_SEMANTIC_RPC=search_links_semantic`。
+   - 恢复 `EMBED_SERVER_URL` / `EMBED_SERVER_API_KEY`。
+   - Redeploy 后运行 `python scripts/backfill-embeddings.py --provider local --apply` 重写 512-d 列。
+   - `embedding_1024` 列保留不动，不干扰旧路径。
+
+2. **全量替换（切换 provider）：**
+   - 新 provider 的 RPC 写入不同列（`embedding` 或 `embedding_1024`）。
+   - 只需 redeploy + 切换 env，无需删除旧列。旧列保留作为回退。
+
+3. **手动回滚一条链接：**
+   - 直接 `UPDATE nav_links SET embedding = NULL WHERE id = '<uuid>'`（不推荐，仅调试用）。
+
+Cloudflare 官方模型页确认 `@cf/baai/bge-m3` REST 调用使用 `https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/baai/bge-m3` 和 `{"text":[...]}` 输入；生产代码同时校验 `EMBED_DIM=1024`。回填脚本默认用 `batch_update_embeddings_v2` 写入 1024 维列，不覆盖旧 512 维 `embedding`。
+
+切换后验收：
+
+```powershell
+rtk pnpm run verify:production -- --require-embedding
+```
+
+回滚：把 Vercel env 改回 `EMBED_PROVIDER=embed-server`、`EMBED_DIM=512`、`EMBED_SEMANTIC_RPC=search_links_semantic`，恢复 `EMBED_SERVER_URL` / `EMBED_SERVER_API_KEY`，redeploy。`embedding_1024` 可以保留，不影响旧路径。
+
+### Upstash 分布式限流（S2）
+
+`/api/search`、`/api/favicon`、`/api/resource-search` 已接入 `lib/rate-limit-distributed.ts`。未配置 Upstash 时自动回退进程内桶；配置后跨 Vercel 实例使用 Upstash Redis REST 计数。
+
+Vercel Production env（encrypted）：
+
+```text
+UPSTASH_REDIS_REST_URL=<https://...upstash.io>
+UPSTASH_REDIS_REST_TOKEN=<token>
+```
+
+设置 env 后必须 redeploy。验收：先跑 `rtk pnpm test tests/rate-limit-distributed.test.ts`，线上用 `rtk pnpm run verify:production` 观察搜索、favicon、资源搜索均 2xx；若 Upstash 抖动，代码会 warn 并回退 memory，不阻断主站。
+
 ## 生产探针
 
 当前生产可用性：
@@ -225,7 +333,7 @@ rtk pnpm run verify:launch-readiness
 scripts/migration-audit-s0-constraints.sql
 ```
 
-幂等（IF NOT EXISTS / DROP IF EXISTS）；PART 2 建唯一索引前会**先合并历史重复 URL**（保留最早一行）。末尾 SELECT 校验三项索引/表存在。
+幂等（IF NOT EXISTS / CREATE OR REPLACE）；PART 2 建唯一索引前会先检测历史重复 URL，若存在重复组会中止并要求人工处理，**不会在迁移里静默删除生产行**。末尾 SELECT 校验表、索引、1024 维列与 v2 RPC 存在。
 
 **未执行时的降级行为（不崩）：** `click_rate_limits` 缺失 → 点击去重写失败仅 warn，计数可能重复但不 500；`nav_links.url` 无唯一索引 → 去重退化为应用层 `findExistingLinkByUrl` 查重（并发窗口可能漏）。执行后即恢复强一致。
 

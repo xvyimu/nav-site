@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getApprovedLinksForApi: vi.fn(),
+  queryApprovedLinksForApi: vi.fn(),
   getCategories: vi.fn(),
   getApprovedLinkBySlug: vi.fn(),
   getRelatedLinks: vi.fn(),
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/repositories", () => ({
   getApprovedLinksForApi: mocks.getApprovedLinksForApi,
+  queryApprovedLinksForApi: mocks.queryApprovedLinksForApi,
   getCategories: mocks.getCategories,
   getApprovedLinkBySlug: mocks.getApprovedLinkBySlug,
   getRelatedLinks: mocks.getRelatedLinks,
@@ -53,6 +55,7 @@ describe("tool detail slugs", () => {
     vi.clearAllMocks();
     mocks.getCategories.mockResolvedValue([]);
     mocks.getApprovedLinksForApi.mockResolvedValue([baseLink]);
+    mocks.queryApprovedLinksForApi.mockResolvedValue({ links: [baseLink], total: 1 });
     mocks.getApprovedLinkBySlug.mockResolvedValue(baseLink);
     mocks.getRelatedLinks.mockResolvedValue([]);
   });
@@ -68,6 +71,30 @@ describe("tool detail slugs", () => {
     expect(response.status).toBe(200);
     expect(body.tools[0].slug).toBe("openai-platform");
     expect(body.tools[0].detail_page).toBe("/tool/openai-platform");
+    expect(mocks.getCategories).not.toHaveBeenCalled();
+  });
+
+  it("/api/tools pushes filters, limit, and total counting into the repository", async () => {
+    mocks.queryApprovedLinksForApi.mockResolvedValue({ links: [baseLink], total: 17 });
+    const { GET } = await importFresh<typeof import("@/app/api/tools/route")>(
+      "@/app/api/tools/route"
+    );
+
+    const response = await GET(new NextRequest(
+      `http://localhost/api/tools?category=ai-tools&search=developer&limit=10&ids=${baseLink.id}`
+    ));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mocks.queryApprovedLinksForApi).toHaveBeenCalledWith({
+      category: "ai-tools",
+      search: "developer",
+      ids: [baseLink.id],
+      limit: 10,
+    });
+    expect(body.total).toBe(17);
+    expect(body.tools).toHaveLength(1);
+    expect(mocks.getCategories).not.toHaveBeenCalled();
   });
 
   it("related tool links prefer the database slug over the current title", async () => {
@@ -95,4 +122,3 @@ describe("tool detail slugs", () => {
     expect(html).not.toContain("/tool/related-tool-renamed");
   });
 });
-

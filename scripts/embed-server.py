@@ -24,12 +24,11 @@
 """
 
 import os, time, argparse, secrets
+from contextlib import asynccontextmanager
 from sentence_transformers import SentenceTransformer
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-
-app = FastAPI(title="nav-site embed service", version="1.2.1")
 
 # ── 配置 ──
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5")
@@ -68,6 +67,15 @@ def get_model() -> SentenceTransformer:
     return model
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    get_model()
+    yield
+
+
+app = FastAPI(title="nav-site embed service", version="1.2.1", lifespan=lifespan)
+
+
 def _extract_bearer(request: Request) -> str | None:
     auth = request.headers.get("authorization") or request.headers.get("Authorization")
     if not auth:
@@ -91,11 +99,6 @@ async def require_api_key(request: Request, call_next):
         if provided is None or not secrets.compare_digest(provided, EMBED_SERVER_API_KEY):
             return JSONResponse(status_code=401, content={"detail": "unauthorized"})
     return await call_next(request)
-
-
-@app.on_event("startup")
-def preload_model() -> None:
-    get_model()
 
 
 class EmbedRequest(BaseModel):

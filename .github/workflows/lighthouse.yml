@@ -30,8 +30,8 @@ jobs:
       - name: 生产构建
         run: pnpm build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SOURCE_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SOURCE_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.CI_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.CI_SUPABASE_ANON_KEY }}
 
       - name: 启动生产服务器
         run: |
@@ -46,7 +46,6 @@ jobs:
           curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:3264/favorites
 
       - name: 运行 Lighthouse CI
-        continue-on-error: true
         run: npx @lhci/cli@0.15.x autorun --config=./lighthouserc.json
 
       - name: 上传 Lighthouse 报告

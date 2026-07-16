@@ -60,7 +60,11 @@ export async function executeSearch({
   try {
     const { q, category, limit, semantic, filters } = params;
     const { terms, appliedSynonyms } = expandQueryTerms(q);
-    const { fuse, links, allLinks } = await adapters.getSearchPool(category, filters);
+    const shouldEmbed = semantic && q.length >= MIN_SEMANTIC_QUERY_LENGTH;
+    const [{ fuse, links, allLinks }, prefetchedEmbedding] = await Promise.all([
+      adapters.getSearchPool(category, filters),
+      shouldEmbed ? adapters.getEmbedding(q) : Promise.resolve(null),
+    ]);
     const facets = buildSearchFacets(allLinks, { ...filters, category });
     const suggestions = buildSearchSuggestions(q, allLinks, facets);
 
@@ -72,7 +76,7 @@ export async function executeSearch({
 
       return {
         status: 200,
-        headers: { "x-request-id": requestId },
+        headers: successHeaders(requestId),
         body: {
           results: [],
           total: 0,
@@ -96,7 +100,7 @@ export async function executeSearch({
       let fallbackReason: SemanticFallbackReason = null;
 
       if (q.length >= MIN_SEMANTIC_QUERY_LENGTH) {
-        const embedding = await adapters.getEmbedding(q);
+        const embedding = prefetchedEmbedding;
         if (embedding) {
           semanticResults = await adapters.searchSemantic(embedding, limit, category, linksById);
           semanticResults = semanticResults.filter((result) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, createContext, useContext, type ReactNode } from "react";
+import { useState, useCallback, useMemo, createContext, useContext, type ReactNode } from "react";
 
 interface ShellContextType {
   sidebarOpen: boolean;
@@ -19,11 +19,16 @@ export function useShell() {
 export function Shell({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const toggleSidebar = () => setSidebarOpen((v) => !v);
-  const closeSidebar = () => setSidebarOpen(false);
+  const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  const ctxValue = useMemo(
+    () => ({ sidebarOpen, toggleSidebar, closeSidebar }),
+    [sidebarOpen, toggleSidebar, closeSidebar],
+  );
 
   return (
-    <ShellContext.Provider value={{ sidebarOpen, toggleSidebar, closeSidebar }}>
+    <ShellContext.Provider value={ctxValue}>
       {/* 无障碍：跳转到主内容 */}
       <a
         href="#main-content"

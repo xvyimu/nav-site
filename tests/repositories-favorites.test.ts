@@ -72,16 +72,23 @@ describe("repositories/favorites", () => {
   });
 
   it("upserts favorites with a user/link uniqueness conflict target", async () => {
+    mockDb.setResponse("user_favorites", {
+      data: [{ link_id: "lnk-1" }],
+      error: null,
+    });
     const result = await addUserFavorites(
       mockDb as unknown as Parameters<typeof addUserFavorites>[0],
       "user-1",
-      ["lnk-1"]
+      ["lnk-1", "lnk-existing"]
     );
 
     expect(result).toEqual({ added: 1 });
     expect(mockDb.calls.user_favorites).toContainEqual([
       "upsert",
-      [{ user_id: "user-1", link_id: "lnk-1" }],
+      [
+        { user_id: "user-1", link_id: "lnk-1" },
+        { user_id: "user-1", link_id: "lnk-existing" },
+      ],
       { onConflict: "user_id,link_id", ignoreDuplicates: true },
     ]);
   });

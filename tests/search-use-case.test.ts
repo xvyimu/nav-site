@@ -155,7 +155,7 @@ describe("executeSearch", () => {
     vi.clearAllMocks();
   });
 
-  it("returns empty search experience without no-store for empty queries", async () => {
+  it("returns empty search experience with no-store for empty queries", async () => {
     const adapters = createAdapters();
 
     const result = await executeSearch({
@@ -167,7 +167,10 @@ describe("executeSearch", () => {
     const body = expectSuccessBody(result.body);
 
     expect(result.status).toBe(200);
-    expect(result.headers).toEqual({ "x-request-id": "req-empty" });
+    expect(result.headers).toEqual({
+      "Cache-Control": "no-store",
+      "x-request-id": "req-empty",
+    });
     expect(body).toMatchObject({
       results: [],
       total: 0,
@@ -262,6 +265,27 @@ describe("executeSearch", () => {
     expect(body.fallbackReason).toBe("semantic_empty");
     expect(adapters.searchSemantic).toHaveBeenCalled();
     expect(body.results.length).toBeGreaterThan(0);
+  });
+
+  it("starts embedding generation in parallel with loading the search pool", async () => {
+    let releasePool!: (value: Awaited<ReturnType<SearchAdapters["getSearchPool"]>>) => void;
+    const getSearchPool = vi.fn(() => new Promise<Awaited<ReturnType<SearchAdapters["getSearchPool"]>>>((resolve) => {
+      releasePool = resolve;
+    }));
+    const getEmbedding = vi.fn(async () => Array(512).fill(0.1));
+    const adapters = createAdapters({ getSearchPool, getEmbedding });
+
+    const pending = executeSearch({
+      params: makeParams({ q: "openai", semantic: true }),
+      requestId: "req-parallel",
+      adapters,
+    });
+    await Promise.resolve();
+
+    expect(getSearchPool).toHaveBeenCalledTimes(1);
+    expect(getEmbedding).toHaveBeenCalledWith("openai");
+    releasePool(await createSearchPoolAdapter()());
+    await pending;
   });
 
   it("excludes semantic candidates that fail active filters", async () => {

@@ -1,9 +1,26 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 
 const STORAGE_KEY = "nav-favorites";
+const SYNC_RETRY_DELAY_MS = 150;
+
+async function requestWithRetry(input: RequestInfo | URL, init: RequestInit): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+      if (response.ok) return true;
+      if (response.status !== 429 && response.status < 500) return false;
+    } catch {
+      // Retry one transient network failure.
+    }
+    if (attempt === 0) {
+      await new Promise((resolve) => setTimeout(resolve, SYNC_RETRY_DELAY_MS));
+    }
+  }
+  return false;
+}
 
 /** 收藏夹 Hook — localStorage 优先，登录后同步到服务端 */
 export function useFavorites() {
@@ -12,6 +29,7 @@ export function useFavorites() {
 
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [mounted, setMounted] = useState(false);
+  const favoritesRef = useRef<Set<string>>(new Set());
 
   // 持久化：写入 localStorage
   const persist = useCallback((next: Set<string>) => {
@@ -22,6 +40,12 @@ export function useFavorites() {
     }
   }, []);
 
+  const commitFavorites = useCallback((next: Set<string>) => {
+    favoritesRef.current = next;
+    setFavorites(next);
+    persist(next);
+  }, [persist]);
+
   // 初始化：从 localStorage 读取
   useEffect(() => {
     try {
@@ -29,83 +53,92 @@ export function useFavorites() {
       if (raw) {
         const ids = JSON.parse(raw) as string[];
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        setFavorites(new Set(ids));
+        commitFavorites(new Set(ids));
       }
     } catch {
       // 忽略解析错误
     }
     setMounted(true);
-  }, []);
+  }, [commitFavorites]);
 
   // 登录后：从服务端拉取收藏并合并到 localStorage
   useEffect(() => {
-    if (status !== "authenticated" || !userId) return;
+    if (!mounted || status !== "authenticated" || !userId) return;
 
     let cancelled = false;
-    fetch("/api/favorites")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (cancelled || !data?.favorites) return;
-        const serverIds = data.favorites as string[];
-        setFavorites((prev) => {
-          const merged = new Set(prev);
-          for (const id of serverIds) {
-            merged.add(id);
-          }
-          persist(merged);
-          return merged;
-        });
-      })
-      .catch(() => {
-        // 网络错误时仅使用本地数据
-      });
+    void (async () => {
+      try {
+        const response = await fetch("/api/favorites");
+        if (!response.ok) return;
+        const data = await response.json();
+        if (cancelled || !Array.isArray(data?.favorites)) return;
 
-    return () => { cancelled = true; };
-  }, [status, userId, persist]);
+        const local = new Set(favoritesRef.current);
+        const serverIds = (data.favorites as unknown[]).filter(
+          (value): value is string => typeof value === "string"
+        );
+        const merged = new Set([...local, ...serverIds]);
+        commitFavorites(merged);
 
-  const toggleFavorite = useCallback((linkId: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      const isAdding = !next.has(linkId);
-      if (isAdding) {
-        next.add(linkId);
-      } else {
-        next.delete(linkId);
-      }
-      persist(next);
-
-      // 登录时同步到服务端（fire-and-forget）
-      if (userId) {
-        if (isAdding) {
-          fetch("/api/favorites", {
+        const serverSet = new Set(serverIds);
+        const localOnly = [...local].filter((id) => !serverSet.has(id));
+        if (localOnly.length > 0) {
+          await requestWithRetry("/api/favorites", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ linkIds: [linkId] }),
-          }).catch(() => {});
-        } else {
-          fetch(`/api/favorites?linkId=${encodeURIComponent(linkId)}`, {
-            method: "DELETE",
-          }).catch(() => {});
+            body: JSON.stringify({ linkIds: localOnly }),
+          });
         }
+      } catch {
+        // Network errors keep the local source of truth intact.
       }
+    })();
 
-      return next;
+    return () => { cancelled = true; };
+  }, [mounted, status, userId, commitFavorites]);
+
+  const toggleFavorite = useCallback((linkId: string) => {
+    const next = new Set(favoritesRef.current);
+    const isAdding = !next.has(linkId);
+    if (isAdding) next.add(linkId);
+    else next.delete(linkId);
+    commitFavorites(next);
+
+    if (!userId) return;
+    const input = isAdding
+      ? "/api/favorites"
+      : `/api/favorites?linkId=${encodeURIComponent(linkId)}`;
+    const init: RequestInit = isAdding
+      ? {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ linkIds: [linkId] }),
+        }
+      : { method: "DELETE" };
+
+    void requestWithRetry(input, init).then((ok) => {
+      if (ok || favoritesRef.current.has(linkId) !== isAdding) return;
+      const rollback = new Set(favoritesRef.current);
+      if (isAdding) rollback.delete(linkId);
+      else rollback.add(linkId);
+      commitFavorites(rollback);
     });
-  }, [persist, userId]);
+  }, [commitFavorites, userId]);
 
   const isFavorite = useCallback((linkId: string) => favorites.has(linkId), [favorites]);
 
   const clearFavorites = useCallback(() => {
-    setFavorites(new Set());
-    persist(new Set());
+    const previous = new Set(favoritesRef.current);
+    commitFavorites(new Set());
 
-    // 登录时清空服务端收藏
     if (userId) {
-      fetch("/api/favorites?all=true", {
+      void requestWithRetry("/api/favorites?all=true", {
         method: "DELETE",
-      }).catch(() => {});
+      }).then((ok) => {
+        if (!ok && favoritesRef.current.size === 0) commitFavorites(previous);
+      });
     }
-  }, [persist, userId]);
+  }, [commitFavorites, userId]);
 
   return useMemo(() => ({
     favorites,

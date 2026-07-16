@@ -85,7 +85,12 @@ export function useServerSearch(params: ServerSearchParams): ServerSearchState {
         if (minRatingFilter !== null) sp.set("minRating", String(minRatingFilter));
         if (popularityFilter) sp.set("popularity", popularityFilter);
         const res = await fetch(`/api/search?${sp}`, { signal: controller.signal });
-        if (res.ok) {
+        if (!res.ok) {
+          setServerResults([]);
+          setSearchFacets(EMPTY_SEARCH_FACETS);
+          setSearchSuggestions([]);
+          setZeroResultRecommendations([]);
+        } else {
           const data = await res.json();
           const mapped: NavLink[] = (data.results || []).map((r: Record<string, unknown>) => ({
             id: r.id as string,

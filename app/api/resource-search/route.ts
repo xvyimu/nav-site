@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
-import { getEmbedding } from "@/lib/search/semantic";
+import { generateResourceEmbedding } from "@/lib/search/embed-provider";
 import { mergeResourceHybrid } from "@/lib/resource-search-merge";
 import { checkDistributedRateLimit } from "@/lib/rate-limit-distributed";
 import { getClientIp } from "@/lib/utils";
@@ -160,7 +160,7 @@ export async function POST(request: Request) {
   let queryEmbedding: number[] | undefined;
 
   if (requestedMode === "vector" || requestedMode === "hybrid") {
-    const embedding = await getEmbedding(query);
+    const embedding = await generateResourceEmbedding(query);
     const dim = Array.isArray(embedding) ? embedding.length : 0;
     if (!isValidEmbedding(embedding)) {
       logger.warn("Resource vector embed unavailable, falling back to FTS", {

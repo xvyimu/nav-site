@@ -21,6 +21,7 @@ export {
   getAllApprovedLinkSlugs,
   getRelatedLinks,
   getApprovedLinksForApi,
+  queryApprovedLinksForApi,
 } from "@/lib/repositories/links";
 
 export {

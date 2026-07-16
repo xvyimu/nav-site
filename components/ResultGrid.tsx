@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { type NavLink } from "@/lib/types";
 import { LinkCard } from "./LinkCard";
 import { Button } from "@/components/ui/button";
@@ -18,8 +18,8 @@ interface ResultGridProps {
   pageSize?: number;
 }
 
-const DEFAULT_INITIAL = 40;
-const DEFAULT_PAGE = 40;
+const DEFAULT_INITIAL = 24;
+const DEFAULT_PAGE = 24;
 
 /**
  * 可键盘导航的链接卡片网格 + 渐进挂载（降低首屏 DOM/favicon 扇出）。
@@ -69,11 +69,32 @@ function ResultGridInner({
   pageSize = DEFAULT_PAGE,
 }: ResultGridProps) {
   const [visibleCount, setVisibleCount] = useState(initialVisible);
+  const rootRef = useRef<HTMLDivElement>(null);
   const visible = links.slice(0, visibleCount);
   const hasMore = visibleCount < links.length;
 
+  useEffect(() => {
+    if (visibleCount > 0 || links.length === 0) return;
+    const root = rootRef.current;
+    if (!root || typeof IntersectionObserver === "undefined") {
+      setVisibleCount(Math.min(pageSize, links.length));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setVisibleCount(Math.min(pageSize, links.length));
+        observer.disconnect();
+      },
+      { rootMargin: "240px 0px" }
+    );
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [links.length, pageSize, visibleCount]);
+
   return (
-    <div className="space-y-3">
+    <div ref={rootRef} className="space-y-3">
       <div
         className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
         role="list"

@@ -38,14 +38,17 @@ describe("CI workflow launch behavior", () => {
     const buildSteps = [
       ...ci.matchAll(/- name: 生产构建\s+run: pnpm run build\s+env:[\s\S]*?(?=\n\s+- name:)/g),
     ].map((match) => match[0]);
-    const serviceRoleEnvLines = ci.match(/^\s+RESOURCE_LIBRARY_SERVICE_ROLE_KEY:/gm) ?? [];
 
-    expect(buildSteps).toHaveLength(2);
-    expect(serviceRoleEnvLines).toHaveLength(1);
+    // e2e 的 build step 已替换为下载 artifact，因此只有一个生产构建 step
+    expect(buildSteps).toHaveLength(1);
     for (const step of buildSteps) {
       expect(step).not.toContain("RESOURCE_LIBRARY_SERVICE_ROLE_KEY");
       expect(step).not.toContain("NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY");
     }
+
+    // SERVICE_ROLE_KEY 应仅在 start/server 环境出现（e2e 需要），不在 build 中
+    const serviceRoleLines = ci.match(/^\s+RESOURCE_LIBRARY_SERVICE_ROLE_KEY:/gm) ?? [];
+    expect(serviceRoleLines.length).toBeGreaterThanOrEqual(1);
     expect(ci).not.toContain("NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY");
     expect(lighthouse).not.toContain("RESOURCE_LIBRARY_SERVICE_ROLE_KEY");
     expect(lighthouse).not.toContain("NEXT_PUBLIC_RESOURCE_LIBRARY_API_KEY");

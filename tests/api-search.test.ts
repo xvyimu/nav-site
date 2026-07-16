@@ -205,6 +205,20 @@ describe("/api/search", () => {
     expect(JSON.stringify(loggerInfo.mock.calls)).not.toContain("openai");
   });
 
+  it("replaces an untrusted oversized request id", async () => {
+    const { GET } = await import("@/app/api/search/route");
+    const untrusted = "x".repeat(200);
+    const response = await GET(
+      new NextRequest("http://localhost/api/search?q=openai", {
+        headers: { "x-request-id": untrusted },
+      })
+    );
+
+    const requestId = response.headers.get("x-request-id");
+    expect(requestId).not.toBe(untrusted);
+    expect(requestId).toMatch(/^[a-f0-9-]{36}$/);
+  });
+
   it("returns facets, suggestions, highlights, and explanations", async () => {
     const { GET } = await import("@/app/api/search/route");
     const response = await GET(

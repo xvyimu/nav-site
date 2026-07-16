@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   getCategories, getApprovedLinks, getApprovedLinkBySlug, getAllApprovedLinkSlugs,
-  getRelatedLinks, getApprovedLinksForApi, getToolReviews, getReviewStats,
+  getRelatedLinks, getApprovedLinksForApi, queryApprovedLinksForApi, getToolReviews, getReviewStats,
   hasUserReviewed, createReview, checkReviewRateLimit, recordReviewAttempt,
   getAllLinksForAdmin, createLink, updateLink, deleteLink,
   getAllCategoriesForAdmin, createCategory, updateCategory, deleteCategory,
@@ -42,6 +42,14 @@ class MockDB {
     this._lastTable = table;
     (this._calls[table] ||= []).push({ table, args: ["from"] });
     return this;
+  }
+  rpc(name: string, args?: unknown) {
+    this._lastTable = `rpc:${name}`;
+    (this._calls[this._lastTable] ||= []).push({
+      table: this._lastTable,
+      args: ["rpc", args],
+    });
+    return Promise.resolve(this._resp());
   }
   select(_c?: string) { this._call("select", _c); return this; }
   eq(c: string, v: unknown) { this._call("eq", c, v); return this; }
@@ -146,6 +154,7 @@ const mockLinkRow = {
   id: "lnk-1", title: "ChatGPT", url: "https://chat.openai.com/", description: "AI chat",
   category_id: "cat-1", approved: true, paid: false, featured: true,
   created_at: "2026-01-01", updated_at: "2026-01-01", click_count: 10,
+  embedding: [0.1, 0.2], embedding_1024: [0.3, 0.4],
   nav_categories: { name: "AI", slug: "ai" },
 };
 const mockTagRow = { id: "tag-1", name: "Hot", slug: "hot", created_at: "2026-01-01" };
@@ -226,6 +235,12 @@ describe("repositories · 链接", () => {
     const result = await getApprovedLinks();
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe("ChatGPT");
+    expect(result[0]).not.toHaveProperty("embedding");
+    expect(result[0]).not.toHaveProperty("embedding_1024");
+
+    const selectCall = db.callsFor("nav_links").find((call) => call.args[0] === "select");
+    expect(selectCall?.args[1]).not.toContain("*");
+    expect(selectCall?.args[1]).not.toContain("embedding");
   });
 
   it("getApprovedLinks 标签表缺失时降级为空标签", async () => {
@@ -303,12 +318,47 @@ describe("repositories · 链接", () => {
     const db = freshMocks();
     db.setResponse("nav_links", { data: [mockLinkRow], error: null });
     expect(await getApprovedLinksForApi("ai")).toHaveLength(1);
+
+    const selectCall = db.callsFor("nav_links").find((call) => call.args[0] === "select");
+    expect(selectCall?.args[1]).toContain("nav_categories!inner(name, slug)");
   });
 
   it("getApprovedLinksForApi all 回退", async () => {
     const db = freshMocks();
     db.setResponse("nav_links", { data: [mockLinkRow], error: null });
     expect(await getApprovedLinksForApi("all")).toHaveLength(1);
+  });
+
+  it("queryApprovedLinksForApi pushes filters and count into the database RPC", async () => {
+    const db = freshMocks();
+    db.setResponse("rpc:list_public_tools", {
+      data: [{
+        ...mockLinkRow,
+        category_name: "AI",
+        category_slug: "ai",
+        total_count: 12,
+      }],
+      error: null,
+    });
+
+    const result = await queryApprovedLinksForApi({
+      category: "ai",
+      search: "chat",
+      ids: ["lnk-1"],
+      limit: 10,
+    });
+
+    expect(result.total).toBe(12);
+    expect(result.links[0].category_name).toBe("AI");
+    expect(db.callsFor("rpc:list_public_tools")[0]?.args).toEqual([
+      "rpc",
+      {
+        p_category_slug: "ai",
+        p_ids: ["lnk-1"],
+        p_search: "chat",
+        p_limit: 10,
+      },
+    ]);
   });
 
   it("findExistingLinkByUrl 命中", async () => {
@@ -472,7 +522,10 @@ describe("repositories · 用户收藏", () => {
 
   it("addUserFavorites 成功", async () => {
     const db = freshMocks();
-    db.setResponse("user_favorites", { data: null, error: null });
+    db.setResponse("user_favorites", {
+      data: [{ link_id: "lnk-1" }, { link_id: "lnk-2" }],
+      error: null,
+    });
     const result = await addUserFavorites(asClient(db), "u1", ["lnk-1", "lnk-2"]);
     expect(result).toEqual({ added: 2 });
   });

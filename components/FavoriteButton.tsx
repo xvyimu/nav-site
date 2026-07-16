@@ -4,7 +4,7 @@ import { memo } from "react";
 import { Heart } from "lucide-react";
 import {
   useFavoritesActions,
-  useFavoritesState,
+  useFavoriteMembership,
 } from "@/components/FavoritesProvider";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,9 +18,8 @@ import { cn } from "@/lib/utils";
  * 独立订阅 isFavorite(id)，避免整卡随任意收藏变更重渲染。
  */
 function FavoriteButtonComponent({ linkId }: { linkId: string }) {
-  const { favorites } = useFavoritesState();
   const { toggleFavorite } = useFavoritesActions();
-  const fav = favorites.has(linkId);
+  const fav = useFavoriteMembership(linkId);
 
   return (
     <Tooltip>

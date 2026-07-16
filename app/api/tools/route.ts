@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApprovedLinksForApi, getCategories } from "@/lib/repositories";
+import { queryApprovedLinksForApi } from "@/lib/repositories";
 import { slugify } from "@/lib/slugify";
 import { logger } from "@/lib/logger";
 import { toolsQuerySchema } from "@/lib/schemas";
@@ -35,46 +35,22 @@ export async function GET(request: NextRequest) {
     }
 
     const category = zodResult.data.category ?? undefined;
-    const search = zodResult.data.search?.toLowerCase();
+    const search = zodResult.data.search;
     const idsParam = zodResult.data.ids;
     const ids = idsParam ? idsParam.split(",").filter(Boolean) : undefined;
 
-    const [links, categories] = await Promise.all([
-      withTimeout(getApprovedLinksForApi(category), FETCH_TIMEOUT).catch(() => {
-        logger.warn("API: getApprovedLinksForApi timed out");
-        return [];
-      }),
-      withTimeout(getCategories(), FETCH_TIMEOUT).catch(() => []),
-    ]);
-
-    let result = links;
-
-    // 关键词搜索
-    if (search) {
-      result = result.filter(
-        (l) =>
-          l.title.toLowerCase().includes(search) ||
-          l.description?.toLowerCase().includes(search) ||
-          l.category_name?.toLowerCase().includes(search)
-      );
-    }
-
-    // 按 ID 批量查询（收藏页使用）
-    if (ids && ids.length > 0) {
-      const idSet = new Set(ids);
-      result = result.filter((l) => idSet.has(l.id));
-    }
-
     // 默认 limit=50（schema default），硬顶 100
     const limit = Math.min(zodResult.data.limit ?? 50, 100);
-    result = result.slice(0, limit);
-
-    // 构建分类映射
-    const categoryMap = new Map(categories.map((c) => [c.id, c]));
+    const { links, total } = await withTimeout(
+      queryApprovedLinksForApi({ category, search, ids, limit }),
+      FETCH_TIMEOUT
+    ).catch(() => {
+      logger.warn("API: queryApprovedLinksForApi timed out");
+      return { links: [], total: 0 };
+    });
 
     // 格式化为 Agent 友好的结构化数据
-    const tools = result.map((link) => {
-      const category = link.category_id ? categoryMap.get(link.category_id) : null;
+    const tools = links.map((link) => {
       const detailSlug = link.slug || slugify(link.title);
       return {
         id: link.id,
@@ -83,11 +59,11 @@ export async function GET(request: NextRequest) {
         url: link.url,
         description: link.description || "",
         icon: link.icon || "",
-        category: category
+        category: link.category_id && link.category_name && link.category_slug
           ? {
-              id: category.id,
-              name: category.name,
-              slug: category.slug,
+              id: link.category_id,
+              name: link.category_name,
+              slug: link.category_slug,
             }
           : null,
         tags: [link.featured ? "featured" : null, link.paid ? "paid" : null].filter(
@@ -100,7 +76,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        total: tools.length,
+        total,
         category: category || "all",
         tools,
       },

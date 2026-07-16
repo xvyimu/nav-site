@@ -34,6 +34,10 @@ describe("/api/health", () => {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
     delete process.env.EMBED_SERVER_URL;
     delete process.env.EMBED_SERVER_API_KEY;
+    delete process.env.EMBED_PROVIDER;
+    delete process.env.EMBED_DIM;
+    delete process.env.CF_ACCOUNT_ID;
+    delete process.env.CF_AI_API_TOKEN;
     delete process.env.RESOURCE_LIBRARY_ANON_KEY;
     delete process.env.RESOURCE_LIBRARY_SUPABASE_ANON_KEY;
     supabaseSelect.mockResolvedValue({ count: 3, error: null });
@@ -45,6 +49,10 @@ describe("/api/health", () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     delete process.env.EMBED_SERVER_URL;
     delete process.env.EMBED_SERVER_API_KEY;
+    delete process.env.EMBED_PROVIDER;
+    delete process.env.EMBED_DIM;
+    delete process.env.CF_ACCOUNT_ID;
+    delete process.env.CF_AI_API_TOKEN;
     delete process.env.RESOURCE_LIBRARY_ANON_KEY;
     delete process.env.RESOURCE_LIBRARY_SUPABASE_ANON_KEY;
     delete process.env.EMBED_SERVER_LOOPBACK_ENABLED;
@@ -95,6 +103,35 @@ describe("/api/health", () => {
     expect(body.checks.database.status).toBe("ok");
     expect(body.checks.embedding.status).toBe("ok");
     expect(body.checks.embedding.detail).toBe("embed service reachable");
+  });
+
+  it("probes Cloudflare Workers AI and validates the configured vector dimension", async () => {
+    process.env.EMBED_PROVIDER = "cloudflare";
+    process.env.EMBED_DIM = "1024";
+    process.env.CF_ACCOUNT_ID = "account-id";
+    process.env.CF_AI_API_TOKEN = "cf-secret";
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ result: { data: [Array.from({ length: 1024 }, () => 0.01)] } }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { GET } = await import("@/app/api/health/route");
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.checks.embedding).toMatchObject({
+      status: "ok",
+      detail: "cloudflare embedding ready (1024-d)",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.cloudflare.com/client/v4/accounts/account-id/ai/run/@cf/baai/bge-m3",
+      expect.objectContaining({ method: "POST" })
+    );
+    expect(JSON.stringify(body)).not.toContain("cf-secret");
   });
 
   it("keeps the app healthy but marks embedding as error when the embed service is down", async () => {

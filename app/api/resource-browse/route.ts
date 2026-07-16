@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
-import { logger } from "@/lib/logger";
 import { z } from "zod";
-import {
-  RESOURCE_LIBRARY_SAFE_PAGE_COLUMNS,
-  createResourceLibraryReadClient,
-} from "@/lib/resource-library/client";
+import { browseResources } from "@/lib/resource-library/browse";
 
 // 资源库浏览 API
 // 优先用资源库 anon key 读取公开 view；未配置时才退回 service_role。
 // 搜索场景走 /api/resource-search 代理；浏览（首屏、分类浏览）走本路由。
 
-const BROWSE_TIMEOUT_MS = 5000;
 const BROWSE_CACHE_CONTROL =
   "public, max-age=60, s-maxage=300, stale-while-revalidate=600";
 
@@ -22,72 +17,27 @@ const browseSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const read = createResourceLibraryReadClient();
-  if (!read) {
-    return NextResponse.json({ error: "资源浏览服务未配置" }, { status: 503 });
-  }
-
-  try {
-    const { searchParams } = new URL(request.url);
-    const parsed = browseSchema.safeParse({
-      category: searchParams.get("category") || undefined,
-      limit: searchParams.get("limit") ?? undefined,
-    });
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "参数错误", details: parsed.error.flatten().fieldErrors },
-        { status: 400 }
-      );
-    }
-    const { category, limit } = parsed.data;
-
-    let q = read.client
-      .from(read.pagesSource)
-      .select(RESOURCE_LIBRARY_SAFE_PAGE_COLUMNS)
-      .order("crawled_at", { ascending: false })
-      .limit(limit);
-
-    if (category) q = q.eq("category", category);
-
-    const { data, error } = await q.abortSignal(AbortSignal.timeout(BROWSE_TIMEOUT_MS));
-    if (error) {
-      logger.warn("Resource browse query failed", {
-        source: "resource-browse",
-        code: error.code,
-      });
-      return NextResponse.json({ error: "读取资源失败" }, { status: 500 });
-    }
-
-    const normalized = (data ?? []).map((r: {
-      id: string;
-      title: string;
-      url: string;
-      domain: string;
-      summary?: string | null;
-      category?: string | null;
-      tags?: string[] | null;
-      crawled_at?: string | null;
-    }) => ({
-      id: r.id,
-      title: r.title,
-      url: r.url,
-      domain: r.domain,
-      summary: r.summary ?? "",
-      category: r.category ?? "Other",
-      tags: r.tags ?? [],
-      crawled_at: r.crawled_at ?? "",
-      rank: 0,
-    }));
-
+  const { searchParams } = new URL(request.url);
+  const parsed = browseSchema.safeParse({
+    category: searchParams.get("category") || undefined,
+    limit: searchParams.get("limit") ?? undefined,
+  });
+  if (!parsed.success) {
     return NextResponse.json(
-      { results: normalized },
-      { headers: { "Cache-Control": BROWSE_CACHE_CONTROL } }
+      { error: "参数错误", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
     );
-  } catch (e) {
-    logger.warn("Resource browse request failed", {
-      source: "resource-browse",
-      error: e instanceof Error ? e.message : String(e),
-    });
-    return NextResponse.json({ error: "服务器错误" }, { status: 500 });
   }
+
+  const result = await browseResources(parsed.data);
+  if (!result.ok) {
+    const status = result.reason === "not_configured" ? 503 : 500;
+    const error = result.reason === "not_configured" ? "资源浏览服务未配置" : "读取资源失败";
+    return NextResponse.json({ error }, { status });
+  }
+
+  return NextResponse.json(
+    { results: result.results },
+    { headers: { "Cache-Control": BROWSE_CACHE_CONTROL } }
+  );
 }

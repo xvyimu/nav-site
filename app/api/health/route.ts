@@ -11,6 +11,11 @@ import {
   RESOURCE_LIBRARY_URL,
   getResourceLibraryAnonKey,
 } from "@/lib/resource-library/client";
+import {
+  generateEmbedding,
+  resolveEmbedProvider,
+  resolveExpectedDim,
+} from "@/lib/search/embed-provider";
 
 const EMBED_HEALTH_TIMEOUT_MS = 8000;
 const RESOURCE_LIBRARY_HEALTH_TIMEOUT_MS = 1500;
@@ -55,6 +60,77 @@ function getEmbedHealthEndpoint() {
     raw: process.env.EMBED_SERVER_URL,
     path: "/health",
   });
+}
+
+function isValidVector(value: number[] | null, expectedDim: number): value is number[] {
+  return (
+    Array.isArray(value) &&
+    value.length === expectedDim &&
+    value.every((item) => typeof item === "number" && Number.isFinite(item))
+  );
+}
+
+async function checkEmbeddingHealth(): Promise<HealthCheck> {
+  const start = Date.now();
+  const provider = resolveEmbedProvider();
+
+  if (provider === "cloudflare") {
+    const expectedDim = resolveExpectedDim();
+    try {
+      const { vector } = await generateEmbedding("nav-site health probe");
+      if (!isValidVector(vector, expectedDim)) {
+        return {
+          status: "error",
+          latency_ms: Date.now() - start,
+          detail: `cloudflare embedding invalid (expected ${expectedDim}-d)`,
+        };
+      }
+      return {
+        status: "ok",
+        latency_ms: Date.now() - start,
+        detail: `cloudflare embedding ready (${expectedDim}-d)`,
+      };
+    } catch (e) {
+      return {
+        status: "error",
+        latency_ms: Date.now() - start,
+        detail: e instanceof Error
+          ? "cloudflare embedding unavailable"
+          : "cloudflare embedding unavailable",
+      };
+    }
+  }
+
+  const { endpoint, reason } = getEmbedHealthEndpoint();
+  if (endpoint === null) {
+    return {
+      status: "skipped",
+      latency_ms: Date.now() - start,
+      detail: describeEmbedSkipReason(reason),
+    };
+  }
+
+  try {
+    const response = await fetch(endpoint, {
+      headers: buildEmbedRequestHeaders({ json: false }),
+      signal: AbortSignal.timeout(EMBED_HEALTH_TIMEOUT_MS),
+    });
+    return {
+      status: response.ok ? "ok" : "error",
+      latency_ms: Date.now() - start,
+      detail: response.ok
+        ? "embed service reachable"
+        : `embed service returned ${response.status}; semantic search will fall back`,
+    };
+  } catch (e) {
+    return {
+      status: "error",
+      latency_ms: Date.now() - start,
+      detail: e instanceof Error
+        ? "embed service unavailable; semantic search will fall back"
+        : "embed service unavailable; semantic search will fall back",
+    };
+  }
 }
 
 async function checkResourceLibrarySearchHealth(): Promise<HealthCheck> {
@@ -125,7 +201,7 @@ export async function GET() {
       checks.database = {
         status: "error",
         latency_ms: Date.now() - dbStart,
-        detail: error.message,
+        detail: "database query failed"
       };
       healthy = false;
     } else {
@@ -139,7 +215,7 @@ export async function GET() {
     checks.database = {
       status: "error",
       latency_ms: Date.now() - dbStart,
-      detail: e instanceof Error ? e.message : "unknown",
+      detail: e instanceof Error ? "database query failed" : "unknown",
     };
     healthy = false;
   }
@@ -166,46 +242,12 @@ export async function GET() {
     detail: process.env.NEXT_PUBLIC_SENTRY_DSN ? "configured" : "not configured (optional)",
   };
 
-  const embedStart = Date.now();
-  const { endpoint: embedEndpoint, reason: embedSkipReason } = getEmbedHealthEndpoint();
-  if (embedEndpoint === null) {
-    checks.embedding = {
-      status: "skipped",
-      latency_ms: Date.now() - embedStart,
-      detail: describeEmbedSkipReason(embedSkipReason),
-    };
-  } else {
-    try {
-      const response = await fetch(embedEndpoint, {
-        headers: buildEmbedRequestHeaders({ json: false }),
-        signal: AbortSignal.timeout(EMBED_HEALTH_TIMEOUT_MS),
-      });
-      checks.embedding = {
-        status: response.ok ? "ok" : "error",
-        latency_ms: Date.now() - embedStart,
-        detail: response.ok
-          ? "embed service reachable"
-          : `embed service returned ${response.status}; semantic search will fall back`,
-      };
-      // 默认 embedding 失败不拖垮全局 healthy；生产探针可设 HEALTH_REQUIRE_EMBEDDING=1
-      if (
-        !response.ok &&
-        process.env.HEALTH_REQUIRE_EMBEDDING === "1"
-      ) {
-        healthy = false;
-      }
-    } catch (e) {
-      checks.embedding = {
-        status: "error",
-        latency_ms: Date.now() - embedStart,
-        detail: e instanceof Error
-          ? `embed service unavailable: ${e.message}`
-          : "embed service unavailable; semantic search will fall back",
-      };
-      if (process.env.HEALTH_REQUIRE_EMBEDDING === "1") {
-        healthy = false;
-      }
-    }
+  checks.embedding = await checkEmbeddingHealth();
+  if (
+    checks.embedding.status === "error" &&
+    process.env.HEALTH_REQUIRE_EMBEDDING === "1"
+  ) {
+    healthy = false;
   }
 
   checks.resourceLibrarySearch = await checkResourceLibrarySearchHealth();
