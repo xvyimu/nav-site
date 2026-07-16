@@ -232,7 +232,8 @@ function mapPublicToolRpcRow(row: PublicToolRpcRow): NavLink {
  * Query the public tools API projection in one database call.
  *
  * `list_public_tools` applies filters, limit, and window-counting in Postgres.
- * During rolling deployment, a missing RPC falls back to the legacy read path.
+ * Production fails closed when the RPC is missing (avoids full-table scan fallback).
+ * Non-production keeps a compatibility query for local/dev without migrations.
  */
 export async function queryApprovedLinksForApi(
   options: ApprovedLinksApiQuery = {}
@@ -262,6 +263,15 @@ export async function queryApprovedLinksForApi(
 
   if (!isMissingToolsRpc(error)) {
     logger.error("Failed to query links for tools API", { source: "repositories" }, error);
+    return { links: [], total: 0 };
+  }
+
+  const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+  if (isProduction) {
+    logger.error("list_public_tools RPC missing in production; refusing full-table fallback", {
+      source: "repositories",
+      code: error.code,
+    });
     return { links: [], total: 0 };
   }
 

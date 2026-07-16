@@ -2,7 +2,7 @@ import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 
-const DEFAULT_BASE_URL = "https://nav-site-kappa.vercel.app";
+const DEFAULT_BASE_URL = "https://yuanjia1314.ccwu.cc";
 const DEFAULT_TIMEOUT_MS = 45_000;
 const DEFAULT_RETRIES = 1;
 const DEFAULT_RETRY_DELAY_MS = 750;

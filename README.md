@@ -212,7 +212,9 @@ push/PR → quality (lint + tsc + test+coverage)
                 ↓
            e2e (Playwright)
                 ↓
-         deploy (Netlify)  [仅 master push]
+         Vercel production deploy  [已验证的 master HEAD]
+
+Netlify 不是生产主轨；仅在人工紧急镜像且 `ALLOW_NETLIFY_MIRROR=1` 时运行。生产发布、版本探针与回滚以 [生产运行手册](docs/PRODUCTION-RUNBOOK.md) 为准。
 ```
 
 ## 架构决策

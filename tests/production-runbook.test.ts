@@ -18,14 +18,19 @@ describe("production runbook", () => {
     expect(checklist).toContain("checks.resourceLibrarySearch.status");
   });
 
-  it("documents the current manual deploy and health-check contract", () => {
+  it("documents the Vercel production and emergency Netlify contracts", () => {
     const runbook = readDoc("PRODUCTION-RUNBOOK.md");
+    const checklist = readDoc("LAUNCH-CHECKLIST.md");
 
-    expect(runbook).toContain("CI 检查 / 手动 Netlify 部署");
+    expect(runbook).toContain("当前生产 = Vercel");
     expect(runbook).toContain("Netlify account credit");
     expect(runbook).toContain("resourceLibrarySearch");
     expect(runbook).toContain("resource_search_health");
     expect(runbook).toContain("不要在 handoff、日志、commit message、README 中写入任何 secret");
+    expect(checklist).toContain("Vercel 主轨");
+    expect(checklist).toContain("ALLOW_NETLIFY_MIRROR=1");
+    expect(checklist).toContain("[Emergency] Netlify mirror");
+    expect(checklist).toContain("https://yuanjia1314.ccwu.cc");
   });
 
   it("documents the Cloudflare 1024-d embedding cutover contract", () => {

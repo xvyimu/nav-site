@@ -17,6 +17,8 @@ const FETCH_TIMEOUT = 8000;
 const CACHE_TTL_MS = 60_000; // 60 秒
 
 let fuseCache: FuseCache | null = null;
+/** In-flight full-pool load so concurrent cold requests share one DB round-trip. */
+let poolLoadPromise: Promise<NavLink[]> | null = null;
 
 function hasActiveFilters(filters?: SearchFilters): boolean {
   return Boolean(
@@ -45,6 +47,8 @@ function createFuse(FuseModule: typeof Fuse, links: NavLink[]): Fuse<NavLink> {
  * 获取当前可搜索的池：返回子池 Fuse + 子池 links + 全量 links。
  *
  * - 全量 links 缓存 60 秒，避免每次请求都打 DB；
+ * - 冷启动时只拉投影列 + tags 一次；并发请求共享同一个 in-flight promise，
+ *   避免 cache stampede；
  * - 子池按 category/filters 即时构建（成本低，因为 Fuse 构造是 O(n)）。
  */
 export async function getSearchPool(
@@ -59,10 +63,17 @@ export async function getSearchPool(
   if (fuseCache && now - fuseCache.timestamp < CACHE_TTL_MS) {
     allLinks = fuseCache.links;
   } else {
-    allLinks = await withTimeout(getApprovedLinks(), FETCH_TIMEOUT).catch(() => {
-      logger.warn("Search API: getApprovedLinks timed out");
-      return [];
-    });
+    if (!poolLoadPromise) {
+      poolLoadPromise = withTimeout(getApprovedLinks(), FETCH_TIMEOUT)
+        .catch(() => {
+          logger.warn("Search API: getApprovedLinks timed out");
+          return [] as NavLink[];
+        })
+        .finally(() => {
+          poolLoadPromise = null;
+        });
+    }
+    allLinks = await poolLoadPromise;
 
     fuseCache = {
       fuse: createFuse(FuseModule, allLinks),

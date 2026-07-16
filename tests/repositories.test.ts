@@ -361,6 +361,21 @@ describe("repositories · 链接", () => {
     ]);
   });
 
+  it("queryApprovedLinksForApi fails closed in production when the public-tools RPC is missing", async () => {
+    const db = freshMocks();
+    db.setResponse("rpc:list_public_tools", {
+      data: null,
+      error: { code: "PGRST202", message: "Could not find the function list_public_tools" },
+    });
+    vi.stubEnv("NODE_ENV", "production");
+
+    const result = await queryApprovedLinksForApi({ category: "ai" });
+
+    expect(result).toEqual({ links: [], total: 0 });
+    expect(db.callsFor("nav_links")).toEqual([]);
+    vi.unstubAllEnvs();
+  });
+
   it("findExistingLinkByUrl 命中", async () => {
     const db = freshMocks();
     db.setResponse("nav_links", { data: { id: "lnk-1", approved: true }, error: null });

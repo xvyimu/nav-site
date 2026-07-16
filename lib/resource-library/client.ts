@@ -6,30 +6,16 @@ function isProductionRuntime(): boolean {
   return process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
 }
 
-/** 允许 env 覆盖；非生产可回落默认 RL 项目 URL 便于本地联调 */
+/** 允许 env 覆盖；未设置时回落默认 RL 项目 URL（与历史行为一致） */
 export function getResourceLibraryUrl(): string {
   const fromEnv =
     process.env.RESOURCE_LIBRARY_SUPABASE_URL?.trim() ||
     process.env.RESOURCE_LIBRARY_URL?.trim() ||
     "";
-  if (fromEnv) return fromEnv;
-  if (isProductionRuntime()) {
-    throw new Error(
-      "RESOURCE_LIBRARY_SUPABASE_URL (or RESOURCE_LIBRARY_URL) is required in production"
-    );
-  }
-  return DEFAULT_RESOURCE_LIBRARY_URL;
+  return fromEnv || DEFAULT_RESOURCE_LIBRARY_URL;
 }
 
-export const RESOURCE_LIBRARY_URL = (() => {
-  try {
-    return getResourceLibraryUrl();
-  } catch {
-    // Module evaluation must not throw during build when env is incomplete;
-    // call sites that need a live client use getResourceLibraryUrl() / create*.
-    return DEFAULT_RESOURCE_LIBRARY_URL;
-  }
-})();
+export const RESOURCE_LIBRARY_URL = getResourceLibraryUrl();
 
 export const RESOURCE_LIBRARY_SAFE_PAGE_COLUMNS =
   "id,title,url,domain,summary,category,tags,crawled_at";

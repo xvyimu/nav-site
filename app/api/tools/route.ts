@@ -3,11 +3,14 @@ import { queryApprovedLinksForApi } from "@/lib/repositories";
 import { slugify } from "@/lib/slugify";
 import { logger } from "@/lib/logger";
 import { toolsQuerySchema } from "@/lib/schemas";
-import { withTimeout } from "@/lib/utils";
+import { getClientIp, withTimeout } from "@/lib/utils";
+import { checkDistributedRateLimit } from "@/lib/rate-limit-distributed";
 
 export const dynamic = "force-dynamic";
 
 const FETCH_TIMEOUT = 8000;
+const TOOLS_WINDOW_MS = 60_000;
+const TOOLS_MAX_PER_MIN = 60;
 
 /**
  * Agent API 端点 — 为 AI Agent 和第三方应用提供结构化工具数据
@@ -21,11 +24,24 @@ const FETCH_TIMEOUT = 8000;
  */
 export async function GET(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const { allowed } = await checkDistributedRateLimit(
+      `tools:${ip}`,
+      TOOLS_WINDOW_MS,
+      TOOLS_MAX_PER_MIN
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "请求过于频繁，请稍后再试", total: 0, tools: [] },
+        { status: 429, headers: { "Retry-After": "60" } }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
 
     // Zod 查询参数校验（searchParams.get 返回 null，需转为 undefined 以适配 optional）
     const rawQuery = Object.fromEntries(
-      ["limit", "category", "search", "ids"].map(k => [k, searchParams.get(k) ?? undefined])
+      ["limit", "category", "search", "ids"].map((k) => [k, searchParams.get(k) ?? undefined])
     );
     const zodResult = toolsQuerySchema.safeParse(rawQuery);
     if (!zodResult.success) {
@@ -59,13 +75,14 @@ export async function GET(request: NextRequest) {
         url: link.url,
         description: link.description || "",
         icon: link.icon || "",
-        category: link.category_id && link.category_name && link.category_slug
-          ? {
-              id: link.category_id,
-              name: link.category_name,
-              slug: link.category_slug,
-            }
-          : null,
+        category:
+          link.category_id && link.category_name && link.category_slug
+            ? {
+                id: link.category_id,
+                name: link.category_name,
+                slug: link.category_slug,
+              }
+            : null,
         tags: [link.featured ? "featured" : null, link.paid ? "paid" : null].filter(
           Boolean
         ) as string[],
@@ -88,9 +105,6 @@ export async function GET(request: NextRequest) {
     );
   } catch (e) {
     logger.error("Agent API error", { source: "api-tools" }, e instanceof Error ? e : undefined);
-    return NextResponse.json(
-      { error: "Failed to fetch tools" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch tools" }, { status: 500 });
   }
 }

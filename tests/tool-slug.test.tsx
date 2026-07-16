@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getCategories: vi.fn(),
   getApprovedLinkBySlug: vi.fn(),
   getRelatedLinks: vi.fn(),
+  checkDistributedRateLimit: vi.fn(),
 }));
 
 vi.mock("@/lib/repositories", () => ({
@@ -24,6 +25,10 @@ vi.mock("@/lib/logger", () => ({
     info: vi.fn(),
     debug: vi.fn(),
   },
+}));
+
+vi.mock("@/lib/rate-limit-distributed", () => ({
+  checkDistributedRateLimit: mocks.checkDistributedRateLimit,
 }));
 
 const baseLink = {
@@ -58,6 +63,7 @@ describe("tool detail slugs", () => {
     mocks.queryApprovedLinksForApi.mockResolvedValue({ links: [baseLink], total: 1 });
     mocks.getApprovedLinkBySlug.mockResolvedValue(baseLink);
     mocks.getRelatedLinks.mockResolvedValue([]);
+    mocks.checkDistributedRateLimit.mockResolvedValue({ allowed: true, backend: "memory" });
   });
 
   it("/api/tools prefers the database slug over the current title", async () => {
@@ -95,6 +101,24 @@ describe("tool detail slugs", () => {
     expect(body.total).toBe(17);
     expect(body.tools).toHaveLength(1);
     expect(mocks.getCategories).not.toHaveBeenCalled();
+  });
+
+  it("/api/tools rejects an exhausted distributed rate-limit before querying tools", async () => {
+    mocks.checkDistributedRateLimit.mockResolvedValue({ allowed: false, backend: "upstash" });
+    const { GET } = await importFresh<typeof import("@/app/api/tools/route")>(
+      "@/app/api/tools/route"
+    );
+
+    const response = await GET(new NextRequest("http://localhost/api/tools", {
+      headers: { "x-forwarded-for": "203.0.113.9" },
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    expect(body.tools).toEqual([]);
+    expect(mocks.checkDistributedRateLimit).toHaveBeenCalledWith("tools:203.0.113.9", 60_000, 60);
+    expect(mocks.queryApprovedLinksForApi).not.toHaveBeenCalled();
   });
 
   it("related tool links prefer the database slug over the current title", async () => {

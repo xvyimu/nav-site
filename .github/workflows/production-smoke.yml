@@ -24,9 +24,11 @@ jobs:
       - name: Run production smoke probe
         id: smoke
         continue-on-error: true
+        env:
+          PRODUCTION_BASE_URL: https://yuanjia1314.ccwu.cc
         run: |
           set -o pipefail
-          node scripts/probe-production.mjs 2>&1 | tee production-smoke-output.txt
+          node scripts/probe-production.mjs --base-url "$PRODUCTION_BASE_URL" 2>&1 | tee production-smoke-output.txt
 
       - name: Upload smoke output
         if: always()
