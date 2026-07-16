@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import NotFound from "@/app/not-found";
@@ -248,9 +249,11 @@ export default async function ToolDetailPage({ params }: PageProps) {
       )}
 
       {/* 用户评价 */}
-      <ErrorBoundary>
-        <ReviewSection linkId={data.id} />
-      </ErrorBoundary>
+      <Suspense fallback={null}>
+        <ErrorBoundary>
+          <ReviewSection linkId={data.id} />
+        </ErrorBoundary>
+      </Suspense>
 
       {/* 分类导航 */}
       <section>
