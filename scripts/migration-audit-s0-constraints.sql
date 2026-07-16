@@ -16,6 +16,15 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 ALTER TABLE nav_links ADD COLUMN IF NOT EXISTS embedding vector(512);
 
+-- Align public link projection used by repositories/shared.ts (PUBLIC_LINK_SELECT).
+-- Production historically only had created_at; mapLinkRow falls back to created_at,
+-- but PostgREST select of missing columns fails after the hardened projection ships.
+ALTER TABLE nav_links ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+UPDATE nav_links
+SET updated_at = coalesce(created_at, now())
+WHERE updated_at IS NULL;
+ALTER TABLE nav_links ALTER COLUMN updated_at SET DEFAULT now();
+
 -- ============================================================
 -- PART 1: click_rate_limits table (click de-duplication / rate limiting)
 -- ============================================================
@@ -192,7 +201,7 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 SECURITY INVOKER
-SET search_path = ''
+SET search_path = public
 AS $$
   WITH filtered AS (
     SELECT
@@ -243,11 +252,15 @@ COMMENT ON FUNCTION list_public_tools(TEXT, UUID[], TEXT, INTEGER)
 -- PART 4: 512-d compatibility batch writer
 -- ============================================================
 
+-- Production historically defined this as RETURNS void. CREATE OR REPLACE
+-- cannot change the return type, so drop first before recreating as INTEGER.
+DROP FUNCTION IF EXISTS batch_update_embeddings(jsonb);
+
 CREATE OR REPLACE FUNCTION batch_update_embeddings(embeddings jsonb)
 RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = ''
+SET search_path = public, extensions
 AS $$
 DECLARE
   item jsonb;
@@ -256,7 +269,7 @@ BEGIN
   FOR item IN SELECT * FROM jsonb_array_elements(embeddings)
   LOOP
     UPDATE public.nav_links
-    SET embedding = (item->>'embedding')::public.vector(512)
+    SET embedding = (item->>'embedding')::vector(512)
     WHERE id = (item->>'link_id')::uuid;
 
     IF FOUND THEN
@@ -320,7 +333,8 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 SECURITY INVOKER
-SET search_path = ''
+-- vector operators (<=>) live in the extensions schema on Supabase.
+SET search_path = public, extensions
 AS $$
   SELECT
     nl.id,
@@ -352,7 +366,7 @@ CREATE OR REPLACE FUNCTION update_link_embedding_v2(
 RETURNS VOID
 LANGUAGE sql
 SECURITY INVOKER
-SET search_path = ''
+SET search_path = public, extensions
 AS $$
   UPDATE public.nav_links
   SET embedding_1024 = new_embedding
@@ -363,7 +377,7 @@ CREATE OR REPLACE FUNCTION batch_update_embeddings_v2(embeddings jsonb)
 RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = ''
+SET search_path = public, extensions
 AS $$
 DECLARE
   item jsonb;
@@ -372,7 +386,7 @@ BEGIN
   FOR item IN SELECT * FROM jsonb_array_elements(embeddings)
   LOOP
     UPDATE public.nav_links
-    SET embedding_1024 = (item->>'embedding')::public.vector(1024)
+    SET embedding_1024 = (item->>'embedding')::vector(1024)
     WHERE id = (item->>'link_id')::uuid;
 
     IF FOUND THEN
@@ -436,4 +450,8 @@ SELECT 'search_links_semantic_v2 function', routine_name::text
 UNION ALL
 SELECT 'batch_update_embeddings_v2 function', routine_name::text
   FROM information_schema.routines
-  WHERE routine_schema = 'public' AND routine_name = 'batch_update_embeddings_v2';
+  WHERE routine_schema = 'public' AND routine_name = 'batch_update_embeddings_v2'
+UNION ALL
+SELECT 'nav_links updated_at column', column_name::text
+  FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'nav_links' AND column_name = 'updated_at';

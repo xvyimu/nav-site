@@ -48,6 +48,9 @@ describe("S0 audit migration", () => {
     expect(migration).toContain("search_links_semantic_v2");
     expect(migration).toContain("query_embedding vector(1024)");
     expect(migration).toContain("batch_update_embeddings_v2");
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ");
+    expect(migration).toContain("DROP FUNCTION IF EXISTS batch_update_embeddings(jsonb)");
+    expect(migration).toContain("SET search_path = public, extensions");
     expect(migration).toContain("REVOKE EXECUTE ON FUNCTION batch_update_embeddings_v2(jsonb) FROM PUBLIC, anon, authenticated");
     expect(migration).toContain("GRANT EXECUTE ON FUNCTION batch_update_embeddings_v2(jsonb) TO service_role");
     expect(migration).toContain("USING hnsw (embedding_1024 vector_cosine_ops)");
