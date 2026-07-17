@@ -36,6 +36,7 @@ export function PanguSpacing() {
   useLayoutEffect(() => {
     let cancelled = false;
     let observer: MutationObserver | null = null;
+    const pendingTargetSet = pendingTargets.current;
 
     try {
 
@@ -160,7 +161,7 @@ export function PanguSpacing() {
         cancelAnimationFrame(rafId.current);
       }
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      pendingTargets.current.clear();
+      pendingTargetSet.clear();
     };
   }, []);
 

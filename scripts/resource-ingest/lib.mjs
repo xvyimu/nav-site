@@ -232,6 +232,7 @@ export function fromHnHit(hit) {
 }
 
 export function stripMeta(row) {
-  const { _meta, ...rest } = row;
+  const rest = { ...row };
+  delete rest._meta;
   return rest;
 }

@@ -133,7 +133,7 @@ export function useServerSearch(params: ServerSearchParams): ServerSearchState {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [rawSearch, activeCategory, semanticSearch, activeTags, minRatingFilter, popularityFilter, setSearch]);
+  }, [rawSearch, activeCategory, semanticSearch, activeTags, minRatingFilter, popularityFilter, links, setSearch]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   return {

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getApprovedLinkBySlug: vi.fn(),
   getRelatedLinks: vi.fn(),
   checkDistributedRateLimit: vi.fn(),
+  createStaticClient: vi.fn(),
 }));
 
 vi.mock("@/lib/repositories", () => ({
@@ -29,6 +30,10 @@ vi.mock("@/lib/logger", () => ({
 
 vi.mock("@/lib/rate-limit-distributed", () => ({
   checkDistributedRateLimit: mocks.checkDistributedRateLimit,
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+  createStaticClient: mocks.createStaticClient,
 }));
 
 const baseLink = {
@@ -64,6 +69,7 @@ describe("tool detail slugs", () => {
     mocks.getApprovedLinkBySlug.mockResolvedValue(baseLink);
     mocks.getRelatedLinks.mockResolvedValue([]);
     mocks.checkDistributedRateLimit.mockResolvedValue({ allowed: true, backend: "memory" });
+    mocks.createStaticClient.mockReturnValue({ kind: "static-client" });
   });
 
   it("/api/tools prefers the database slug over the current title", async () => {
@@ -146,5 +152,18 @@ describe("tool detail slugs", () => {
     expect(html).toContain('href="/tool/related-tool"');
     expect(html).not.toContain("/tool/related-tool-renamed");
     expect(html).not.toContain("🖊️");
+  });
+
+  it("uses a cookie-free static client for categories during ISR rendering", async () => {
+    const mod = await importFresh<typeof import("@/app/tool/[slug]/page")>(
+      "@/app/tool/[slug]/page"
+    );
+
+    await mod.default({
+      params: Promise.resolve({ slug: "openai-platform" }),
+    });
+
+    expect(mocks.createStaticClient).toHaveBeenCalledTimes(1);
+    expect(mocks.getCategories).toHaveBeenCalledWith({ kind: "static-client" });
   });
 });

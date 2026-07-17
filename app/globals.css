@@ -18,6 +18,8 @@
 :root {
   color-scheme: light;
   --radius: 0.75rem;
+  --font-geist-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   --paper-bg: #f8f6f2;
   --paper-surface: #fffdfa;

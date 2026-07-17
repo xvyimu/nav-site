@@ -19,18 +19,19 @@ function isNavLink(value: unknown): value is NavLink {
 export function FavoritesView() {
   const { favorites, count } = useFavoritesState();
   const { clearFavorites } = useFavoritesActions();
+  const favoritesKey = useMemo(
+    () => `${count}:${Array.from(favorites).join(",")}`,
+    [count, favorites],
+  );
   const [links, setLinks] = useState<NavLink[]>([]);
-  const [loading, setLoading] = useState(count > 0);
+  const [loadedKey, setLoadedKey] = useState(() => count === 0 ? favoritesKey : "");
 
   useEffect(() => {
     if (count === 0) {
-      setLinks([]);
-      setLoading(false);
       return;
     }
 
     let cancelled = false;
-    setLoading(true);
 
     void fetch("/api/favorites?detail=links")
       .then((res) => (res.ok ? res.json() : null))
@@ -45,17 +46,25 @@ export function FavoritesView() {
         if (!cancelled) setLinks([]);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadedKey(favoritesKey);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [count, favorites]);
+  }, [count, favorites, favoritesKey]);
+
+  const loading = count > 0 && loadedKey !== favoritesKey;
+
+  const visibleLinks = useMemo(() => {
+    if (count === 0) return [];
+    const allowed = new Set(favorites);
+    return links.filter((link) => allowed.has(link.id));
+  }, [count, favorites, links]);
 
   const sorted = useMemo(
-    () => [...links].sort((a, b) => a.title.localeCompare(b.title, "zh-CN")),
-    [links],
+    () => [...visibleLinks].sort((a, b) => a.title.localeCompare(b.title, "zh-CN")),
+    [visibleLinks],
   );
 
   return (

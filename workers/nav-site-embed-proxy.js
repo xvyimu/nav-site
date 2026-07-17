@@ -4,7 +4,7 @@
  * Path: Vercel -> this workers.dev -> https://embed.aijiaqi.ccwu.cc -> Named Tunnel -> 127.0.0.1:18003
  * Redeploy: scripts/deploy-embed-proxy-worker.ps1
  */
-export default {
+const embedProxyWorker = {
   async fetch(request, env) {
     const incoming = new URL(request.url);
     const originBase = (env.EMBED_ORIGIN || "https://embed.aijiaqi.ccwu.cc").replace(/\/$/, "");
@@ -47,3 +47,5 @@ export default {
     });
   },
 };
+
+export default embedProxyWorker;

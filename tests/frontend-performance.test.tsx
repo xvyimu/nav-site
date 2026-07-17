@@ -180,7 +180,7 @@ describe("frontend performance and lifecycle regressions", () => {
     const disconnect = vi.fn();
     const observe = vi.fn();
     class MutationObserverMock {
-      constructor(_callback: MutationCallback) {}
+      constructor() {}
       observe = observe;
       disconnect = disconnect;
       takeRecords = vi.fn(() => []);

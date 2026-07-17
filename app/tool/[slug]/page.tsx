@@ -10,6 +10,7 @@ import { escapeJsonForHtml, isSafeUrl, withTimeout } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ReviewSection } from "@/components/ReviewSection";
 import { logger } from "@/lib/logger";
+import { createStaticClient } from "@/lib/supabase/server";
 
 export const revalidate = 60;
 
@@ -105,13 +106,14 @@ export default async function ToolDetailPage({ params }: PageProps) {
     return <NotFound />;
   }
   const data = link; // 类型收窄：notFound() 之后 TS 仍不认识 link 已非 null
+  const staticClient = createStaticClient();
 
   const [relatedLinks, categories] = await Promise.all([
     withTimeout(getRelatedLinks(data.category_id, data.url), FETCH_TIMEOUT).catch(() => {
       logger.warn("Tool detail: getRelatedLinks timed out");
       return [];
     }),
-    withTimeout(getCategories(), FETCH_TIMEOUT).catch(() => []),
+    withTimeout(getCategories(staticClient), FETCH_TIMEOUT).catch(() => []),
   ]);
 
   const jsonLd = generateJsonLd(data);
