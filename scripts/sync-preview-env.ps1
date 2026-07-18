@@ -78,8 +78,11 @@ if ($hostName -notmatch "nzaocqwumlmbewoddysd") {
 Write-Host "Preview Supabase host: $hostName"
 
 # Prefer explicit DEV service role; never attach prod service role to Preview.
+# Sources (first hit wins): .env.local DEV key → User env SUPABASE_DEV_SERVICE_ROLE
 $service = $envMap["SUPABASE_SERVICE_ROLE_KEY_DEV"]
 if (-not $service) { $service = $envMap["SOURCE_SUPABASE_SERVICE_ROLE_KEY"] }
+if (-not $service) { $service = [Environment]::GetEnvironmentVariable("SUPABASE_DEV_SERVICE_ROLE", "User") }
+if (-not $service) { $service = $env:SUPABASE_DEV_SERVICE_ROLE }
 $prodRef = "vyqqbypwrbdcafanzwmj"
 $devRef = "nzaocqwumlmbewoddysd"
 if ($service) {
@@ -90,6 +93,8 @@ if ($service) {
   } elseif ($ref -and $ref -ne $devRef) {
     Write-Host "WARN service role JWT ref=$ref does not match nav-dev; skipping service role."
     $service = $null
+  } else {
+    Write-Host "DEV service_role JWT ref=$ref"
   }
 }
 
@@ -120,11 +125,22 @@ if ($envMap["NEXT_PUBLIC_SENTRY_DSN"]) {
 if ($envMap["SENTRY_DSN"]) {
   Add-PreviewEnv "SENTRY_DSN" $envMap["SENTRY_DSN"] -Sensitive
 }
-if ($envMap["EMBED_SERVER_URL"]) {
-  Add-PreviewEnv "EMBED_SERVER_URL" $envMap["EMBED_SERVER_URL"]
+# Embed: always point Preview at the public Worker (never loopback from .env.local).
+$embedUrl = "https://nav-site-embed-proxy.xiej4352.workers.dev"
+Add-PreviewEnv "EMBED_SERVER_URL" $embedUrl
+
+# Prefer repo-local .embed-api-key.local (same key native embed/tunnel uses).
+# Do NOT fall back to User EMBEDDING_API_KEY — that may be a different product key.
+$embedKey = $envMap["EMBED_SERVER_API_KEY"]
+$embedKeyFile = Join-Path $Root ".embed-api-key.local"
+if (-not $embedKey -and (Test-Path $embedKeyFile)) {
+  $embedKey = (Get-Content -Path $embedKeyFile -Raw -Encoding utf8).Trim()
+  Write-Host "EMBED key loaded from .embed-api-key.local (len=$($embedKey.Length))"
 }
-if ($envMap["EMBED_SERVER_API_KEY"]) {
-  Add-PreviewEnv "EMBED_SERVER_API_KEY" $envMap["EMBED_SERVER_API_KEY"] -Sensitive
+if ($embedKey) {
+  Add-PreviewEnv "EMBED_SERVER_API_KEY" $embedKey -Sensitive
+} else {
+  Write-Host "WARN EMBED_SERVER_API_KEY missing — Preview embedding will skip"
 }
 
 foreach ($k in @(
@@ -142,6 +158,6 @@ foreach ($k in @(
 }
 
 Write-Host ""
-Write-Host "OK Preview env sync finished (public nav-dev)."
-Write-Host "Protection: Vercel Dashboard → nav-site → Deployment Protection → set Preview to Standard Protection or Disabled for private repo probes."
-Write-Host "Redeploy latest preview to pick up env: vercel redeploy <preview-url> --scope aijiai520"
+Write-Host "OK Preview env sync finished (nav-dev + embed worker)."
+Write-Host "SSO Protection should stay null for private-repo probes (PATCH /v9/projects)."
+Write-Host "Redeploy: vercel redeploy <preview-url> --scope aijiai520"

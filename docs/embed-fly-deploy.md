@@ -129,6 +129,30 @@ powershell -NoProfile -File D:\nav-site\scripts\bootstrap-embed-always-on.ps1
 
 需要负责人提供 VPS SSH 或明确「在这台机器上装 origin」后再执行路径 A 第 2–5 步。
 
+### Fly 尝试结果（2026-07-18）
+
+| 项 | 结果 |
+|---|---|
+| `flyctl` 登录 | ✅ `xxxm68009@gmail.com` / org `personal` |
+| `fly.embed.toml` + `Dockerfile.embed` | ✅ 仓库已有 |
+| `fly apps create nav-site-embed` | ❌ **需绑卡/买 credit**：`fly.io/dashboard/xihg/billing` |
+| 本机 Docker | ❌ 未安装 |
+| SSH 可用 VPS | ❌ 仅 github.com host alias |
+
+**结论：** 云 GPU/Fly 路径硬阻塞在账单；在绑卡或提供 Linux VPS 之前，**生产语义检索继续走本机 Named Tunnel 路径**（已自启 + 探针 embedding=ok）。
+
+解除后最短命令：
+
+```powershell
+# 1) 绑卡后
+fly apps create nav-site-embed --org personal
+# 2) 设 secret（与 .embed-api-key.local 相同）
+fly secrets set EMBED_SERVER_API_KEY=*** -a nav-site-embed
+# 3) 有 Docker 的机器上
+fly deploy -c fly.embed.toml
+# 4) 二选一：改 Tunnel 上游到 Fly URL，或 Vercel EMBED_SERVER_URL 直指 Fly HTTPS
+```
+
 ## 已完成
 
 - [x] ADR-005 远程 HTTPS + Bearer
