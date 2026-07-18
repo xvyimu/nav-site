@@ -95,7 +95,7 @@ Vercel
 | 语义 smoke | ✅ `search_links_semantic_v2` + `/api/search?semantic=true` hybrid |
 | Preview | ✅ 同 env 已写 |
 | 本机 BGE / Tunnel | 保留作 RL 512-d 与 fallback，**非主路径** |
-| Fly/VPS | **不再阻塞语义搜索** |
+| Fly/VPS | **不做主路径**（用户无 Fly 账单/VPS）；语义 24×7 已由 Workers AI 覆盖 |
 
 回填（生产，需 CF token + service_role；默认 dry-run 加 `--apply`）：
 

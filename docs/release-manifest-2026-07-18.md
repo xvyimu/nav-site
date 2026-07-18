@@ -87,6 +87,6 @@ pnpm run verify:production -- --base-url https://yuanjia1314.ccwu.cc --expect-co
 
 | 项 | 状态 |
 |---|---|
-| Fly 绑卡部署 BGE | 可选灾备，非主路径 |
+| Fly 绑卡部署 BGE | **不做**（用户无 Fly/VPS）；主路径为 Workers AI |
 | 专用长期 CF API Token | ✅ 已用用户提供的 `cfut_` Workers AI token（User env + Vercel）；勿提交 git |
 | 为 docs 再 prod 部署 | 不做 |
