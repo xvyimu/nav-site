@@ -83,9 +83,20 @@ test.describe("已认证管理后台", () => {
 
   test("分类页支持导航、搜索与打开只读表单流程", async ({ page }) => {
     await page.goto("/admin", { waitUntil: "domcontentloaded" });
-    await page.getByRole("link", { name: "分类管理" }).click();
+    await expect(page.getByRole("heading", { name: "链接工作台" })).toBeVisible({
+      timeout: 20_000,
+    });
 
-    await expect(page).toHaveURL(/\/admin\/categories$/);
+    // 桌面侧栏与移动顶栏各有一份导航；取当前可见的「分类管理」链接并等待路由完成
+    const categoriesLink = page
+      .getByRole("link", { name: "分类管理" })
+      .filter({ visible: true })
+      .first();
+    await expect(categoriesLink).toBeVisible();
+    await Promise.all([
+      page.waitForURL(/\/admin\/categories(?:\?.*)?$/, { timeout: 20_000 }),
+      categoriesLink.click(),
+    ]);
     await expect(page.getByRole("heading", { name: "分类管理" })).toBeVisible({
       timeout: 20_000,
     });

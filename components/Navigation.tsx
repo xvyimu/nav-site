@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { type Category, type NavLink } from "@/lib/types";
 import type { PrecomputedNavData } from "@/lib/nav-derived-data";
@@ -51,13 +51,30 @@ export function Navigation({
   } = useLinksFilter({ categories, links, precomputed });
   const [mounted, setMounted] = useState(false);
   const [previewLink, setPreviewLink] = useState<NavLink | null>(null);
+  /** 打开预览时记录触发控件，关闭后把键盘焦点还回去（a11y / E2E）。 */
+  const previewTriggerRef = useRef<HTMLElement | null>(null);
 
   // 稳定的预览回调：避免每次渲染都生成新引用，破坏 LinkCard / ToolQuickView 的 memo
-  const openPreview = useCallback((link: NavLink) => setPreviewLink(link), []);
+  const openPreview = useCallback((link: NavLink) => {
+    const active = document.activeElement;
+    previewTriggerRef.current = active instanceof HTMLElement ? active : null;
+    setPreviewLink(link);
+  }, []);
   const closePreview = useCallback(() => setPreviewLink(null), []);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
+
+  // Dialog 卸载后再 focus，避免与 Radix 焦点清理竞态
+  useEffect(() => {
+    if (previewLink !== null) return;
+    const trigger = previewTriggerRef.current;
+    if (!trigger) return;
+    const frame = window.requestAnimationFrame(() => {
+      trigger.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [previewLink]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });

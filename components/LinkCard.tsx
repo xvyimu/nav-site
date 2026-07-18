@@ -146,6 +146,8 @@ function LinkCardComponent({
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
+                      // 确保触发按钮持有焦点，便于关闭预览后还原
+                      event.currentTarget.focus();
                       onPreview(link);
                     }}
                     className="shrink-0 text-[var(--paper-faint)]"

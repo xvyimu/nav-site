@@ -133,7 +133,7 @@
 |---|---|
 | R0 候选 SHA | 本地 `78369801` 已形成；**未 push** |
 | DB0 staging 迁移验收 | 对象/权限/关键行为 **通过**；完整应用联调未做 |
-| QA0 E2E 绑定候选 | **未执行**；2026-07-18 因 `.env.local` 主链指向 prod 且缺少 nav-dev `service_role` 而中止 |
+| QA0 E2E 绑定候选 | **chromium home+admin 32/32 pass**（nav-dev，2026-07-18）；mobile 项目与 admin-performance 未纳入本轮；Playwright 进程自管 webServer 时偶发挂起，改用 reuseExistingServer |
 | CD0 Vercel 后验探针 | 未完成 |
 | OBS0 生产基线 | 未完成 |
 
@@ -147,45 +147,54 @@
 | 验证 | Playwright 退出码 0；报告/trace 记录候选 SHA |
 | 回滚 | 删除 E2E 产生的测试数据；停 dev server；不改生产 |
 
-**已获“E2E 用 nav-dev”确认，但本地环境门禁失败，仍未执行。**
+## 6. E2E 风险门与执行记录
 
-环境门禁结果（仅 host/JWT `ref`，无 secret）：
+### 6.1 环境门禁
 
 | 变量 | 解析结果 |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` + anon | **prod** `vyqqbypwrbdcafanzwmj` |
-| `NEXT_PUBLIC_SUPABASE_URL_DEV` + anon_DEV | **nav-dev** `nzaocqwumlmbewoddysd` |
-| `SOURCE_SUPABASE_*` | **nav-dev**（仅 URL/anon） |
-| `SUPABASE_SERVICE_ROLE_KEY` / `_PROD` | 均为 **prod** ref |
-| nav-dev `SUPABASE_SERVICE_ROLE_KEY` | **缺失** |
+| 默认 `.env.local` URL/anon/service | **prod** `vyqqbypwrbdcafanzwmj` |
+| `*_DEV` URL/anon | **nav-dev** `nzaocqwumlmbewoddysd` |
+| 会话注入 `SUPABASE_SERVICE_ROLE_KEY` | **nav-dev** JWT ref 匹配 |
+| E2E 进程覆盖 | URL/anon→DEV；`SERVICE_ROLE` 与 `SERVICE_ROLE_KEY_PROD` 均强制 nav-dev（避免 Next dotenv 复活 prod） |
 
-应用 `getServiceRoleKey()` 优先读 `_PROD`，再读 plain；在当前文件下**无法**安全绑定 nav-dev 写路径。  
-若用 prod service_role + nav-dev URL，JWT ref 与项目不一致，也会失败或行为未定义——已拒绝。
+### 6.2 执行结果（绑定代码候选 `78369801` + 后续 E2E 修复 commit）
 
-恢复 E2E 的最小条件（任选其一，**不写盘改 prod 默认**）：
+| 套件 | 项目 | 结果 |
+|---|---|---|
+| `e2e/home.spec.ts` + `e2e/admin.spec.ts` | chromium | **32 passed / 0 failed**（约 1.5m） |
+| 同上 | mobile-chrome | 未完整收口（首轮有 flaky；本轮以 chromium 为准） |
+| `e2e/admin-performance.spec.ts` | chromium | 未纳入本轮（perf 需 production build） |
 
-1. 提供 **仅用于进程内覆盖** 的 nav-dev service_role（JWT ref=`nzaocqwumlmbewoddysd`），由启动脚本设置：
-   - `NEXT_PUBLIC_SUPABASE_URL` → nav-dev URL  
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` → nav-dev anon  
-   - `SUPABASE_SERVICE_ROLE_KEY` → nav-dev service_role  
-   - **清空/覆盖** `SUPABASE_SERVICE_ROLE_KEY_PROD`（否则仍优先 prod）  
-   - `E2E_AUTH_SECRET` = 与测试服相同的 `AUTH_SECRET`
-2. 或新建 disposable `.env.e2e.local`（gitignore）只含 nav-dev 三元组 + AUTH_SECRET，再跑。
+### 6.3 Staging 数据/schema 补齐（仅 nav-dev）
 
-提供后启动命令示例（值由你本地注入，不入库）：
+1. `nav_links.updated_at`（s0 兼容列；PostgREST 投影需要）
+2. Figma `slug='figma'`（原为 null，阻断 `/tool/figma`）
+3. 既有：cycle-guard + link-tags RPC（前序）
 
-```powershell
-# 在 D:\nav-site，先 export/覆盖到 nav-dev，再：
-rtk pnpm e2e
-rtk pnpm e2e:admin -- --headless
-```
+已知噪音（非本轮失败主因）：
+
+- `public_tool_reviews` 表缺失 → 工具详情 reviews 拉取报错日志
+- `list_public_tools` RPC 不可用 → 兼容查询回退
+- embed-server fetch failed → 搜索降级
+
+### 6.4 代码修复（E2E 收口）
+
+- `Navigation`：关闭预览后 `requestAnimationFrame` 还原触发按钮焦点
+- `LinkCard`：点击预览前 `focus()` 触发按钮
+- `e2e/admin.spec.ts`：可见导航链接 + `waitForURL` 防 flaky
+
+### 6.5 仍禁止
+
+- 生产迁库 / 生产部署 / 默认 `.env.local` 写回 prod 以外的值  
+- 在未单独确认前 push / Vercel 部署
 
 ## 7. Go/No-Go
 
-**当前：No-Go（条件放宽仍未达标）。**
+**当前：No-Go（E2E chromium 已绿，仍未 push/部署/生产迁库）。**
 
-已具备：本地候选 SHA、代码门禁全绿、nav-dev 缺失迁移补齐与关键行为验收。  
-仍缺：push、E2E、候选应用指向已迁库 staging 的联调证据、Vercel 探针、生产迁库与部署确认。
+已具备：本地候选 `78369801`、代码门禁、nav-dev 迁移补齐、chromium home+admin E2E 32/32。  
+仍缺：push、mobile/perf E2E 全量收口、Vercel 探针、生产迁库与部署确认。
 
 ## 8. 回滚要点
 
