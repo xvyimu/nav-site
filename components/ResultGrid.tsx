@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { type NavLink } from "@/lib/types";
+import { extractDomain, isSafeUrl } from "@/lib/utils";
+import { prefetchFavicons } from "@/lib/use-favicon";
 import { LinkCard } from "./LinkCard";
 import { Button } from "@/components/ui/button";
 
@@ -78,6 +80,17 @@ function ResultGridInner({
   const effectiveVisibleCount = Math.max(visibleCount, focusRequiredCount);
   const visible = links.slice(0, effectiveVisibleCount);
   const hasMore = effectiveVisibleCount < links.length;
+
+  // 可见切片就绪后预热域名 favicon（跳过已有安全 icon 的链接）
+  useEffect(() => {
+    if (effectiveVisibleCount <= 0 || links.length === 0) return;
+    const slice = links.slice(0, effectiveVisibleCount);
+    const domains = slice.map((link) => {
+      if (typeof link.icon === "string" && isSafeUrl(link.icon)) return null;
+      return extractDomain(link.url);
+    });
+    prefetchFavicons(domains);
+  }, [links, effectiveVisibleCount]);
 
   useEffect(() => {
     if (visibleCount > 0 || links.length === 0) return;

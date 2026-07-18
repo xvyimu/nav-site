@@ -76,8 +76,17 @@ export function Navigation({
     return () => window.cancelAnimationFrame(frame);
   }, [previewLink]);
 
+  // 侧栏/筛选变更时，仅在结果区不在视口时轻推到 #atlas；
+  // 避免 window.scrollTo(top:0) 把用户强行拉回页顶。
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const atlas = document.getElementById("atlas");
+    if (!atlas) return;
+    const rect = atlas.getBoundingClientRect();
+    const headerOffset = 72;
+    const fullyAbove = rect.bottom < headerOffset;
+    const fullyBelow = rect.top > window.innerHeight;
+    if (!fullyAbove && !fullyBelow) return;
+    atlas.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [activeCategory, activeTags, minRatingFilter, popularityFilter]);
 
   const topHeroTabs = tabTree

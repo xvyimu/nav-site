@@ -1,7 +1,6 @@
 "use client";
 
 import { memo } from "react";
-import NextImage from "next/image";
 import { Eye, Globe, Sparkles } from "lucide-react";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { InteractiveSurface } from "@/components/ui/interactive-surface";
@@ -34,8 +33,10 @@ function LinkCardComponent({
   const type = getLinkType(link.category_slug ?? null);
   const ts = relativeTime(link.updated_at || link.created_at);
   const searchMeta = link.searchMeta;
-  // 懒加载：仅在卡片挂载后请求 favicon（ResultGrid 窗口化后首屏扇出下降）
-  const faviconUrl = useFavicon(domain);
+  // 优先业务库 icon；否则走域名代理（ResultGrid 会预热可见域名）
+  const preferredIcon =
+    typeof link.icon === "string" && isSafeUrl(link.icon) ? link.icon : null;
+  const faviconUrl = useFavicon(preferredIcon ? null : domain, preferredIcon);
 
   function handleLinkClick() {
     trackClick(link.url);
@@ -73,14 +74,16 @@ function LinkCardComponent({
                 style={{ transform: "scale(var(--card-icon-scale))" }}
               >
                 {faviconUrl ? (
-                  <NextImage
+                  // 代理图用原生 img，避免 next/image 额外调度；固定尺寸防 CLS
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
                     src={faviconUrl}
                     alt=""
                     width={24}
                     height={24}
+                    loading="lazy"
+                    decoding="async"
                     className="size-6 rounded"
-                    style={{ width: 24, height: 24 }}
-                    unoptimized
                   />
                 ) : (
                   <Globe className="size-5 text-[var(--paper-faint)]" />
