@@ -1,8 +1,9 @@
 # 发布检查清单
 
-> 最后更新：2026-07-17
+> 最后更新：2026-07-18
 > 发布分支：`master`
 > 生产入口：`https://yuanjia1314.ccwu.cc`（Vercel 主轨）
+> 当前生产 HEAD：`46981a1a`（见 [release-manifest-2026-07-18](./release-manifest-2026-07-18.md)）
 
 详细操作、故障处理和回滚见[生产运行手册](./PRODUCTION-RUNBOOK.md)。
 

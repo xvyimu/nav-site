@@ -1,9 +1,11 @@
 # 生产运行手册
 
-> 最后更新：2026-07-13  
+> 最后更新：2026-07-18  
 > 适用项目：nav-site  
 > **生产入口：`https://yuanjia1314.ccwu.cc`**（自定义域 · Vercel 项目 `nav-site` · **verified**）  
-> 备用直连：`https://nav-site-kappa.vercel.app`（同部署）  
+> **当前生产 HEAD**：以 `GET /build-info.json` 的 `commit` 为准（2026-07-18 收口为 `46981a1a`）  
+> 发布单次记录：`docs/release-manifest-2026-07-18.md`  
+> 备用直连：`https://nav-site-kappa.vercel.app`（同部署；直链可能受 Deployment Protection）  
 > DNS（Cloudflare zone `yuanjia1314.ccwu.cc` / gmail 账）：apex **CNAME** → `41f090bbdb4a5afe.vercel-dns-017.com`（橙云）+ `_vercel` **TXT** 校验  
 > 历史 Netlify site `nav-site`：**账号侧已 disable**（`credit_save_vercel_primary`）+ build hook 已删 + custom_domain 已解绑；`netlify.toml` ignore **默认跳过全部构建**。  
 > 紧急 Netlify 构建：先 enableSite，再 `NETLIFY_FORCE_BUILD=1` 或 allowlist（一般不需要）

@@ -1,9 +1,11 @@
 # nav-site 优化与发布主计划（2026-07-18）
 
-> 状态：Planned
-> 适用范围：当前未提交工作树到首个可审计生产候选版本
-> 基线：`master` / `9733897d8d417e36cb293e94fff11cde4215ec76`
-> 重要边界：本文描述的是计划和当前工作树事实，不代表代码已提交、迁移已执行或功能已上线。
+> 状态：**Released / Go（主域）** — 2026-07-18 收口  
+> 适用范围：2026-07-18 候选从工作树到生产主域的完整证据链  
+> 基线：`master` / `9733897d8d417e36cb293e94fff11cde4215ec76`  
+> **当前生产 HEAD**：`46981a1aed3d58b2d10236d8413e30d112b8b5dc`  
+> 权威单次记录：`docs/release-manifest-2026-07-18.md`  
+> 本文保留阶段计划原文，供复盘；**事实状态以 §13 收口结论与 release manifest 为准**。
 
 ## 1. 目标
 
@@ -314,8 +316,26 @@ rtk pnpm run verify:launch-readiness -- --skip-network
 5. 上一稳定版本、数据库兼容矩阵、值守阈值和回滚路径已确认。
 6. README、PROGRESS、API、发布清单、运行手册和 CHANGELOG 不再把未验证能力写成生产事实。
 
+## 13. 收口结论（2026-07-18）
+
+| 门禁 | 结果 |
+|---|---|
+| 候选 SHA 冻结并 push | ✅ `origin/master` = `46981a1a` |
+| 生产迁库（候选集合） | ✅ supabase-nav-prod 按序幂等应用 |
+| 主域部署 + build-info | ✅ `dpl_3KnaaDy7kR3yQ9hcx1Dq2gCkGWaq` · commit 匹配 |
+| 主域 `verify:production` | ✅ PASS |
+| 前台 UX hotfix | ✅ 侧栏滚动 / 挂载预算 / favicon 代理+monogram |
+| Preview 功能探针 | ⚠️ 未完成（Deployment Protection；不阻断主域 Go） |
+| Embedding 常开 | ⚠️ 仍依赖本机 BGE；health 默认可 degraded |
+
+**完成定义对照（§12）：** 1–5 已满足主域口径；6 由本轮文档同步完成。  
+**后续不阻断项：** icon 库内回填、Preview 完整环境、embedding 上云、RUM 仪表盘 — 见 release manifest §9。
+
 ## 参考文档
 
+- [Release Manifest 2026-07-18](./release-manifest-2026-07-18.md)
+- [前台交互与性能优化清单](./frontend-perf-optimization-2026-07-18.md)
+- [Chrome 抽检证据](./perf/chrome-review-2026-07-18/README.md)
 - [管理后台前后端 interface ADR](./adr-009-admin-frontend-backend-interface.md)
 - [管理后台优化收尾报告](./admin-optimization-closeout-2026-07-17.md)
 - [全栈审计](./full-stack-audit-2026-07-17.md)

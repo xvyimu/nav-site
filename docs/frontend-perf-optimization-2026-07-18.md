@@ -176,8 +176,15 @@
 
 已 push + 生产部署（2026-07-18）：
 
-- commit `353a1fda0a5d750d0828c4d5cd6fb19175b34df4`
-- deploy `dpl_EXSUdAC85RjHUh4qWrL8CHGMPgHd` → `https://yuanjia1314.ccwu.cc`
-- 主域探针 PASS（build-info commit 匹配）
+- perf UX 首发 commit `353a1fda0a5d750d0828c4d5cd6fb19175b34df4`
+- 跟进修复：`b8cb1f6a`（DualTrack 预算后零卡片）· `9c8175ee`（分类区首屏挂载）
+- **favicon 恢复** commit `46981a1aed3d58b2d10236d8413e30d112b8b5dc`
+  - 跟随 CDN 内部 redirect；接受「404 + 有效图片 body」
+  - 过滤 Google/DDG 通用占位图；新增 `google-v2` 源
+  - 全失败时返回字母 monogram SVG（200），不再空 404
+- 当前生产 deploy `dpl_3KnaaDy7kR3yQ9hcx1Dq2gCkGWaq` → `https://yuanjia1314.ccwu.cc`
+- 主域探针 PASS（build-info commit = `46981a1a`）
+- 浏览器抽检：首页 favicon 请求 ~129，失败 0；卡片破图 0  
+  证据目录：`docs/perf/chrome-review-2026-07-18/`
 
-仍后续：icon 数据回填、虚拟列表、E2E scrollY 断言。
+仍后续：icon 数据回填、虚拟列表、E2E scrollY 断言、生产 Lighthouse 对比。

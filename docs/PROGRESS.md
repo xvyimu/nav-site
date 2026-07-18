@@ -1,7 +1,26 @@
 # 综合导航站 — 项目进度文档
 
-> 最后更新：2026-07-04 · 版本 v16.4
+> 最后更新：2026-07-18 · 版本 v17.0（发布收口注记）
 > 项目路径：`d:\nav-site` · 开发端口：3264
+> **当前生产 HEAD**：`46981a1a` · 主域 `https://yuanjia1314.ccwu.cc`
+
+## 〇、2026-07-18 发布收口（权威入口）
+
+本轮已完成候选冻结 → 生产迁库 → 主域部署探针 → 前台 UX/favicon hotfix。  
+**单次事实源**：[`docs/release-manifest-2026-07-18.md`](./release-manifest-2026-07-18.md)  
+**主计划收口**：[`docs/optimization-and-release-plan-2026-07-18.md`](./optimization-and-release-plan-2026-07-18.md) §13  
+**前台性能**：[`docs/frontend-perf-optimization-2026-07-18.md`](./frontend-perf-optimization-2026-07-18.md)
+
+| 项 | 状态 |
+|---|---|
+| Admin 模块化 interface + 迁库 | ✅ 生产已应用 |
+| 主域 commit 探针 | ✅ 匹配 `46981a1a` |
+| 侧栏滚动 / 首屏预算 | ✅ 已上线 |
+| Favicon 代理恢复 + monogram | ✅ 已上线（首页 0 破图抽检） |
+| Preview 功能探针 | ⚠️ Deployment Protection，不阻断主域 |
+| Embedding 常开 | ⚠️ 仍本机 BGE 路径 |
+
+下文 Phase 1–26 为历史进度（至 2026-07-04），数量与平台口径可能漂移；**以 release manifest 与 README 为准**。
 
 ---
 
