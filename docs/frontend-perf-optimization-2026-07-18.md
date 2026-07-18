@@ -174,4 +174,10 @@
 
 文档：`docs/frontend-perf-optimization-2026-07-18.md`
 
-未做（后续）：icon 数据回填、虚拟列表、生产部署本轮 UX commit。
+已 push + 生产部署（2026-07-18）：
+
+- commit `353a1fda0a5d750d0828c4d5cd6fb19175b34df4`
+- deploy `dpl_EXSUdAC85RjHUh4qWrL8CHGMPgHd` → `https://yuanjia1314.ccwu.cc`
+- 主域探针 PASS（build-info commit 匹配）
+
+仍后续：icon 数据回填、虚拟列表、E2E scrollY 断言。
