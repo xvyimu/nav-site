@@ -89,7 +89,8 @@ Vercel
 
 | 项 | 状态 |
 |---|---|
-| 生产 health | ✅ `cloudflare embedding ready (1024-d)` · deploy `dpl_FNsWZWAQ…` |
+| 生产 health | ✅ `cloudflare embedding ready (1024-d)` · deploy `dpl_6GCemEkc…` |
+| CF 凭证 | ✅ 用户长期 `cfut_` token + account `ceed74b0…`（User env / Vercel / `.env.local`，非 wrangler oauth） |
 | 回填 | ✅ 512/512 `embedding_1024`（`--provider cloudflare --apply --batch-size 8`） |
 | 语义 smoke | ✅ `search_links_semantic_v2` + `/api/search?semantic=true` hybrid |
 | Preview | ✅ 同 env 已写 |
@@ -120,9 +121,9 @@ python scripts/backfill-embeddings.py --provider cloudflare --apply --batch-size
 | embed-server + native 启停脚本 | ✅ |
 | Named Tunnel + Worker 反代 | ✅ |
 | ensure / autostart | ✅（2026-07-18 已装 `nav-site-embed-stack`） |
-| 生产 env `EMBED_SERVER_URL` | ✅（指向 Worker） |
-| 本机 origin 健康 | ✅ `127.0.0.1:18003` + tunnel/worker health ok（开机后） |
-| 真正无本机 origin | ⏳ 待 VPS |
+| 生产 env `EMBED_SERVER_URL` | ✅（指向 Worker；RL/备援） |
+| 本机 origin 健康 | ✅ `127.0.0.1:18003` + tunnel/worker health ok（开机后，可选） |
+| 主导航无本机 origin | ✅ Cloudflare Workers AI 1024-d（生产默认） |
 
 一键：
 

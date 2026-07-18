@@ -1,8 +1,8 @@
 # 综合导航站 — 项目进度文档
 
-> 最后更新：2026-07-19 · 版本 v18.1（Cloudflare 1024-d 常开）
+> 最后更新：2026-07-19 · 版本 v18.2（CF durable token）
 > 项目路径：`d:\nav-site` · 开发端口：3264
-> **生产运行时 HEAD**：`ee5a047b` · 主域 `https://yuanjia1314.ccwu.cc` · deploy `dpl_FNsWZWAQ…`
+> **生产运行时 HEAD**：`ee5a047b` · 主域 `https://yuanjia1314.ccwu.cc` · deploy `dpl_6GCemEkc…`
 
 ## 〇、2026-07-18 全日收口（权威入口）
 
