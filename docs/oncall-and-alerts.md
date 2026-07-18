@@ -76,3 +76,4 @@ powershell -NoProfile -File D:\nav-site\scripts\bootstrap-embed-always-on.ps1
 | 日期 | 变更 |
 |---|---|
 | 2026-07-18 | 首版：主值守=owner；Sentry 邮件 + Vercel 失败通知；embed 本机+自启 |
+| 2026-07-18 | 关闭 Vercel `ssoProtection`（API）；Preview 探针 PASS |
