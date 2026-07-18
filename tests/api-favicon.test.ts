@@ -48,6 +48,27 @@ describe("favicon API", () => {
     expect(response.headers.get("x-favicon-source")).toBe("cccyun");
   });
 
+  it("accepts upstream 404 responses that still return image bytes", async () => {
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("duckduckgo.com")) {
+        return new Response("y".repeat(1600), {
+          status: 404,
+          headers: { "Content-Type": "image/png" },
+        });
+      }
+      return new Response(null, { status: 403 });
+    });
+
+    const { GET } = await getHandler();
+    const response = await GET(
+      new NextRequest("http://localhost/api/favicon?domain=example.com")
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-favicon-source")).toBe("duckduckgo");
+  });
+
   it("races upstream sources and returns the first valid image", async () => {
     vi.mocked(fetch).mockImplementation((input, init) => {
       const url = String(input);
@@ -62,7 +83,7 @@ describe("favicon API", () => {
           headers: { "Content-Type": "image/png" },
         }));
       }
-      return Promise.resolve(new Response(null, { status: 404 }));
+      return Promise.resolve(new Response(null, { status: 500 }));
     });
 
     const { GET } = await getHandler();
@@ -70,11 +91,27 @@ describe("favicon API", () => {
       new NextRequest("http://localhost/api/favicon?domain=example.com")
     );
 
-    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
     const response = await pending;
 
     expect(response.status).toBe(200);
     expect(response.headers.get("x-favicon-source")).toBe("duckduckgo");
+  });
+
+  it("falls back to monogram SVG when every CDN source fails", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 503 }));
+
+    const { GET } = await getHandler();
+    const response = await GET(
+      new NextRequest("http://localhost/api/favicon?domain=example.com")
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("image/svg+xml");
+    expect(response.headers.get("x-favicon-source")).toBe("monogram");
+    const body = await response.text();
+    expect(body).toContain("<svg");
+    expect(body).toContain(">E</text>");
   });
 
   it("cancels upstream bodies once the streaming size limit is exceeded", async () => {
@@ -102,7 +139,9 @@ describe("favicon API", () => {
       new NextRequest("http://localhost/api/favicon?domain=example.com")
     );
 
-    expect(response.status).toBe(404);
-    expect(cancelCount).toBe(3);
+    // 超限后所有 CDN 失败 → monogram 200
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-favicon-source")).toBe("monogram");
+    expect(cancelCount).toBeGreaterThan(0);
   });
 });

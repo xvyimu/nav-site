@@ -7,21 +7,15 @@ import { getClientIp, isBlockedOutboundHost } from "@/lib/utils";
 /**
  * Favicon 代理 API
  *
- * 四级降级策略（按国内可达性排序）：
- * 1. favicon.cccyun.cc（主源，国内访问稳定）
- * 2. DuckDuckGo icon 服务（备用，国内偶尔超时）
- * 3. Google S2（备用，国内偶尔超时）
- * 4. 直接取目标域名 /favicon.ico（最终兜底）
- * 5. 返回 404 让客户端显示 Globe 图标
+ * 降级顺序：
+ * 1. favicon.cccyun.cc
+ * 2. DuckDuckGo icons
+ * 3. Google S2（跟随 redirect 到 gstatic）
+ * 4. Google faviconV2 直链
+ * 5. 域名首字母 SVG 占位（始终 200，避免前端 Globe 闪烁与 404 噪音）
  *
- * 单源超时 3s，避免长尾请求拖慢页面。
- * 带服务端缓存头，减少重复请求。
- *
- * 本地开发：若设置了 HTTPS_PROXY / HTTP_PROXY 环境变量
- * （如 http://127.0.0.1:7897），将自动通过代理访问外部图标源，
- * 解决 Node.js fetch 默认不走系统代理的问题。
- *
- * 用法：/api/favicon?domain=example.com
+ * 安全：只请求固定 CDN 模板，禁止直连用户域名（防 SSRF）。
+ * 上游 404 但 body 仍是 image/* 时也会接受（DDG/Google 常见）。
  */
 
 const FAVICON_PROXY = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
@@ -31,8 +25,11 @@ let proxyInitialized = false;
 const FAVICON_WINDOW_MS = 60_000;
 const FAVICON_MAX_PER_MIN = 120;
 const MAX_BODY_BYTES = 512 * 1024;
-const MIN_BODY_BYTES = 100;
-const UPSTREAM_TIMEOUT_MS = 3000;
+/** 过小几乎一定是空壳/错误页；真实 16x16 png 也常 > 80B */
+const MIN_BODY_BYTES = 64;
+const UPSTREAM_TIMEOUT_MS = 3500;
+/** Google 无图标时的通用占位约 726B；DDG 无图标约 1478B */
+const PLACEHOLDER_BODY_SIZES = new Set([726, 1478]);
 
 export const runtime = "nodejs";
 
@@ -58,7 +55,7 @@ async function cancelBody(response: Response): Promise<void> {
   try {
     await response.body?.cancel();
   } catch {
-    // The body may already be closed or aborted.
+    // already closed
   }
 }
 
@@ -85,6 +82,7 @@ async function readBodyWithinLimit(response: Response): Promise<Uint8Array> {
   }
 
   if (total < MIN_BODY_BYTES) throw new Error("favicon_body_too_small");
+  if (PLACEHOLDER_BODY_SIZES.has(total)) throw new Error("favicon_placeholder_body");
 
   const body = new Uint8Array(total);
   let offset = 0;
@@ -100,6 +98,10 @@ interface FaviconSource {
   label: string;
 }
 
+/**
+ * 从固定 CDN 拉图标。接受 200 或「404 + image/* + 非占位 body」
+ *（上游常用 404 表示 default icon，但 body 仍是 png）。
+ */
 async function fetchFaviconSource(
   source: FaviconSource,
   dispatcherOption: { dispatcher?: unknown },
@@ -112,20 +114,23 @@ async function fetchFaviconSource(
   try {
     const response = await fetch(source.url, {
       signal: controller.signal,
-      headers: { "User-Agent": "nav-site-favicon-proxy/1.0" },
-      redirect: "manual",
+      headers: {
+        "User-Agent": "nav-site-favicon-proxy/1.1",
+        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      },
+      // 跟随 CDN 内部跳转（如 Google → gstatic）；起点已是白名单 CDN
+      redirect: "follow",
       ...dispatcherOption,
     });
 
-    if (!response.ok || (response.status >= 300 && response.status < 400)) {
-      await cancelBody(response);
-      throw new Error("favicon_upstream_invalid_status");
-    }
-
     const contentType = response.headers.get("content-type") || "";
-    if (!contentType.startsWith("image/")) {
+    const isImage = contentType.startsWith("image/");
+    const statusOk = response.status >= 200 && response.status < 300;
+    const softNotFoundImage = response.status === 404 && isImage;
+
+    if ((!statusOk && !softNotFoundImage) || !isImage) {
       await cancelBody(response);
-      throw new Error("favicon_upstream_invalid_type");
+      throw new Error("favicon_upstream_invalid_response");
     }
 
     const contentLength = Number(response.headers.get("content-length") || 0);
@@ -136,12 +141,27 @@ async function fetchFaviconSource(
 
     return {
       body: await readBodyWithinLimit(response),
-      contentType,
+      contentType: contentType.split(";")[0]?.trim() || "image/png",
       label: source.label,
     };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** 用域名首字母生成 SVG 占位，保证始终有图标可显示。 */
+function buildMonogramSvg(domain: string): Uint8Array {
+  const label = (domain.replace(/^www\./, "").charAt(0) || "?").toUpperCase();
+  // 简单色相：按首字符稳定取色，避免每次随机
+  const hue = (label.charCodeAt(0) * 37) % 360;
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="${label}">
+  <rect width="64" height="64" rx="14" fill="hsl(${hue} 42% 46%)"/>
+  <text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle"
+    font-family="ui-sans-serif,system-ui,sans-serif" font-size="32" font-weight="700"
+    fill="#fff">${label}</text>
+</svg>`;
+  return new TextEncoder().encode(svg);
 }
 
 export async function GET(request: NextRequest) {
@@ -165,24 +185,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing domain parameter" }, { status: 400 });
   }
 
-  // Zod 域名格式校验（替换原手动正则）
   const domainCheck = faviconDomainSchema.safeParse(domain);
   if (!domainCheck.success) {
     const firstError = domainCheck.error.flatten().formErrors[0] || "Invalid domain";
     return NextResponse.json({ error: firstError }, { status: 400 });
   }
 
-  if (isBlockedOutboundHost(domainCheck.data)) {
+  const safeDomain = domainCheck.data;
+  if (isBlockedOutboundHost(safeDomain)) {
     return NextResponse.json({ error: "Domain not allowed" }, { status: 400 });
   }
 
   const dispatcherOption = await getProxyDispatcher();
 
-  // 仅走第三方 icon CDN，禁止 direct fetch(用户域名) 以消除 redirect/DNS SSRF 面。
-  const sources = [
-    { url: `https://favicon.cccyun.cc/${domain}`, label: "cccyun" },
-    { url: `https://icons.duckduckgo.com/ip3/${domain}.ico`, label: "duckduckgo" },
-    { url: `https://www.google.com/s2/favicons?domain=${domain}&sz=64`, label: "google-s2" },
+  // 仅固定 CDN 模板；禁止 `https://${userDomain}/favicon.ico`
+  const sources: FaviconSource[] = [
+    { url: `https://favicon.cccyun.cc/${safeDomain}`, label: "cccyun" },
+    { url: `https://icons.duckduckgo.com/ip3/${safeDomain}.ico`, label: "duckduckgo" },
+    {
+      url: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(safeDomain)}&sz=64`,
+      label: "google-s2",
+    },
+    {
+      url: `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(`http://${safeDomain}`)}&size=64`,
+      label: "google-v2",
+    },
   ];
 
   const controllers: AbortController[] = [];
@@ -191,7 +218,7 @@ export async function GET(request: NextRequest) {
       sources.map((source) => fetchFaviconSource(source, dispatcherOption, controllers))
     );
 
-    return new NextResponse(result.body, {
+    return new NextResponse(Buffer.from(result.body), {
       status: 200,
       headers: {
         "Content-Type": result.contentType,
@@ -200,17 +227,19 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch {
-    // All fixed upstream sources failed validation or timed out.
+    // all CDN sources failed
   } finally {
     for (const controller of controllers) controller.abort();
   }
 
-  // 所有源都失败 — 返回 404，客户端显示 Globe 图标
-  return new NextResponse(null, {
-    status: 404,
+  // SVG 字母占位：200 + 长缓存，客户端不再 Globe / 404 风暴
+  const monogram = buildMonogramSvg(safeDomain);
+  return new NextResponse(Buffer.from(monogram), {
+    status: 200,
     headers: {
-      // 短负缓存，减轻失败重试风暴
-      "Cache-Control": "public, max-age=600, s-maxage=600",
+      "Content-Type": "image/svg+xml; charset=utf-8",
+      "Cache-Control": "public, max-age=3600, s-maxage=86400",
+      "X-Favicon-Source": "monogram",
     },
   });
 }
