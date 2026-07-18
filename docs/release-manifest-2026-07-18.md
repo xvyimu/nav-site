@@ -11,7 +11,7 @@
 |---|---|
 | 分支 | `master` = `origin/master`（文档/清理后续 commit 可能更新） |
 | **生产运行时 HEAD** | **`ee5a047b`**（T1–T10 代码；env 切换不改 commit） |
-| 生产 deploy（CF embed） | `dpl_FNsWZWAQgt6xswtT4rr7xZKFQWrt` → https://yuanjia1314.ccwu.cc |
+| 生产 deploy（CF embed） | `dpl_6GCemEkco5zaRGxxzx7Y6bRccorj` → https://yuanjia1314.ccwu.cc |
 | 基线 SHA | `9733897d…` |
 | 形成日期 | 2026-07-18 |
 | 生产迁库 | **是**（supabase-nav-prod + `embedding_1024` 列/RPC 已有） |
@@ -88,5 +88,5 @@ pnpm run verify:production -- --base-url https://yuanjia1314.ccwu.cc --expect-co
 | 项 | 状态 |
 |---|---|
 | Fly 绑卡部署 BGE | 可选灾备，非主路径 |
-| 专用长期 CF API Token | 建议在 Dashboard 建 `Workers AI` 限定 token 替换 wrangler oauth（更稳） |
+| 专用长期 CF API Token | ✅ 已用用户提供的 `cfut_` Workers AI token（User env + Vercel）；勿提交 git |
 | 为 docs 再 prod 部署 | 不做 |
