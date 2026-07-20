@@ -1,10 +1,11 @@
 # 生产运行手册
 
-> 最后更新：2026-07-18  
+> 最后更新：2026-07-20  
 > 适用项目：nav-site  
 > **生产入口：`https://yuanjia1314.ccwu.cc`**（自定义域 · Vercel 项目 `nav-site` · **verified**）  
 > **当前生产 HEAD**：以 `GET /build-info.json` 的 `commit` 为准（2026-07-18 收口运行时为 `ee5a047b`）  
 > 发布单次记录：`docs/release-manifest-2026-07-18.md`  
+> Embed 架构：`docs/embed-fly-deploy.md`（**路径 B = Cloudflare Workers AI 为生产默认**）  
 > 值守：`docs/oncall-and-alerts.md` · Preview：`docs/preview-env-setup.md`  
 > DNS（Cloudflare zone `yuanjia1314.ccwu.cc` / gmail 账）：apex **CNAME** → `41f090bbdb4a5afe.vercel-dns-017.com`（橙云）+ `_vercel` **TXT** 校验  
 > 历史 Netlify site `nav-site`：**账号侧已 disable**（`credit_save_vercel_primary`）+ build hook 已删 + custom_domain 已解绑；`netlify.toml` ignore **默认跳过全部构建**。  
@@ -14,51 +15,65 @@
 
 这份手册用于生产发布、故障处理、账号额度恢复、健康检查和跨代理交接。任何涉及生产数据库、部署平台 secret、GitHub secret、账单和域名 DNS 的操作，都先按本手册确认影响范围，再执行。
 
-## 语义检索 / Embedding（2026-07-12）
+## 语义检索 / Embedding（生产默认 · 2026-07-18/19）
 
-生产向量检索已通：
+### 路径 B — 主导航（24×7 · **当前默认**）
 
 ```text
-Vercel → https://nav-site-embed-proxy.xiej4352.workers.dev
-  → https://embed.aijiaqi.ccwu.cc (Named Tunnel)
-  → 本机 127.0.0.1:18003 (BGE-small-zh-v1.5 · 512-d)
+Vercel
+  EMBED_PROVIDER=cloudflare
+  CF_ACCOUNT_ID / CF_AI_API_TOKEN
+  → Workers AI @cf/baai/bge-m3 (1024-d)
+  → RPC search_links_semantic_v2
+  → nav_links.embedding_1024
 ```
 
 | 探针 | 期望 |
 |------|------|
-| `GET /api/health` → `checks.embedding` | `ok` |
-| `GET /api/resource-search-status` | `available/vector/rpc: true` |
-| `POST /api/resource-search` `{"query":"...","mode":"vector"}` | `mode: "vector"` |
-| `POST /api/resource-search` `{"query":"...","mode":"hybrid"}` | `mode: "hybrid"`（RRF） |
+| `GET /api/health` → `checks.embedding` | `ok` · detail 含 `cloudflare embedding ready (1024-d)` |
+| `GET /api/search?q=...&semantic=true` | hybrid / 含 similarity |
+| `GET /build-info.json` | commit = 生产运行时 HEAD（`ee5a047b`） |
 
-本机日常：
+生产 env（Vercel encrypted）：
+
+```text
+EMBED_PROVIDER=cloudflare
+CF_ACCOUNT_ID=<Cloudflare account id>
+CF_AI_API_TOKEN=<Workers AI token · 用户 durable cfut_>
+EMBED_DIM=1024
+EMBED_SEMANTIC_RPC=search_links_semantic_v2
+```
+
+**不依赖本机进程。** Fly / VPS BGE **不做主路径**（无账单/VPS）；见 `docs/embed-fly-deploy.md` §路径 B。
+
+### 路径 A — Resource Library / 备援（本机 BGE 512-d · 可选）
+
+仅当需要 RL 向量或把主导航临时回滚到 embed-server 时启动：
+
+```text
+Vercel/本机 → Worker 反代（可选）
+  → Named Tunnel embed.aijiaqi.ccwu.cc
+  → 127.0.0.1:18003  BGE-small-zh-v1.5 · 512-d
+```
 
 ```powershell
 # 幂等拉起 native + tunnel
 powershell -NoProfile -File D:/nav-site/scripts/ensure-embed-stack.ps1
 
-# 或分步
-powershell -NoProfile -File D:/nav-site/scripts/start-embed-native.ps1
-powershell -NoProfile -File D:/nav-site/scripts/start-embed-tunnel.ps1
+# 停
+powershell -NoProfile -File D:/nav-site/scripts/stop-embed-tunnel.ps1
+powershell -NoProfile -File D:/nav-site/scripts/stop-embed-native.ps1
 ```
 
-**登录自启（可选 · 2026-07-13 默认已卸载）：**
+| 探针（路径 A） | 期望 |
+|------|------|
+| `GET http://127.0.0.1:18003/health` | `dim:512` · BGE-small-zh |
+| `GET /api/resource-search-status` | `available/vector/rpc: true`（依赖 RL 配置） |
 
-```powershell
-# 当前状态：计划任务 nav-site-embed-stack 已卸；需语义检索时手动 ensure
-powershell -NoProfile -File D:/nav-site/scripts/ensure-embed-stack.ps1
+**登录自启（可选 · 默认已卸载）：** 任务名 `nav-site-embed-stack`。主导航已走 CF 后，一般不必再装。
 
-# 若要重新安装登录自启：
-powershell -NoProfile -File D:/nav-site/scripts/install-embed-autostart.ps1
-# 卸载
-powershell -NoProfile -File D:/nav-site/scripts/uninstall-embed-autostart.ps1
-```
-
-任务名：`nav-site-embed-stack` · 登录后 90s · 日志 `.embed-autostart.log`  
-
-**脆弱点：** 本机关机/未跑 ensure → embedding error；默认 health 仍 healthy（探针可设 `HEALTH_REQUIRE_EMBEDDING=1` 或 `pnpm verify:production` 加 `--require-embedding`）。语义搜索降级 FTS。  
-**勿**把 `EMBED_SERVER_URL` 指回失效 `*.trycloudflare.com` quick tunnel。  
-**云端路径说明：** Worker + Named Tunnel 只是公网入口；**origin 仍是本机 BGE**（非始终在线云 GPU）。长期应迁 VPS。见 `docs/embed-fly-deploy.md`。
+**脆弱点（仅路径 A）：** 本机关机/未跑 ensure → RL 向量或备援路径失败；主导航 CF 路径不受影响。  
+**勿**把 `EMBED_SERVER_URL` 指回失效 `*.trycloudflare.com` quick tunnel。
 
 ### 管理员密码（scrypt）
 
@@ -108,15 +123,18 @@ rtk node scripts/pre-commit-secret-scan.mjs
 
 4. **历史 Netlify 路径**（credits 恢复前勿用）：`master` push → quality + build + E2E only；生产 deploy 仅 `workflow_dispatch`：`CI 检查 / 手动 Netlify 部署`。额度用尽期间 **禁止空触发**。
 
-5. 部署后复验（Vercel）：
+5. 部署后复验（主域优先；Vercel 别名亦可）：
 
 ```text
-GET  https://nav-site-kappa.vercel.app/api/health               → embedding=ok
-GET  https://nav-site-kappa.vercel.app/api/resource-search-status → vector:true
-POST https://nav-site-kappa.vercel.app/api/resource-search  {"query":"大模型","mode":"vector"}
+GET  https://yuanjia1314.ccwu.cc/api/health
+     → checks.embedding.status=ok · cloudflare embedding ready (1024-d)
+GET  https://yuanjia1314.ccwu.cc/build-info.json
+pnpm run verify:production -- --base-url https://yuanjia1314.ccwu.cc --expect-commit <prod HEAD>
+# RL 向量（可选，依赖本机/备援路径 A）
+GET  https://yuanjia1314.ccwu.cc/api/resource-search-status → vector:true
 ```
 
-仓库质量门脚本 `verify:production:*` / `verify:launch-readiness` 仍可跑；入口 URL 以 Vercel 为准。
+仓库质量门脚本 `verify:production:*` / `verify:launch-readiness` 仍可跑。
 
 ## Netlify Credit 问题
 
@@ -159,58 +177,37 @@ https://nav-site-kappa.vercel.app/api/health
 | `database` | `ok` | 是 | 主 Supabase 分类表连通性 |
 | `env` | `ok` | 是 | 必需公开 Supabase env 是否存在，不暴露值 |
 | `sentry` | `ok` 或 `skipped` | 否 | Sentry 是可选观测项 |
-| `embedding` | `ok`、`skipped` 或 `error` | 否 | 语义搜索可降级到 Fuse；loopback 在 serverless 默认跳过；远程须 HTTPS + `EMBED_SERVER_API_KEY`（见 ADR-005） |
+| `embedding` | `ok`、`skipped` 或 `error` | 否 | **生产默认 CF 1024-d**；可降级 Fuse。`embed-server` 远程须 HTTPS + API Key（ADR-008） |
 | `resourceLibrarySearch` | `ok` 或 `skipped` | 否 | 资源库公开搜索 RPC；`error` 会被生产探针标红 |
 
 资源库搜索健康检查只使用 `RESOURCE_LIBRARY_ANON_KEY` 或 `RESOURCE_LIBRARY_SUPABASE_ANON_KEY` 调用公开 RPC `resource_search_health`。缺 key 时标记 `skipped`，不会回退到 service role。
 
-### Embedding 远程端点（生产语义搜索）
+### Embedding 路径对照
 
-本地开发：`EMBED_SERVER_URL=http://127.0.0.1:18003`（或 8003 历史端口）。
+| 路径 | 用途 | Provider / 维 | 依赖本机？ |
+|------|------|---------------|-----------|
+| **B（默认）** | 主导航语义 | `cloudflare` · 1024 | 否 |
+| **A（可选）** | RL / 回滚 | `embed-server` · 512 | 是（native + tunnel） |
 
-生产（**Vercel**，2026-07-11 已通）：
+路径 A 远程形态（历史生产入口，现作备援）：
 
 1. 本机 `scripts/embed-server.py`（BGE-small-zh-v1.5，512 维）+ Named Tunnel `embed.aijiaqi.ccwu.cc`。
 2. Worker 反代 `https://nav-site-embed-proxy.xiej4352.workers.dev`（绕 zone Bot Fight 对 Vercel 出口的 403）。
-3. Vercel env（encrypted）：
-   - `EMBED_SERVER_URL=https://nav-site-embed-proxy.xiej4352.workers.dev`
-   - `EMBED_SERVER_API_KEY=<same as .embed-api-key.local>`
-4. 不要设 `EMBED_SERVER_LOOPBACK_ENABLED`；不要用远程 HTTP 明文。
+3. env：`EMBED_PROVIDER=embed-server` + `EMBED_SERVER_URL` / `EMBED_SERVER_API_KEY`；不要设 `EMBED_SERVER_LOOPBACK_ENABLED`；不要用远程 HTTP 明文。
 
-验收：
+本地开发也可直接 `EMBED_SERVER_URL=http://127.0.0.1:18003`。
 
-- `/api/health` → `checks.embedding.status === "ok"`
-- `/api/resource-search-status` → `{ "available": true, "vector": true, "rpc": true }`
-- `mode=vector` 不降级 FTS
+详见 `docs/embed-fly-deploy.md` · `docs/adr-008-remote-embed-endpoint.md`（ADR-008 描述路径 A 远程端点契约）。
 
-详见 `docs/embed-fly-deploy.md` · `docs/adr-008-remote-embed-endpoint.md`。
+### 回填 / 重建 `embedding_1024`（路径 B）
 
-### Cloudflare Workers AI 切换（nav 语义搜索 · S3）
-
-当前 512 维 embed-server 路径仍是默认回滚路径。切到 Cloudflare Workers AI 前，先执行 `scripts/migration-audit-s0-constraints.sql`，确认它已创建：
-
-- `nav_links.embedding_1024`
-- `idx_nav_links_embedding_1024`
-- `search_links_semantic_v2`
-- `batch_update_embeddings_v2`
-
-Vercel Production env（encrypted）：
-
-```text
-EMBED_PROVIDER=cloudflare
-CF_ACCOUNT_ID=<Cloudflare account id>
-CF_AI_API_TOKEN=<Workers AI token with ai:run>
-EMBED_DIM=1024
-EMBED_SEMANTIC_RPC=search_links_semantic_v2
-```
-
-回填顺序：
+前置：库中已有 `nav_links.embedding_1024`、`idx_nav_links_embedding_1024`、`search_links_semantic_v2`、`batch_update_embeddings_v2`（见 `scripts/migration-audit-s0-constraints.sql`）。
 
 ```powershell
-rtk python scripts/backfill-embeddings.py --provider cloudflare --limit 5 --dry-run
-rtk python scripts/backfill-embeddings.py --provider cloudflare --dry-run
+python scripts/backfill-embeddings.py --provider cloudflare --limit 5 --dry-run
+python scripts/backfill-embeddings.py --provider cloudflare --dry-run
 # 确认目标库、env、费用和输出后再写入：
-rtk python scripts/backfill-embeddings.py --provider cloudflare --apply
+python scripts/backfill-embeddings.py --provider cloudflare --apply --batch-size 8
 ```
 
 ### 回填命令参考

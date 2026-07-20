@@ -11,7 +11,8 @@
 | 数据库 | Supabase (PostgreSQL + RLS) | 单库模式 |
 | 认证 | next-auth v5 (Credentials + GitHub OAuth) | 5.0.0-beta.31 |
 | 搜索 | Fuse.js 服务端模糊搜索 + pgvector 语义搜索 | — |
-| 嵌入服务 | BAAI/bge-small-zh-v1.5 (512 维) | FastAPI + uvicorn |
+| 嵌入（主导航） | **Cloudflare Workers AI** `@cf/baai/bge-m3` | **1024 维** · 生产默认 |
+| 嵌入（RL / 备援） | BAAI/bge-small-zh-v1.5 | 512 维 · 本机 FastAPI + uvicorn（可选） |
 | 动画 | Motion (Framer Motion) | — |
 | 监控 | Sentry (client/server/edge) | — |
 | 测试 | Vitest (单元) + Playwright (E2E) | — |
@@ -51,8 +52,11 @@ pnpm start
 | `ADMIN_PASSWORD` | 管理员明文密码（仅当未设 HASH 时过渡用） | 否* |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key（服务端绕过 RLS） | 是 |
 | `SUPABASE_SERVICE_ROLE_KEY_PROD` | 生产库 service role key（优先于 `SUPABASE_SERVICE_ROLE_KEY`） | 否 |
-| `EMBED_SERVER_URL` | embedding 服务 URL（本地 `http://127.0.0.1:18003`；生产 HTTPS Worker） | 否 |
-| `EMBED_SERVER_API_KEY` | 远程 embedding Bearer（生产必填） | 否 |
+| `EMBED_PROVIDER` | 主导航 embedding：`cloudflare`（生产默认）或 `embed-server`（本机/备援） | 否 |
+| `CF_ACCOUNT_ID` / `CF_AI_API_TOKEN` | Cloudflare Workers AI（`EMBED_PROVIDER=cloudflare` 时必填） | 否* |
+| `EMBED_DIM` / `EMBED_SEMANTIC_RPC` | 生产默认 `1024` / `search_links_semantic_v2` | 否 |
+| `EMBED_SERVER_URL` | 本机/备援 BGE URL（本地 `http://127.0.0.1:18003`；或 Worker 反代） | 否 |
+| `EMBED_SERVER_API_KEY` | 远程 embed-server Bearer（HTTPS 远程必填） | 否 |
 | `RESOURCE_LIBRARY_API_KEY` | Resource Library Edge Function API key（仅服务端使用） | 否 |
 | `RESOURCE_LIBRARY_ANON_KEY` | Resource Library anon key（公开读路径优先使用） | 否 |
 | `RESOURCE_LIBRARY_PUBLIC_PAGES_SOURCE` | Resource Library 公开页面 view/table（默认 `public_pages`） | 否 |
