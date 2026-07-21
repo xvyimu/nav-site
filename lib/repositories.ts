@@ -77,3 +77,4 @@ export type {
   LinkHealthReport,
   ListOpenFindingsResult,
 } from "@/lib/repositories/link-health";
+// Prefer `@/lib/admin/link-health-types` from client components (ADR-009 seam).

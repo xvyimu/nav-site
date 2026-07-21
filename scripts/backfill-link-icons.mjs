@@ -17,31 +17,14 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { loadProjectEnv } from "./lib/load-project-env.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, "..");
 
-function loadEnv() {
-  try {
-    const envPath = join(projectRoot, ".env.local");
-    for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eq = trimmed.indexOf("=");
-      if (eq === -1) continue;
-      const key = trimmed.slice(0, eq).trim();
-      const value = trimmed.slice(eq + 1).trim();
-      if (!process.env[key]) process.env[key] = value;
-    }
-  } catch {
-    // optional
-  }
-}
-
-loadEnv();
+loadProjectEnv(projectRoot);
 
 const args = process.argv.slice(2);
 const write = args.includes("--write");

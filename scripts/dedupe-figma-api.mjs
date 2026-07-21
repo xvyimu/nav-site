@@ -12,31 +12,14 @@
  *   node scripts/dedupe-figma-api.mjs --dry-run    # 仅查询预览
  */
 
-import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { loadProjectEnv } from "./lib/load-project-env.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, "..");
 
-// ── 环境变量加载 ──
-function loadEnv() {
-  try {
-    const envPath = join(projectRoot, ".env.local");
-    const lines = readFileSync(envPath, "utf-8").split("\n");
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eqIdx = trimmed.indexOf("=");
-      if (eqIdx === -1) continue;
-      const key = trimmed.slice(0, eqIdx).trim();
-      const value = trimmed.slice(eqIdx + 1).trim();
-      if (!process.env[key]) process.env[key] = value;
-    }
-  } catch {}
-}
-
-loadEnv();
+loadProjectEnv(projectRoot);
 
 const dryRun = process.argv.includes("--dry-run");
 const apiBase = "http://localhost:3264";

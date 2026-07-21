@@ -26,6 +26,7 @@ import { readFileSync, writeFileSync } from "fs";
 import { dirname, join, isAbsolute, resolve } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 import { buildLinkHealthReport } from "./link-health-report-shape.mjs";
+import { loadProjectEnv } from "./lib/load-project-env.mjs";
 
 export { buildLinkHealthReport };
 
@@ -34,24 +35,6 @@ const projectRoot = join(__dirname, "..");
 
 const TIMEOUT = parseInt(process.env.LINK_CHECK_TIMEOUT || "10000", 10);
 const CONCURRENCY = parseInt(process.env.LINK_CHECK_CONCURRENCY || "5", 10);
-
-/** 可选加载 .env.local（不覆盖已有 process.env） */
-function loadEnv() {
-  try {
-    const envPath = join(projectRoot, ".env.local");
-    for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eq = trimmed.indexOf("=");
-      if (eq === -1) continue;
-      const key = trimmed.slice(0, eq).trim();
-      const value = trimmed.slice(eq + 1).trim();
-      if (!process.env[key]) process.env[key] = value;
-    }
-  } catch {
-    // optional
-  }
-}
 
 /** Parse --json [path]; bare --json → link-health-report.json */
 function parseJsonFlag(args) {
@@ -186,7 +169,7 @@ async function persistFindings(report, supabaseUrl) {
 }
 
 async function main() {
-  loadEnv();
+  loadProjectEnv(projectRoot);
 
   const argv = process.argv.slice(2);
   const isStrict = argv.includes("--strict");

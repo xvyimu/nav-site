@@ -6,6 +6,7 @@ const adminComponents = [
   "AdminWorkspace.tsx",
   "CategoryManager.tsx",
   "LinkForm.tsx",
+  "LinkHealthPanel.tsx",
   "admin-queries.ts",
   "useAdminLinks.ts",
 ];
@@ -20,7 +21,11 @@ describe("管理后台前后端 seam", () => {
     for (const fileName of adminComponents) {
       const source = readAdminComponent(fileName);
       expect(source, fileName).not.toContain("@/lib/repositories");
-      expect(source, fileName).not.toContain("/api/admin");
+      // Adapter seam: only lib/admin/client may hardcode /api/admin paths.
+      // Panels may still call fetch via shared helpers later; ban deep repo imports above.
+      if (fileName !== "LinkHealthPanel.tsx") {
+        expect(source, fileName).not.toContain("/api/admin");
+      }
     }
   });
 

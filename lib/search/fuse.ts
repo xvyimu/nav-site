@@ -15,10 +15,14 @@ import type { FuseCache, FuseResultItem, SearchResult } from "./types";
 
 const FETCH_TIMEOUT = 8000;
 const CACHE_TTL_MS = 60_000; // 60 秒
+/** Bound filtered-pool Fuse instances to avoid unbounded growth under diverse filters. */
+const FILTERED_FUSE_CACHE_MAX = 32;
 
 let fuseCache: FuseCache | null = null;
 /** In-flight full-pool load so concurrent cold requests share one DB round-trip. */
 let poolLoadPromise: Promise<NavLink[]> | null = null;
+/** Short-lived Fuse instances keyed by category + filter fingerprint + pool timestamp. */
+const filteredFuseCache = new Map<string, Fuse<NavLink>>();
 
 function hasActiveFilters(filters?: SearchFilters): boolean {
   return Boolean(
@@ -27,6 +31,39 @@ function hasActiveFilters(filters?: SearchFilters): boolean {
     filters?.minRating !== null && filters?.minRating !== undefined ||
     filters?.popularity
   );
+}
+
+function filterFingerprint(
+  category: string | undefined,
+  filters: SearchFilters | undefined,
+  poolTimestamp: number
+): string {
+  const tags = filters?.tagSlugs?.length
+    ? [...filters.tagSlugs].sort().join(",")
+    : "";
+  return [
+    category ?? "all",
+    tags,
+    filters?.minRating ?? "",
+    filters?.popularity ?? "",
+    String(poolTimestamp),
+  ].join("|");
+}
+
+function getOrCreateFilteredFuse(
+  FuseModule: typeof Fuse,
+  pool: NavLink[],
+  fingerprint: string
+): Fuse<NavLink> {
+  const hit = filteredFuseCache.get(fingerprint);
+  if (hit) return hit;
+  const fuse = createFuse(FuseModule, pool);
+  if (filteredFuseCache.size >= FILTERED_FUSE_CACHE_MAX) {
+    const oldest = filteredFuseCache.keys().next().value;
+    if (oldest !== undefined) filteredFuseCache.delete(oldest);
+  }
+  filteredFuseCache.set(fingerprint, fuse);
+  return fuse;
 }
 
 function createFuse(FuseModule: typeof Fuse, links: NavLink[]): Fuse<NavLink> {
@@ -80,6 +117,8 @@ export async function getSearchPool(
       links: allLinks,
       timestamp: now,
     };
+    // Full pool rebuilt → drop filtered Fuse instances (they key on pool timestamp).
+    filteredFuseCache.clear();
   }
 
   let pool = allLinks;
@@ -89,9 +128,17 @@ export async function getSearchPool(
   pool = applySearchFilters(pool, filters);
 
   const isFullPool = (!category || category === "all") && !hasActiveFilters(filters);
+  const poolTimestamp = fuseCache?.timestamp ?? now;
 
   return {
-    fuse: isFullPool && fuseCache ? fuseCache.fuse : createFuse(FuseModule, pool),
+    fuse:
+      isFullPool && fuseCache
+        ? fuseCache.fuse
+        : getOrCreateFilteredFuse(
+            FuseModule,
+            pool,
+            filterFingerprint(category, filters, poolTimestamp)
+          ),
     links: pool,
     allLinks,
   };

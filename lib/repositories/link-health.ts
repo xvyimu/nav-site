@@ -1,41 +1,16 @@
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import { isMissingRelationError } from "@/lib/repositories/shared";
-
-/** Open or historical link-health finding row. */
-export interface LinkHealthFinding {
-  id: string;
-  link_id: string | null;
-  title: string;
-  url: string;
-  http_status: string;
-  detail: string | null;
-  kind: "broken" | "redirect";
-  checked_at: string;
-  resolved_at: string | null;
-  run_id: string | null;
-}
-
-/** Structured report produced by scripts/check-links.mjs --json. */
-export interface LinkHealthReport {
-  generatedAt: string;
-  total: number;
-  ok: number;
-  broken: Array<{
-    id?: string | null;
-    title: string;
-    url: string;
-    status: string | number;
-    error?: string;
-  }>;
-  redirects: Array<{
-    id?: string | null;
-    title: string;
-    url: string;
-    status: string | number;
-    location?: string;
-  }>;
-}
+// Types live under lib/admin so client UI never imports repositories/* for DTOs only.
+export type {
+  LinkHealthFinding,
+  LinkHealthReport,
+  LinkHealthKind,
+} from "@/lib/admin/link-health-types";
+import type {
+  LinkHealthFinding,
+  LinkHealthReport,
+} from "@/lib/admin/link-health-types";
 
 export type ListOpenFindingsResult =
   | { findings: LinkHealthFinding[]; unavailable?: false }

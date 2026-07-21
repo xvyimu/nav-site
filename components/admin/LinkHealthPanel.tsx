@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import type { LinkHealthFinding } from "@/lib/repositories/link-health";
+import type { LinkHealthFinding } from "@/lib/admin/link-health-types";
 
 type ListResponse = {
   findings: LinkHealthFinding[];
