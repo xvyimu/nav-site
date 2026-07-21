@@ -5,3 +5,7 @@ allowBuilds:
   sharp: true
 overrides:
   postcss: 8.5.15
+  # Dependabot highs 2026-07-21 — force patched transitives
+  # GHSA-52cp-r559-cp3m (js-yaml), GHSA-3jxr-9vmj-r5cp (brace-expansion)
+  js-yaml: 4.3.0
+  brace-expansion: 5.0.7
