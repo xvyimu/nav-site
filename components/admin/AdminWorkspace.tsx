@@ -119,7 +119,7 @@ export function AdminWorkspace({ initialPage, initialCategories }: AdminWorkspac
   const handleSaved = useCallback((savedLink: NavLink) => {
     queryClient.setQueriesData<AdminLinksPage>(
       { queryKey: adminQueryKeys.links },
-      (current) => {
+      (current: AdminLinksPage | undefined) => {
         if (!current) return current;
         const idx = current.links.findIndex((item) => item.id === savedLink.id);
         if (idx >= 0) {
@@ -154,7 +154,7 @@ export function AdminWorkspace({ initialPage, initialCategories }: AdminWorkspac
 
     queryClient.setQueriesData<AdminLinksPage>(
       { queryKey: adminQueryKeys.links },
-      (current) => {
+      (current: AdminLinksPage | undefined) => {
         if (!current) return current;
         const nextLinks = current.links.filter((item) => item.id !== deletingLink.id);
         if (nextLinks.length === current.links.length) return current;
