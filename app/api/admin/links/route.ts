@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withAdminGet, withAdminWrite } from "@/lib/with-admin";
 import { createLinkSchema } from "@/lib/schemas";
 import { getAdminLinksPage, createLink } from "@/lib/repositories/admin-links";
+import { revalidatePublicNavContent } from "@/lib/admin/revalidate-public";
 
 const adminLinksQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -49,5 +50,6 @@ export const POST = withAdminWrite(createLinkSchema, async ({ parsed }) => {
     featured: parsed.featured,
     tag_ids: parsed.tag_ids,
   });
+  revalidatePublicNavContent({ slug: link.slug });
   return NextResponse.json({ link });
 });

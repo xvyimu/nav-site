@@ -85,23 +85,23 @@
   --sidebar-border: #d8e0e7;
   --sidebar-ring: #5f84b2;
 
-  /* 管理后台：克制的蓝灰工作界面 */
-  --admin-primary: #4a5568;
-  --admin-primary-hover: #374151;
-  --admin-primary-soft: #edf2f7;
-  --admin-canvas: #f7f9fb;
-  --admin-surface: #f8fafc;
+  /* 管理后台：对齐前台 paper-accent 的简洁现代工作界面 */
+  --admin-primary: #5f84b2;
+  --admin-primary-hover: #4a6f99;
+  --admin-primary-soft: rgba(95, 132, 178, 0.12);
+  --admin-canvas: #f4f6f9;
+  --admin-surface: #eef2f6;
   --admin-text: #1f2937;
-  --admin-muted: #718096;
-  --admin-faint: #a0aec0;
+  --admin-muted: #64748b;
+  --admin-faint: #94a3b8;
   --admin-border: #e2e8f0;
-  --admin-danger: #9f2f2d;
-  --admin-danger-soft: #fdebec;
-  --admin-success: #346538;
-  --admin-success-soft: #edf3ec;
-  --admin-warning: #956400;
-  --admin-warning-soft: #fbf3db;
-  --admin-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --admin-danger: #b42318;
+  --admin-danger-soft: #fef3f2;
+  --admin-success: #027a48;
+  --admin-success-soft: #ecfdf3;
+  --admin-warning: #b54708;
+  --admin-warning-soft: #fffaeb;
+  --admin-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
 @theme inline {
@@ -158,7 +158,7 @@ body {
 
 .admin-panel {
   border: 1px solid var(--admin-border);
-  border-radius: 8px;
+  border-radius: 12px;
   background: #ffffff;
   box-shadow: var(--admin-shadow);
 }

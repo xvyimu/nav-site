@@ -63,12 +63,14 @@ export function HomeHero({
                 <Compass className="size-3.5" aria-hidden="true" />
                 导航图谱
               </p>
-              <h1 className="nav-display max-w-4xl text-[2.55rem] leading-[1.05] text-[var(--paper-ink)] sm:text-6xl md:text-7xl lg:text-8xl">
+              <h1 className="nav-display max-w-4xl text-[2.4rem] leading-[1.06] tracking-tight text-[var(--paper-ink)] sm:text-5xl md:text-6xl lg:text-7xl">
                 寻得合用之器
-                <span className="block pl-[12%] text-[var(--paper-accent)]">安放每一次探索。</span>
+                <span className="mt-1 block pl-[8%] text-[var(--paper-accent)] sm:pl-[12%]">
+                  安放每一次探索。
+                </span>
               </h1>
-              <p className="max-w-2xl text-sm leading-6 text-[var(--paper-muted)] md:text-base md:leading-7">
-                为开发者、设计师和 AI 从业者整理的低噪声工具索引。先搜索，再用分类和标签收束结果。
+              <p className="max-w-xl text-sm leading-6 text-[var(--paper-muted)] md:max-w-2xl md:text-[0.95rem] md:leading-7">
+                低噪声工具索引 · 搜索优先 · 分类收束。5 秒内找到并点开。
               </p>
             </div>
 

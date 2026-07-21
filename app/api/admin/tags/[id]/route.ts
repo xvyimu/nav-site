@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAdminIdWrite, withAdminIdDelete } from "@/lib/with-admin";
 import { updateTagSchema } from "@/lib/schemas";
 import { updateTag, deleteTag } from "@/lib/repositories/tags";
+import { revalidatePublicNavContent } from "@/lib/admin/revalidate-public";
 
 /** 更新指定 UUID 的管理标签。 */
 export const PUT = withAdminIdWrite(updateTagSchema, async ({ parsed, id }) => {
@@ -16,11 +17,13 @@ export const PUT = withAdminIdWrite(updateTagSchema, async ({ parsed, id }) => {
   }
 
   const tag = await updateTag(id, updateInput);
+  revalidatePublicNavContent();
   return NextResponse.json({ tag });
 });
 
 /** 删除指定 UUID 的管理标签。 */
 export const DELETE = withAdminIdDelete(async ({ id }) => {
   await deleteTag(id);
+  revalidatePublicNavContent();
   return NextResponse.json({ success: true });
 });

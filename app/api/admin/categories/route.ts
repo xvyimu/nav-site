@@ -5,6 +5,7 @@ import {
   getAllCategoriesForAdmin,
   createCategory,
 } from "@/lib/repositories/categories";
+import { revalidatePublicNavContent } from "@/lib/admin/revalidate-public";
 
 /** 查询管理分类，并禁止共享缓存持有后台数据。 */
 export const GET = withAdminGet(async () => {
@@ -31,5 +32,6 @@ export const POST = withAdminWrite(createCategorySchema, async ({ parsed }) => {
     sort_order: parsed.sort_order,
     parent_id: parsed.parent_id ?? null,
   });
+  revalidatePublicNavContent();
   return NextResponse.json({ category });
 });

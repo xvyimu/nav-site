@@ -112,28 +112,73 @@ export function AdminWorkspace({ initialPage, initialCategories }: AdminWorkspac
   /** 任一筛选条件变化时回到第一页。 */
   const resetPage = useCallback(() => setPage(1), []);
 
-  /** 保存成功后刷新链接分页，并关闭编辑面板。 */
+  /**
+   * 保存成功：先乐观写进当前筛选缓存，再后台失效对齐服务端；
+   * 避免整表闪烁与等待网络 refetch。
+   */
   const handleSaved = useCallback((savedLink: NavLink) => {
-    void savedLink;
-    void queryClient.invalidateQueries({ queryKey: adminQueryKeys.links });
+    queryClient.setQueriesData<AdminLinksPage>(
+      { queryKey: adminQueryKeys.links },
+      (current) => {
+        if (!current) return current;
+        const idx = current.links.findIndex((item) => item.id === savedLink.id);
+        if (idx >= 0) {
+          const nextLinks = current.links.slice();
+          nextLinks[idx] = { ...nextLinks[idx], ...savedLink };
+          return { ...current, links: nextLinks };
+        }
+        // 新建：插到当前页顶部并增加 total
+        return {
+          ...current,
+          total: current.total + 1,
+          links: [savedLink, ...current.links].slice(0, current.pageSize),
+        };
+      }
+    );
+    void queryClient.invalidateQueries({
+      queryKey: adminQueryKeys.links,
+      refetchType: "active",
+    });
     setEditingLink(undefined);
     toast.success("链接已保存");
   }, [queryClient]);
 
-  /** 删除当前确认的链接，并在末页变空时回退一页。 */
+  /** 删除：乐观移出列表，失败则回滚；末页变空时回退一页。 */
   const handleDelete = useCallback(async () => {
     if (!deletingLink || deleting) return;
     setDeleting(true);
 
-    try {
-      // 删除行为通过 client seam 执行，组件只处理业务结果与缓存。
-      await adminApi.links.remove(deletingLink.id);
+    const previous = queryClient.getQueriesData<AdminLinksPage>({
+      queryKey: adminQueryKeys.links,
+    });
 
+    queryClient.setQueriesData<AdminLinksPage>(
+      { queryKey: adminQueryKeys.links },
+      (current) => {
+        if (!current) return current;
+        const nextLinks = current.links.filter((item) => item.id !== deletingLink.id);
+        if (nextLinks.length === current.links.length) return current;
+        return {
+          ...current,
+          links: nextLinks,
+          total: Math.max(0, current.total - 1),
+        };
+      }
+    );
+
+    try {
+      await adminApi.links.remove(deletingLink.id);
       if (linksPage.links.length === 1 && page > 1) setPage((current) => current - 1);
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.links });
+      await queryClient.invalidateQueries({
+        queryKey: adminQueryKeys.links,
+        refetchType: "active",
+      });
       setDeletingLink(null);
       toast.success("链接已删除");
     } catch (error) {
+      for (const [key, data] of previous) {
+        queryClient.setQueryData(key, data);
+      }
       toast.error(error instanceof Error ? error.message : "删除失败");
     } finally {
       setDeleting(false);
@@ -144,8 +189,12 @@ export function AdminWorkspace({ initialPage, initialCategories }: AdminWorkspac
     <div className="space-y-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase text-[var(--admin-muted)]">内容管理</p>
-          <h1 className="mt-1 text-2xl font-semibold leading-tight">链接工作台</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--admin-muted)]">
+            内容管理
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight leading-tight text-[var(--admin-text)]">
+            链接工作台
+          </h1>
         </div>
         <Button
           type="button"
