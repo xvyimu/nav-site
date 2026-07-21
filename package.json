@@ -84,5 +84,15 @@
     "typescript": "^5.1.0",
     "undici": "7.28.0",
     "vitest": "^4.1.9"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xvyimu/ChronoPortal.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xvyimu/ChronoPortal/issues"
+  },
+  "homepage": "https://nav-site-chi.vercel.app",
+  "license": "MIT",
+  "description": "ChronoPortal (GitHub) — curated AI/dev/design site navigator. Local package name remains nav-site."
 }
