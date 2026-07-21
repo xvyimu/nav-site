@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderTree, LayoutDashboard } from "lucide-react";
+import { FolderTree, LayoutDashboard, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/admin", label: "链接管理", icon: LayoutDashboard },
   { href: "/admin/categories", label: "分类管理", icon: FolderTree },
+  { href: "/admin/link-health", label: "链接健康", icon: Link2 },
 ] as const;
 
 /** 管理后台主导航；compact 用于移动顶栏横向滚动。 */

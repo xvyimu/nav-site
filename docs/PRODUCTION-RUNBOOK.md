@@ -390,6 +390,40 @@ scripts/migration-audit-s0-constraints.sql
 
 生产 SQL、secret 配置、远程数据库写入应交给有凭据的操作者或 Claude Code 执行，并在执行前确认目标项目、SQL 文件、回滚方案和验证命令。
 
+## 链接健康（死链队列 · C3）
+
+运营闭环：CLI 检测 → 可选入库 → Admin 列表 → 人工「标记已处理」。**不**自动下架/改 URL；**不**在恢复正常时自动 resolve。
+
+### 1. 迁移（按需 apply，本切片不强制生产）
+
+```text
+scripts/migration-link-health.sql
+```
+
+在目标 Supabase SQL Editor 执行。Rollback 见文件头注释。未 apply 时 Admin `GET /api/admin/link-health` 返回 200 + `meta.unavailable: true` 空列表，不 500。
+
+### 2. CLI
+
+```powershell
+# Markdown + JSON（默认 link-health-report.json）
+pnpm check:links
+
+# 仅 JSON 路径可自定义
+node scripts/check-links.mjs --json ./tmp-report.json
+
+# 写入 open findings（需 SUPABASE_SERVICE_ROLE_KEY；persist 失败只 warn，exit 仍由 BROKEN 数决定，exit 2 = 有死链）
+node scripts/check-links.mjs --report --json --persist
+```
+
+Redirects 默认以 `kind=redirect` 入队；broken 为 `kind=broken`。同一 `link_id`+`kind` 且 `resolved_at IS NULL` 则 update，否则 insert。
+
+### 3. Admin
+
+- 导航：「链接健康」→ `/admin/link-health`
+- API：`GET/POST /api/admin/link-health`（admin；写操作 CSRF）
+  - resolve：`{ "action": "resolve", "id": "<uuid>" }`
+  - import：`{ "action": "import", "report": { ...check-links JSON... } }`
+
 ## 回滚
 
 优先使用 revert commit，不重写历史：

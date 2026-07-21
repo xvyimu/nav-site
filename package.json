@@ -26,7 +26,7 @@
     "resource:ingest:dry-run": "node scripts/resource-ingest/run.mjs --source devto --limit 20",
     "resource:ingest:hn-dry-run": "node scripts/resource-ingest/run.mjs --source hn --query programming --limit 20",
     "resource:backfill-pages": "node scripts/resource-ingest/backfill-page-embeddings.mjs",
-    "check:links": "node scripts/check-links.mjs --report",
+    "check:links": "node scripts/check-links.mjs --report --json",
     "db:reviews:apply": "node scripts/apply-reviews-migration.mjs",
     "db:reviews:apply:dry-run": "node scripts/apply-reviews-migration.mjs --dry-run",
     "db:reviews:verify": "node scripts/verify-reviews-migration.mjs",

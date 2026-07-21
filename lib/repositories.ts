@@ -65,3 +65,15 @@ export {
   getUserFavorites,
   removeUserFavorite,
 } from "@/lib/repositories/favorites";
+
+export {
+  listOpenLinkHealthFindings,
+  resolveLinkHealthFinding,
+  replaceOrUpsertFindingsFromReport,
+  isLinkHealthTableMissing,
+} from "@/lib/repositories/link-health";
+export type {
+  LinkHealthFinding,
+  LinkHealthReport,
+  ListOpenFindingsResult,
+} from "@/lib/repositories/link-health";

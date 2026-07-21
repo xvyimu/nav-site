@@ -44,6 +44,7 @@ describe("管理后台前后端 seam", () => {
       ["categories", "[id]", "route.ts"],
       ["tags", "route.ts"],
       ["tags", "[id]", "route.ts"],
+      ["link-health", "route.ts"],
     ];
 
     for (const segments of routeFiles) {
