@@ -1,8 +1,8 @@
 # 综合导航站 — 项目进度文档
 
-> 最后更新：2026-07-20 · 版本 v18.3（docs 对齐 CF 1024 默认）
+> 最后更新：2026-07-21 · 版本 v18.4（§九 待办与 DESIGN-DOC 部署口径校准；SSOT 仍为本节 §〇）
 > 项目路径：`d:\nav-site` · 开发端口：3264
-> **生产运行时 HEAD**：`ee5a047b` · 主域 `https://yuanjia1314.ccwu.cc` · deploy `dpl_6GCemEkc…`
+> **生产运行时 HEAD**：`ee5a047b` · 主域 `https://yuanjia1314.ccwu.cc` · deploy 以 Vercel 当前 Production 为准
 
 ## 〇、2026-07-18 全日收口（权威入口）
 
@@ -915,17 +915,17 @@ pnpm sync         # 数据库同步
 - [x] 无障碍 skip-to-content 链接
 - [x] 运行 migration-slug.sql 到 Supabase — ✅ 已执行（slug 列+索引+trigger）
 - [x] 运行 migration-user-favorites.sql 到 Supabase — ✅ 已执行（表+RLS）
-- [ ] 配置 GitHub OAuth App（Callback URL: /api/auth/callback/github）
+- [x] GitHub OAuth provider（代码条件启用；Production 已配 `GITHUB_ID`/`GITHUB_SECRET`；Callback 按 GitHub 控制台维护，非代码债）
 - [x] 移动端底栏图标在低分辨率下的可读性测试（320/360/390 通过，已加 E2E 防回退）
 
 ### 中期
 - [ ] 分类层级支持（父/子分类）— 需数据库 schema 变更
-- [ ] 标签系统（多标签交叉过滤）— 需数据库 schema 变更
+- [x] 标签系统 — Admin tags CRUD + contracts/client 已实现；前台多标签交叉过滤可增强
 - [x] 热门排行榜（按点击量排序）— 已实现"热门访问"区域
-- [x] 链接健康检测 — 脚本已有，CI 已集成
-- [x] 收藏夹功能 — 已实现 localStorage + /favorites 页面
-- [ ] 批量录入至 500+ 站点（当前 287，持续扩充中）
-- [ ] Google Search Console 提交
+- [x] 链接健康检测 — 脚本已有，CI 已集成（**Admin 待处理队列产品化 = 后续 C3**）
+- [x] 收藏夹功能 — 已实现 localStorage + /favorites 页面 + 登录同步
+- [x] 批量录入至 500+ 站点 — §一口径 **513**（持续扩充；历史「287」仅指早期导入阶段）
+- [ ] Google Search Console 提交（运营项）
 
 ### 长期
 - [x] pgvector 语义搜索 ✅ (Phase v21)
@@ -935,4 +935,4 @@ pnpm sync         # 数据库同步
 
 ---
 
-> 文档版本 v16.4 · 2026-07-04 · Phase 26 完成：Visual Polish Phase 2 移动优先纸面工作台精修与交接同步
+> 文档版本 v18.4 · 2026-07-21 · §九 与 DESIGN-DOC 部署/规模口径校准；权威入口仍为文首 §〇

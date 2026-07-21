@@ -6,6 +6,19 @@
 > **生产地址**: https://yuanjia1314.ccwu.cc  
 > **审计范围**: 全量代码审查 + 架构分析 + 安全评估 + 改进路线图
 
+> ## ⚠ 历史文档 · 非 2026-07 进度 SSOT
+>
+> 本文是 **2026-06 审计快照**，保留供复盘。  
+> **不要** 用文中的 Netlify 部署结论、「API 缺失」等过时判断驱动当前生产决策。  
+> **当前进度 / 部署 / 完成度** 请读：
+>
+> - `docs/PROGRESS.md` **§〇**
+> - `docs/release-manifest-2026-07-18.md`
+> - `docs/PRODUCTION-RUNBOOK.md`
+> - 设计说明（非进度）：`DESIGN-DOC.md`（部署已校准为 Vercel）
+>
+> 冲突时：PROGRESS §〇 + release-manifest + 生产探针 ＞ 本文。
+
 ---
 
 ## 目录

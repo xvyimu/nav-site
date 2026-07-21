@@ -3,7 +3,7 @@
 > 状态：**Released / Go（主域）** — 2026-07-18 收口  
 > 适用范围：2026-07-18 候选从工作树到生产主域的完整证据链  
 > 基线：`master` / `9733897d8d417e36cb293e94fff11cde4215ec76`  
-> **当前生产 HEAD**：`46981a1aed3d58b2d10236d8413e30d112b8b5dc`  
+> **文内「当前生产 HEAD」为收口当日快照，会过期** — runtime 以 `docs/release-manifest-2026-07-18.md`、主域 `/api/health` `version.commit` 与 `docs/PROGRESS.md` §〇 为准（2026-07-21 探针常见 `ee5a047b`）。  
 > 权威单次记录：`docs/release-manifest-2026-07-18.md`  
 > 本文保留阶段计划原文，供复盘；**事实状态以 §13 收口结论与 release manifest 为准**。
 

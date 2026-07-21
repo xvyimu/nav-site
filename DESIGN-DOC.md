@@ -2,7 +2,8 @@
 
 > 设计定位：面向开发者的综合资源导航平台 · 一站式覆盖 AI/云服务/开发工具/开源项目/设计/学习
 >
-> 文档版本 v12.0 · 2026-06-28 · 513 站点 · 11 分类 · next-auth v5 · 服务端搜索 + pgvector 语义搜索 · GitHub OAuth
+> 文档版本 v12.1 · 2026-07-21 · **513 站点 · 9 分类** · next-auth v5 · 服务端搜索 + pgvector 语义搜索 · GitHub OAuth  
+> **实现与进度 SSOT**：`docs/PROGRESS.md` §〇 + `docs/release-manifest-2026-07-18.md`（本文为设计说明，站点数会漂移）
 
 ---
 
@@ -61,7 +62,7 @@
 │  💻 软件   │  │    │ │    │ │    │ │    │ │    │    │
 │  📖 学习   │  └────┘ └────┘ └────┘ └────┘ └────┘    │
 │  🏢 企业   │                                           │
-│           │  模型排行榜（仅 AI 分类时显示）             │
+│           │  （模型排行榜已移除；旧 URL 回退「全部」）   │
 ├──────────┴──────────────────────────────────────────┤
 │  Footer                                              │
 │  © 2026 综合导航站 · 提交站点 · 管理 · 同款网站搭建  │
@@ -170,7 +171,7 @@
 | 数据库 | Supabase PostgreSQL (单库模式) |
 | 认证 | next-auth v5 (Credentials + GitHub OAuth) |
 | 搜索 | Fuse.js 服务端搜索 + pgvector 语义搜索、RRF 混合排序 (`/api/search` API, `?semantic=true`) |
-| 部署 | Netlify |
+| 部署 | **Vercel**（生产单轨；Netlify 历史路径已 disable） |
 
 ### 6.2 数据流
 
@@ -222,16 +223,16 @@
 ## 八、已实现功能清单
 
 ### Phase 1-12（基础建设）
-- 11 个分类体系，287 个精选站点
+- 分类驱动导航（历史阶段曾为多分类扩张；**当前口径 9 主类 / 约 513 站**，以 PROGRESS §一为准）
 - LinkCard 卡片组件 + Favicon 代理
 - 侧边栏分类导航 + 搜索框
-- 管理后台 CRUD（链接 + 分类）
+- 管理后台 CRUD（链接 + 分类 + 标签）
 - 用户提交 + 审核
 - 点击计数 + 热门排行
 - 程序化 SEO 工具详情页
 - Sentry 监控 + 结构化日志
 - CI/CD 流水线（lint + tsc + test + build + e2e + deploy）
-- 73 单元测试 + 18 E2E 测试
+- 单元测试 + E2E（数量以 PROGRESS §三为准，会增长）
 
 ### Phase 13（搜索 + API 文档 + 图片优化）
 - 服务端 Fuse.js 搜索 API（`/api/search`）
@@ -254,5 +255,5 @@
 
 ---
 
-> 文档版本 v12.0 · 2026-06-28
-> 进度详情请参阅 `docs/PROGRESS.md`
+> 文档版本 v12.1 · 2026-07-21  
+> 进度 SSOT：`docs/PROGRESS.md` §〇 + `docs/release-manifest-2026-07-18.md`
