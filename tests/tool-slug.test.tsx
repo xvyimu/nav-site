@@ -127,6 +127,23 @@ describe("tool detail slugs", () => {
     expect(mocks.queryApprovedLinksForApi).not.toHaveBeenCalled();
   });
 
+  it("/api/tools returns 429 when distributed limiter is unavailable under fail-closed", async () => {
+    mocks.checkDistributedRateLimit.mockResolvedValue({ allowed: false, backend: "unavailable" });
+    const { GET } = await importFresh<typeof import("@/app/api/tools/route")>(
+      "@/app/api/tools/route"
+    );
+
+    const response = await GET(new NextRequest("http://localhost/api/tools", {
+      headers: { "x-forwarded-for": "203.0.113.11" },
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    expect(body.tools).toEqual([]);
+    expect(mocks.queryApprovedLinksForApi).not.toHaveBeenCalled();
+  });
+
   it("related tool links prefer the database slug over the current title", async () => {
     mocks.getRelatedLinks.mockResolvedValue([
       {

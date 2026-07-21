@@ -103,6 +103,11 @@ describe("scripts/check-launch-readiness", () => {
         requireEmbedding: false,
         expectEmbeddingSkipped: false,
         allowedDirtyPaths: [".planning/"],
+        distributedRateLimitConfig: {
+          name: "distributed-rate-limit-config",
+          ok: true,
+          detail: "soft mode (Upstash optional)",
+        },
       },
       execFileImpl: execFileImpl as never,
       fetchImpl: vi.fn() as never,
@@ -113,6 +118,45 @@ describe("scripts/check-launch-readiness", () => {
     expect(report.checks.find((check) => check.name === "production-smoke")).toMatchObject({
       ok: false,
       detail: "network checks skipped",
+    });
+  });
+
+  it("validates distributed rate limit fail-closed consistency with Upstash credentials", async () => {
+    const { evaluateDistributedRateLimitConfig, evaluateReadiness } = await importReadinessModule();
+
+    const missing = evaluateDistributedRateLimitConfig({
+      DISTRIBUTED_RATE_LIMIT_FAIL_CLOSED: "1",
+    } as NodeJS.ProcessEnv);
+    expect(missing).toMatchObject({
+      name: "distributed-rate-limit-config",
+      ok: false,
+    });
+    expect(missing.detail).toContain("fail-closed requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN");
+
+    const configured = evaluateDistributedRateLimitConfig({
+      DISTRIBUTED_RATE_LIMIT_FAIL_CLOSED: "1",
+      UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+      UPSTASH_REDIS_REST_TOKEN: "token",
+    } as NodeJS.ProcessEnv);
+    expect(configured).toMatchObject({
+      name: "distributed-rate-limit-config",
+      ok: true,
+    });
+
+    const soft = evaluateDistributedRateLimitConfig({} as NodeJS.ProcessEnv);
+    expect(soft).toMatchObject({
+      name: "distributed-rate-limit-config",
+      ok: true,
+    });
+
+    const report = evaluateReadiness({
+      git: { branch: "master", ahead: 0, behind: 0, dirty: [] },
+      networkSkipped: true,
+      distributedRateLimitConfig: missing,
+    });
+    expect(report.ok).toBe(false);
+    expect(report.checks.find((check) => check.name === "distributed-rate-limit-config")).toMatchObject({
+      ok: false,
     });
   });
 });

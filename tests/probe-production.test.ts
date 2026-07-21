@@ -301,6 +301,53 @@ describe("scripts/probe-production", () => {
     expect(() => assertProbePassed(results)).toThrow("Production probe failed");
   });
 
+  it("accepts distributedRateLimit health status ok or skipped and fails on error", async () => {
+    const { validateHealthPayload } = await importProbeModule();
+
+    expect(
+      validateHealthPayload({
+        status: "healthy",
+        checks: {
+          database: { status: "ok" },
+          env: { status: "ok" },
+          distributedRateLimit: { status: "skipped" },
+        },
+      })
+    ).toEqual([]);
+
+    expect(
+      validateHealthPayload({
+        status: "healthy",
+        checks: {
+          database: { status: "ok" },
+          env: { status: "ok" },
+          distributedRateLimit: { status: "ok" },
+        },
+      })
+    ).toEqual([]);
+
+    // Older deploys without the field remain valid.
+    expect(
+      validateHealthPayload({
+        status: "healthy",
+        checks: {
+          database: { status: "ok" },
+          env: { status: "ok" },
+        },
+      })
+    ).toEqual([]);
+
+    const failures = validateHealthPayload({
+      status: "healthy",
+      checks: {
+        database: { status: "ok" },
+        env: { status: "ok" },
+        distributedRateLimit: { status: "error" },
+      },
+    });
+    expect(failures.some((message) => /distributed rate limit/i.test(message))).toBe(true);
+  });
+
   it("flags a deployed commit mismatch when a release commit is expected", async () => {
     const { runProductionProbe, assertProbePassed } = await importProbeModule();
     const baseUrl = "https://nav-site.example";

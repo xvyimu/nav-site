@@ -59,4 +59,24 @@ describe("POST /api/web-vitals", () => {
     expect(response.status).toBe(429);
     expect(mocks.captureMessage).not.toHaveBeenCalled();
   });
+
+  it("returns 429 when distributed limiter is unavailable under fail-closed", async () => {
+    mocks.checkDistributedRateLimit.mockResolvedValue({ allowed: false, backend: "unavailable" });
+    const { POST } = await import("@/app/api/web-vitals/route");
+    const response = await POST(new Request("http://localhost/api/web-vitals", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Host: "localhost",
+        Origin: "http://localhost",
+        "x-forwarded-for": "203.0.113.10",
+      },
+      body: JSON.stringify(metric),
+    }));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    expect(mocks.captureMessage).not.toHaveBeenCalled();
+    expect(mocks.setMeasurement).not.toHaveBeenCalled();
+  });
 });

@@ -25,11 +25,18 @@
     "database": { "status": "ok", "latency_ms": 5, "detail": "6 categories" },
     "env": { "status": "ok", "latency_ms": 0, "detail": "all required vars present" },
     "sentry": { "status": "ok", "latency_ms": 0, "detail": "configured" },
+    "distributedRateLimit": {
+      "status": "ok|skipped|error",
+      "latency_ms": 0,
+      "detail": "Upstash distributed limiter configured | Upstash not configured; in-memory fallback active | strict distributed limiting requires Upstash configuration"
+    },
     "embedding": { "status": "ok", "latency_ms": 150, "detail": "embed service reachable" },
     "resourceLibrarySearch": { "status": "ok", "latency_ms": 200, "detail": "public resource search RPC reachable" }
   }
 }
 ```
+
+**`distributedRateLimit`：** `ok` = Upstash env 已配置；`skipped` = 未配置、soft mode；`error` = `DISTRIBUTED_RATE_LIMIT_FAIL_CLOSED=1`（且 production/VERCEL）但 Upstash 缺失。`error` 会使整体 `healthy=false` → **503**。
 
 **注意：** error message 不暴露给外部，仅返回 `"database query failed"` 等通用描述。
 
@@ -46,13 +53,15 @@
 | `limit` | int | `20` | 结果数量上限（≤100） |
 | `semantic` | bool | `false` | 启用语义搜索 |
 
-**速率限制：** 分布式，每 IP 60s 内 Fuse 60 次 / semantic 20 次。
+**速率限制：** 分布式（Upstash 或 memory），每 IP 60s 内 Fuse 60 次 / semantic 20 次。超额或 fail-closed 下 backend 不可用时 **429** + `Retry-After: 60`。
 
 **响应：** `200`
 
 ```json
 { "results": [{ "id": "uuid", "title": "...", "url": "...", "description": "...", "category_name": "...", "category_slug": "...", "featured": false, "paid": false, "click_count": 0, "tags": [], "similarity": 0.95, "source": "fuse|semantic" }], "total": 5 }
 ```
+
+**限流响应：** `429` `{ "error": "搜索过于频繁，请稍后再试", "results": [], "total": 0 }` + `Retry-After: 60`
 
 ---
 
@@ -67,7 +76,7 @@ AI Agent / 第三方友好 API。返回结构化工具列表。
 | `search` | string | — | 关键词搜索 |
 | `ids` | string | — | 逗号分隔 UUID 精确匹配 |
 
-**速率限制：** 无。
+**速率限制：** 分布式，每 IP 60s 内 60 次。超额或 fail-closed 下 backend 不可用时 **429** + `Retry-After: 60`。
 
 **缓存：** `Cache-Control: public, s-maxage=60`
 
@@ -173,8 +182,8 @@ Favicon 代理。按优先级尝试三个源：cccyun → DuckDuckGo → Google 
 用户提交新链接。
 
 **Body：** `{ "url": "https://...", "title": "...", "description": "...", "category": "slug" }`  
-**速率限制：** 每 IP 15min 3 次  
-**响应：** `200` `{ "success": true }` | `409` `{ "error": "该站点已收录/已提交" }` | `429` rate limit
+**速率限制：** 每 IP 15min 3 次；DB 后端经 `checkRateLimit(..., "deny")` fail-closed（与 Upstash 无关）  
+**响应：** `200` `{ "success": true }` | `409` `{ "error": "该站点已收录/已提交" }` | `429` rate limit / backend deny
 
 ---
 
@@ -183,8 +192,8 @@ Favicon 代理。按优先级尝试三个源：cccyun → DuckDuckGo → Google 
 提交评价。
 
 **Body：** `{ "link_id": "uuid", "rating": 5, "comment": "..." }`  
-**速率限制：** 每 IP 15min 限定  
-**响应：** `200` `{ "success": true, "review": {...}, "message": "..." }` | `409` `{ "error": "您已经评价过这个工具" }`
+**速率限制：** 每 IP 15min 限定；DB 后端 `deny` policy  
+**响应：** `200` `{ "success": true, "review": {...}, "message": "..." }` | `409` `{ "error": "您已经评价过这个工具" }` | `429` rate limit
 
 ---
 
@@ -193,8 +202,8 @@ Favicon 代理。按优先级尝试三个源：cccyun → DuckDuckGo → Google 
 提交资源评分。
 
 **Body：** `{ "page_id": "uuid", "rating": 4, "query_text": "..." }`  
-**速率限制：** 每 IP 15min 10 次（fail-close）  
-**响应：** `200` `{ "success": true }` | `503` rate limit failed
+**速率限制：** 每 IP 15min 10 次；DB 后端 `checkRateLimit(..., "deny")`  
+**响应：** `200` `{ "success": true }` | `429` rate limit / backend deny | `503` 评分服务未配置
 
 ---
 
@@ -205,10 +214,10 @@ Favicon 代理。按优先级尝试三个源：cccyun → DuckDuckGo → Google 
 已登录用户收藏管理。
 
 **认证：** NextAuth session（任意已登录用户）  
-**速率限制（写操作）：** 分布式，每 IP 15min 30 次（service_role 限流表）  
+**速率限制（写操作）：** 每 IP 15min 30 次（Supabase service_role 限流表 + `deny` policy，非 Upstash）  
 **GET：** `{ "favorites": ["uuid", ...] }`  
-**POST：** `{ "linkIds": ["uuid1", "uuid2"] }` → `{ "ok": true, "added": 2 }`  
-**DELETE：** `?linkId=<uuid>` 或 `?all=true` → `{ "ok": true }`
+**POST：** `{ "linkIds": ["uuid1", "uuid2"] }` → `{ "ok": true, "added": 2 }`；限流 → **429**  
+**DELETE：** `?linkId=<uuid>` 或 `?all=true` → `{ "ok": true }`；限流 → **429**
 
 ---
 

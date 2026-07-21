@@ -25,6 +25,42 @@ function parseBooleanValue(value) {
   return ["1", "true", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
 }
 
+function readEnvString(env, key) {
+  const value = env?.[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function evaluateDistributedRateLimitConfig(env = process.env) {
+  const failClosed = parseBooleanValue(env.DISTRIBUTED_RATE_LIMIT_FAIL_CLOSED);
+  const upstashUrl = readEnvString(env, "UPSTASH_REDIS_REST_URL");
+  const upstashToken = readEnvString(env, "UPSTASH_REDIS_REST_TOKEN");
+  const upstashConfigured = Boolean(upstashUrl && upstashToken);
+
+  if (failClosed && !upstashConfigured) {
+    return {
+      name: "distributed-rate-limit-config",
+      ok: false,
+      detail: "fail-closed requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN",
+    };
+  }
+
+  if (failClosed) {
+    return {
+      name: "distributed-rate-limit-config",
+      ok: true,
+      detail: "fail-closed enabled with Upstash credentials present",
+    };
+  }
+
+  return {
+    name: "distributed-rate-limit-config",
+    ok: true,
+    detail: upstashConfigured
+      ? "soft mode with Upstash configured"
+      : "soft mode (Upstash optional)",
+  };
+}
+
 export function readConfigFromEnv(env = process.env, args = process.argv.slice(2)) {
   const requireEmbedding =
     parseBooleanArg(args, "--require-embedding") ||
@@ -50,6 +86,7 @@ export function readConfigFromEnv(env = process.env, args = process.argv.slice(2
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean),
+    distributedRateLimitConfig: evaluateDistributedRateLimitConfig(env),
   };
 }
 
@@ -83,6 +120,11 @@ export function evaluateReadiness({
   currentProductionResults = [],
   latestProductionResults = [],
   networkSkipped = false,
+  distributedRateLimitConfig = {
+    name: "distributed-rate-limit-config",
+    ok: true,
+    detail: "soft mode (Upstash optional)",
+  },
 }) {
   const checks = [];
 
@@ -99,6 +141,12 @@ export function evaluateReadiness({
       git.ahead === 0 && git.behind === 0
         ? "local branch matches upstream"
         : `ahead=${git.ahead}, behind=${git.behind}`,
+  });
+
+  checks.push({
+    name: distributedRateLimitConfig.name || "distributed-rate-limit-config",
+    ok: Boolean(distributedRateLimitConfig.ok),
+    detail: distributedRateLimitConfig.detail || "distributed rate limit config check",
   });
 
   if (networkSkipped) {
@@ -192,6 +240,12 @@ export async function collectLaunchReadiness({
     currentProductionResults,
     latestProductionResults,
     networkSkipped: config.skipNetwork,
+    distributedRateLimitConfig:
+      config.distributedRateLimitConfig ?? {
+        name: "distributed-rate-limit-config",
+        ok: true,
+        detail: "soft mode (Upstash optional)",
+      },
   });
 
   return {

@@ -279,7 +279,9 @@ rtk pnpm run verify:production -- --require-embedding
 
 ### Upstash 分布式限流（S2）
 
-`/api/search`、`/api/favicon`、`/api/resource-search` 已接入 `lib/rate-limit-distributed.ts`。未配置 Upstash 时自动回退进程内桶；配置后跨 Vercel 实例使用 Upstash Redis REST 计数。
+公开读路径已接入 `lib/rate-limit-distributed.ts`：`/api/search`、`/api/favicon`、`/api/resource-search`、`/api/tools`、`/api/web-vitals`。敏感写（`/api/submit`、favorites 写、resource-ratings、login、reviews）走 Supabase `checkRateLimit(..., "deny")`，与 Upstash 无关。
+
+#### 1. 配置 Upstash（推荐生产多实例）
 
 Vercel Production env（encrypted）：
 
@@ -288,7 +290,46 @@ UPSTASH_REDIS_REST_URL=<https://...upstash.io>
 UPSTASH_REDIS_REST_TOKEN=<token>
 ```
 
-设置 env 后必须 redeploy。验收：先跑 `rtk pnpm test tests/rate-limit-distributed.test.ts`，线上用 `rtk pnpm run verify:production` 观察搜索、favicon、资源搜索均 2xx；若 Upstash 抖动，代码会 warn 并回退 memory，不阻断主站。
+设置后必须 redeploy。未配置时自动回退进程内桶（soft mode，不阻断部署）。
+
+#### 2. 可选 fail-closed（默认关闭）
+
+仅在 Upstash 已配置且健康验证通过后，再考虑开启：
+
+```text
+DISTRIBUTED_RATE_LIMIT_FAIL_CLOSED=1
+```
+
+生效条件：`NODE_ENV=production` 或 `VERCEL=1`，且值为 `1`。本地普通 dev 不会因该变量单独进入 fail-closed。未配 Upstash 时不要开启（见下）。
+
+#### 3. Health 含义（`checks.distributedRateLimit`）
+
+| status | 含义 |
+|--------|------|
+| `skipped` | 未配置 Upstash，soft mode（memory fallback） |
+| `ok` | Upstash env 已配置（不 live ping Redis） |
+| `error` | fail-closed 开启且 Upstash 缺失 → 整体 unhealthy **503** |
+
+#### 4. 故障模式
+
+- fail-closed **关** + Upstash 抖动/不可用 → 代码 warn 并回退 memory，公开路径尽量放行，主站不因 Redis 挂掉。
+- fail-closed **开** + Upstash 缺失/请求失败 → 分布式检查 `allowed:false, backend:"unavailable"`；路由统一映射 **429**（不发明 503）；未配置时 health `distributedRateLimit=error` → **503**。
+
+#### 5. 验收
+
+本地：
+
+```powershell
+rtk pnpm test tests/rate-limit-distributed.test.ts tests/api-health.test.ts tests/probe-production.test.ts tests/check-launch-readiness.test.ts
+```
+
+线上 smoke（不要求真实 Upstash 已开通也能过 soft mode）：
+
+```powershell
+rtk pnpm run verify:production
+```
+
+真实 Redis 开通与 Vercel secrets 写入属运维带外步骤，不在代码仓库内完成。Launch readiness 仅校验「fail-closed 开启时必须同时有 URL+TOKEN」，不连 Redis。
 
 ## 生产探针
 

@@ -298,6 +298,18 @@ export function validateHealthPayload(payload, { expectEmbeddingSkipped, require
     );
   }
 
+  // Tolerate older deploys missing the field; reject hard error (fail-closed misconfig).
+  const distributedRateLimitStatus = payload?.checks?.distributedRateLimit?.status;
+  if (
+    distributedRateLimitStatus !== undefined &&
+    distributedRateLimitStatus !== "ok" &&
+    distributedRateLimitStatus !== "skipped"
+  ) {
+    failures.push(
+      `expected distributed rate limit check ok or skipped, got ${distributedRateLimitStatus}`
+    );
+  }
+
   return failures;
 }
 
