@@ -166,3 +166,44 @@ export function createCspNonce(bytes = 16): string {
   for (const b of arr) bin += String.fromCharCode(b);
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
+
+/** Request/response header name for the per-request CSP nonce. */
+export const CSP_NONCE_HEADER = "x-nonce";
+
+export type DynamicCspAttachment = {
+  nonce: string;
+  pairs: Array<{ key: string; value: string }>;
+  flags: CspFlags;
+};
+
+/**
+ * When `CSP_DYNAMIC=1`, produce a per-request nonce + CSP header pairs for proxy.
+ * Returns null when dynamic mode is off (static CSP stays in next.config).
+ *
+ * Preview-only path — production default keeps CSP_DYNAMIC off.
+ */
+export function createDynamicCspAttachment(
+  env: Record<string, string | undefined> = process.env as Record<
+    string,
+    string | undefined
+  >,
+  options: { isDev?: boolean; nonce?: string } = {}
+): DynamicCspAttachment | null {
+  const flags = readCspFlags(env);
+  if (!flags.dynamic) return null;
+
+  const nonce = (options.nonce?.trim() || createCspNonce()).trim();
+  if (!nonce) return null;
+
+  const isDev =
+    options.isDev ?? env.NODE_ENV !== "production";
+
+  const pairs = buildCspHeaderPairs({
+    isDev,
+    scriptUnsafeInline: flags.scriptUnsafeInline,
+    reportOnlyEnabled: flags.reportOnlyEnabled,
+    nonce,
+  });
+
+  return { nonce, pairs, flags };
+}

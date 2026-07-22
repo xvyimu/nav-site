@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { Providers } from "@/components/Providers";
 import { AppChrome } from "@/components/AppChrome";
 import { escapeJsonForHtml } from "@/lib/utils";
+import { CSP_NONCE_HEADER, readCspFlags } from "@/lib/csp";
 import { WebVitals } from "./_components/web-vitals";
 
 const ShortcutPanel = dynamic(() => import("@/components/ShortcutPanel").then((m) => m.ShortcutPanel));
@@ -43,7 +44,20 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+/**
+ * Read per-request CSP nonce only when CSP_DYNAMIC=1.
+ * Avoids calling headers() (dynamic rendering) on the default static path.
+ */
+async function getCspNonce(): Promise<string | undefined> {
+  if (!readCspFlags().dynamic) return undefined;
+  const { headers } = await import("next/headers");
+  const h = await headers();
+  return h.get(CSP_NONCE_HEADER) ?? undefined;
+}
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = await getCspNonce();
+
   return (
     <html lang="zh-CN" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full flex flex-col bg-background text-foreground">
@@ -52,11 +66,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Providers>
             <AppChrome>{children}</AppChrome>
           </Providers>
-          <Analytics />
+          <Analytics nonce={nonce} />
           <ShortcutPanel />
           <ToasterWrapper />
           <script
             type="application/ld+json"
+            nonce={nonce}
             dangerouslySetInnerHTML={{
               __html: escapeJsonForHtml(JSON.stringify({
                 "@context": "https://schema.org",

@@ -7,7 +7,7 @@ Derived from `docs/ops/L2-hygiene-checklist.md`. **Maintain Next; no Vue/Go rewr
 | ID | Item | Status note |
 |----|------|-------------|
 | P0-CSP-unsafe | Keep `CSP_SCRIPT_UNSAFE_INLINE` default **true** until nonce→layout wired | Code red-line in checklist |
-| P0-CSP-dynamic | Do **not** set `CSP_DYNAMIC=1` in production without proxy+layout nonce | See T9 decision |
+| P0-CSP-dynamic | T9″ 接线已合入（proxy+layout）；**仍勿生产开** `CSP_DYNAMIC=1`，仅 preview 手动验证 | See T9 decision |
 | P0-RLS | Run `scripts/rls-audit.sql` on staging/prod with service role carefully | Operator |
 | P0-Admin | Confirm admin password hash + session path after deploy | `PRODUCTION-RUNBOOK` |
 | P0-Edge | `node scripts/audit-edge-scripts.mjs` → mangled=0, rocketLoader off | Already cleaned 2026-07-22 |
