@@ -4,13 +4,18 @@
 > 生产 host：`https://yuanjia1314.ccwu.cc`  
 > 实测 NS：`luciane.ns.cloudflare.com` / `lee.ns.cloudflare.com`（**子域在 Cloudflare**；根域 `ccwu.cc` NS 为 dnshe，不是同一套）。
 
-## 0. 2026-07-22 自动尝试结果
+## 0. 2026-07-22 结果
 
 | 项 | 结果 |
 |----|------|
-| 本机 `CLOUDFLARE_API_TOKEN`（User env） | **active**，但 **zones=0 / accounts=0** |
-| `.env.local` `CF_AI_API_TOKEN` | Workers AI 用；**同样无 Zone 权限** |
-| 结论 | **当前令牌不能改该 zone 设置**；需在 **托管 `yuanjia1314.ccwu.cc` 的 CF 账号** 上建 **Zone Settings Edit** 令牌 |
+| zone | `yuanjia1314.ccwu.cc` · id `8d87055fa1e04b3b65a3490b5caa8480` |
+| `rocket_loader` | **on → off**（API PATCH） |
+| `minify.js` | 已是 **off**（css/html 亦 off） |
+| cache | `purge_everything` **success** |
+| `audit-edge-scripts.mjs` | **mangledScriptTypeCount=0** · `rocketLoaderHints=false` |
+| 生产探针 | 仍 **全 PASS**（runtime `46e71ec3`） |
+
+旧 User env / `CF_AI` token 无 zone；本次用 **Zone Settings Edit** 令牌完成。令牌若曾出现在聊天中，建议在 CF 轮换/删除。
 
 ## 1. Dashboard（推荐，一次做完）
 
