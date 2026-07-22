@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { captureMessage } from "@sentry/nextjs";
 import { checkDistributedRateLimit } from "@/lib/rate-limit-distributed";
 import { getClientIp } from "@/lib/utils";
 import { logger } from "@/lib/logger";
@@ -17,7 +18,8 @@ type CspReportBody = {
 /**
  * CSP Report-Only collector (P1-3).
  * Accepts browser CSP violation reports; never blocks page loads.
- * Sampling + rate-limit keep log volume bounded.
+ * Sampling + rate-limit keep volume bounded.
+ * Sampled hits go to structured logs AND Sentry (queryable; T9 evidence).
  */
 export async function POST(request: Request) {
   const ip = getClientIp(request);
@@ -58,14 +60,38 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 204 });
   }
 
-  logger.warn("CSP report-only violation (sampled)", {
+  const documentUri = report["document-uri"] ?? report["documentURI"];
+  const disposition = String(report["disposition"] ?? "report");
+  const context = {
     source: "csp-report",
-    documentUri: report["document-uri"] ?? report["documentURI"],
+    documentUri,
     violatedDirective: directive,
     blockedUri: blocked,
     originalPolicy: report["original-policy"] ?? undefined,
-    disposition: report["disposition"] ?? "report",
-  });
+    disposition,
+  };
+
+  logger.warn("CSP report-only violation (sampled)", context);
+
+  // Mirror web-vitals: tags for Sentry Issues aggregation; no DB write.
+  try {
+    captureMessage(`csp-report: ${directive || "unknown"}`, {
+      level: "warning",
+      tags: {
+        source: "csp-report",
+        violatedDirective: directive.slice(0, 64) || "unknown",
+        disposition: disposition.slice(0, 32),
+      },
+      extra: {
+        documentUri,
+        blockedUri: blocked,
+        originalPolicy: report["original-policy"] ?? undefined,
+      },
+      fingerprint: ["csp-report", directive || "unknown", blocked.slice(0, 120) || "none"],
+    });
+  } catch {
+    // Never fail the browser report endpoint because of Sentry.
+  }
 
   return new NextResponse(null, { status: 204 });
 }
