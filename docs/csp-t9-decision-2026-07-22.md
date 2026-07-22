@@ -10,7 +10,7 @@
 |---|------|------|------|
 | 1 | Nonce / strict-dynamic 管道 | **Builder 就绪；动态挂载未默认开** | `lib/csp.ts`：`createCspNonce` / `'nonce-…'` + `'strict-dynamic'`；`CSP_DYNAMIC=1` 时 next.config **跳过**静态 CSP（避免双头）。layout 读 `x-nonce` 挂 `<Script nonce>` **尚未接**（避免半吊子破坏生产） |
 | 2 | GA 外置 | **已做** | `components/Analytics.tsx` → gtag.js + **`/api/ga?id=`**（`app/api/ga/route.ts`），**无** inline bootstrap |
-| 3 | 边缘 script 改写排查 | **已确认阻断** | 生产 `server: cloudflare` · **36** 处 `type="<hex>-text/javascript"` · Rocket Loader 痕迹。**nonce-only 前必须在 CF 关 Rocket Loader / 对 HTML 的 JS 改写**；`node scripts/audit-edge-scripts.mjs` |
+| 3 | 边缘 script 改写排查 | **已确认阻断** | 生产 `server: cloudflare` · **36** 处 mangled type · Rocket Loader。关闭步骤：`docs/cloudflare-edge-csp-hardening-2026-07-22.md` + `scripts/cf-disable-rocket-loader.mjs`（需 **Zone Settings Edit** 令牌；当前本机 token zones=0） |
 | 4 | 样本窗口 | **通道在线** | RO + `/api/csp-report` → 采样 Sentry `source:csp-report`；本机无 `SENTRY_AUTH_TOKEN` 时用 UI。结构阻断已足够否决立刻去 inline |
 | 5 | 回滚开关 | **已做** | 见 §Env |
 
