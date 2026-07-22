@@ -2,12 +2,13 @@
 
 **GitHub：** [xvyimu/ChronoPortal](https://github.com/xvyimu/ChronoPortal)  
 **产品显示名：** 综合导航站 / 公益 API 导航  
-**本地路径 / package 名：** `D:\ChronoPortal` ≡ `D:\nav-site` · npm `"name": "nav-site"`（private，**不是** GitHub 身份）  
+**本地路径 / package 名：** `D:\ChronoPortal` · npm `"name": "nav-site"`（private，**不是** GitHub 身份）  
 **线上：** https://yuanjia1314.ccwu.cc  
 **许可：** [MIT](./LICENSE) · Copyright (c) 2026 xvyimu  
 
 > 仓库由 `xvyimu/nav-site` **改名**为 `xvyimu/ChronoPortal`（2026-07-21）。  
-> 产品品牌与本地目录可仍称「导航站 / nav-site」；**GitHub、克隆 URL、文档外链一律用 ChronoPortal**。  
+> 产品品牌可仍称「导航站」；**本地真路径与 GitHub 一律用 ChronoPortal**（入口 `D:\projects\ChronoPortal`）。  
+> **许可 / 第三方：** [LICENSE](./LICENSE)（MIT）· [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)  
 > 身份卡：[GITHUB_IDENTITY.md](./GITHUB_IDENTITY.md)
 
 ## 它是什么
