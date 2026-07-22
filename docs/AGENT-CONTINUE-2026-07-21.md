@@ -4,33 +4,39 @@
 > **先读本文件**；深度方案仍见 `docs/research/2026-07-21-integrated-master-research.md`（方案 R）。  
 > 产品 GitHub 名 **ChronoPortal**；npm / 历史路径可称 nav-site。
 
-## 0. 当前终态事实（2026-07-22 实测）
+## 0. 当前终态事实（2026-07-22 hygiene）
 
 | 项 | 值 |
 |----|-----|
 | CWD | `D:\ChronoPortal` ≡ `D:\nav-site` |
-| origin/master = 生产 runtime | **`a1e5c7f6`** · deploy `dpl_EwZKkesa8YjRHwVwb1EEXFmqGpvm` |
+| 生产 runtime | **`46e71ec3`** · deploy `dpl_rGFZxkqt…` |
+| origin/master tip | **`34b1fc1a`+**（docs hygiene 可能更新 tip） |
 | 生产入口 | `https://yuanjia1314.ccwu.cc` |
 | 探针 | home/health/search/tool/sitemap/robots/build-info **全 PASS**（`--no-proxy`） |
 | 限流 | Upstash **ok** + `DISTRIBUTED_RATE_LIMIT_FAIL_CLOSED` |
 | embedding | Cloudflare Workers AI bge-m3 **1024-d** ok |
-| CSP | Enforcing（script **仍有** `unsafe-inline`）+ Report-Only（无 inline，`report-uri /api/csp-report`）→ 采样 **logger + Sentry** |
-| typecheck | **干净**（`3abf5eca` 已清测试债） |
-| 工作树 | 以 push 后为准；docs hygiene 可能 ahead |
+| CSP | Enforcing 默认 script **仍有** `unsafe-inline`；RO + csp-report→Sentry；**CF Rocket Loader off** · mangled=0 |
+| 测试 | 正式 Vitest **55** + e2e 保留；**不删**正式用例；本地 `.next` 可清 |
+| typecheck | **干净** |
+| 工作树 | clean · 无 `_tmp*` / backup / coverage / playwright-report |
 
-### 本轮已合入（master）
+### 本轮已合入（master，摘要）
 
 | commit | 内容 |
 |--------|------|
-| `3abf5eca` | fix(types): 测试 ProcessEnv / JSDoc，清 tsc 债 |
-| `a1e5c7f6` | feat(csp): report-only 采样 mirror 到 Sentry `captureMessage` |
+| `3abf5eca` | typecheck 测试债 |
+| `a1e5c7f6` | csp-report → Sentry |
+| `46e71ec3` | T9′ GA 外置 + CSP builders/flags |
+| `0ec4b8e1` / `34b1fc1a` | CF Rocket Loader 关闭脚本/手册 + 已关记录 |
 
 ### 验证结论
 
 | 项 | 结论 |
 |----|------|
-| Admin 写→前台秒更 | **本地 dev + prod 库写测 PASS**（~300ms 首页见新标题，已还原）。生产脚本登录因 CSRF cookie 未自动化；代码已在生产路径。 |
-| CSP T9 去 inline | **2026-07-22 评估：暂不去**（结构阻断，非仅缺样本）。决策：`docs/csp-t9-decision-2026-07-22.md`。Sentry：`message:"csp-report:"` / tag `source:csp-report`（本机无 auth token 时用 UI）。 |
+| Admin 写→前台秒更 | **本地 dev + prod 库写测 PASS**。生产脚本登录 CSRF cookie 限制；代码已在生产。 |
+| CF 边缘 | `rocket_loader` **off** · `audit-edge-scripts` **mangled=0** |
+| CSP T9 去 inline | **默认仍不去**。决策：`docs/csp-t9-decision-2026-07-22.md`。下一手 **T9″ nonce→layout**。 |
+| Hygiene | 正式测试保留；无 ad-hoc 探针/备份入仓 |
 
 ## 1. 不可动的架构不变式（ADR）
 
@@ -56,14 +62,15 @@
 
 ## 3. 已完成（累计，摘要）
 
-C1 favorites 权限纵深 · C2 文档 SSOT · C3 死链→Admin · Upstash+FAIL_CLOSED · CSP Report-Only · Admin revalidate + 乐观更新 · Dependabot overrides · 书签 HTML 导入 · 五层内部优化 · ChronoPortal 身份 · typecheck 债 · **CSP report→Sentry** · Admin 秒更本地写测。
+C1 favorites 权限纵深 · C2 文档 SSOT · C3 死链→Admin · Upstash+FAIL_CLOSED · CSP Report-Only · Admin revalidate + 乐观更新 · Dependabot overrides · 书签 HTML 导入 · 五层内部优化 · ChronoPortal 身份 · typecheck 债 · **CSP report→Sentry** · T9′ GA 外置/CSP flags · **CF Rocket Loader off** · Admin 秒更本地写测 · hygiene（正式测保留、无备份/ad-hoc）。
 
 ## 4. 下一步候选
 
 | # | 事项 | 类型 | 就绪度 | 备注 |
 |---|------|------|--------|------|
 | T9 | 去 Enforcing script `unsafe-inline` | 安全 | **默认暂缓** | 见 `docs/csp-t9-decision-2026-07-22.md`；env `CSP_SCRIPT_UNSAFE_INLINE` |
-| T9′ | GA 外置 + CSP builder/开关 + 边缘审计 | 前置 | **代码已合** | CF Rocket Loader 仍阻断；关闭手册 `docs/cloudflare-edge-csp-hardening-2026-07-22.md`（本机 API token **无 zone**） |
+| T9′ | GA 外置 + CSP builder/开关 | 前置 | **已上线** `46e71ec3` | `/api/ga` · flags · 正式测保留 |
+| T9″ | proxy/layout 接 nonce · preview 金丝雀 | 安全 | 就绪前置 | 边缘 mangled=0；可开干 |
 | A′ | 浏览器生产 Admin 秒更 | 验证 | 可选 | 本地已 PASS |
 | D | Admin 审核 AI 建议标签 | 产品 P2 | 需 spec | 只建议、人确认 |
 | E | 死链周报节奏 | 运营 | 需 spec | 不改 check-links 算法 |

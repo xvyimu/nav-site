@@ -20,18 +20,20 @@
 - Auth.js（Credentials + 可选 GitHub OAuth）· Upstash 分布式限流（可 fail-closed）
 - CSP Enforcing + Report-Only；采样违规进 **Sentry**（`source:csp-report`）
 
-## 当前状态（2026-07-22）
+## 当前状态（2026-07-22 hygiene）
 
 | 项 | 值 |
 |----|-----|
-| **origin/master = 生产 runtime** | **`a1e5c7f6`** · deploy `dpl_EwZKkesa…` |
+| **生产 runtime** | **`46e71ec3`** · deploy `dpl_rGFZxkqt…` |
+| **origin/master tip** | **`34b1fc1a`**（含 docs；runtime 仍以 build-info 为准） |
 | 生产入口 | https://yuanjia1314.ccwu.cc |
-| 探针 | `node scripts/probe-production.mjs --no-proxy` · home/health/search/tool/sitemap/robots/build-info |
+| 探针 | `node scripts/probe-production.mjs --no-proxy --expect-commit 46e71ec3` |
 | 限流 | Upstash + `DISTRIBUTED_RATE_LIMIT_FAIL_CLOSED` |
-| CSP | Enforcing 仍含 script `unsafe-inline`；RO 无 inline → `/api/csp-report` → 采样日志 + Sentry |
-| typecheck | `pnpm typecheck` 干净（`3abf5eca` 已清测试债） |
+| CSP | Enforcing 默认仍含 script `unsafe-inline`；RO + `/api/csp-report` → Sentry；**CF Rocket Loader off**（mangled=0） |
+| 测试 | 正式 Vitest **55** 文件 + e2e 保留；无 ad-hoc 探针/备份 |
+| typecheck | `pnpm typecheck` 干净 |
 
-Agent 续作 SSOT：[`docs/AGENT-CONTINUE-2026-07-21.md`](./docs/AGENT-CONTINUE-2026-07-21.md)（文内已刷新至 07-22 tip）。
+Agent 续作 SSOT：[`docs/AGENT-CONTINUE-2026-07-21.md`](./docs/AGENT-CONTINUE-2026-07-21.md)。
 
 ## 技术栈
 
@@ -79,12 +81,13 @@ pnpm build
 
 ```bash
 # Windows 上本机代理常 down 时加 --no-proxy，避免 undici 打 7890 失败
-node scripts/probe-production.mjs --no-proxy --expect-commit a1e5c7f6
+node scripts/probe-production.mjs --no-proxy --expect-commit 46e71ec3
 # 或
 pnpm verify:production
 
-# 核对线上 commit
+# 核对线上 commit / 边缘 script 改写
 node -e "fetch('https://yuanjia1314.ccwu.cc/build-info.json').then(r=>r.json()).then(console.log)"
+node scripts/audit-edge-scripts.mjs
 ```
 
 部署（本机约定）：
@@ -110,15 +113,16 @@ npx vercel deploy --prod --scope aijiai520
 
 - 五层内部优化 · 书签导入 · 死链→Admin · Upstash fail-closed  
 - Admin 写路径 `revalidatePublicNavContent`（本地 prod 库写测秒更 PASS）  
-- CSP Report-Only + **`a1e5c7f6` 采样 → Sentry**  
-- ChronoPortal 身份 docs · typecheck 测试债清零  
+- CSP Report-Only → Sentry（`a1e5c7f6`）· T9′ GA 外置 + CSP flags（`46e71ec3`）  
+- CF **Rocket Loader off** · edge mangled script types **0**  
+- ChronoPortal 身份 docs · typecheck 债清零 · 工作树 hygiene（无备份/ad-hoc 探针）  
 
 ## 下一候选
 
 | # | 事项 | 备注 |
 |---|------|------|
-| T9 | **默认仍不去** script `unsafe-inline` | 决策 + T9′：[`docs/csp-t9-decision-2026-07-22.md`](./docs/csp-t9-decision-2026-07-22.md) |
-| T9′ | GA 外置 · CSP env 回滚 · builder/nonce · **CF Rocket Loader 阻断** | 关 CF 改写 + nonce→layout 后再金丝雀 `CSP_SCRIPT_UNSAFE_INLINE=0` |
+| T9 | **默认仍不去** script `unsafe-inline` | 决策：[`docs/csp-t9-decision-2026-07-22.md`](./docs/csp-t9-decision-2026-07-22.md) |
+| T9″ | proxy/layout 接 nonce · preview 金丝雀 `CSP_SCRIPT_UNSAFE_INLINE=0` | 边缘阻断已清 |
 | A′ | 浏览器生产 Admin 秒更手测 | 可选；本地已验证 |
 | D–F | AI 建议标签 / 死链周报 / favorites DB JWT | 需 spec |
 
