@@ -36,6 +36,7 @@
     "icons:backfill": "node scripts/backfill-link-icons.mjs",
     "icons:backfill:write": "node scripts/backfill-link-icons.mjs --write",
     "icons:pwa": "node scripts/generate-pwa-icons.mjs",
+    "probe:headers": "node scripts/probe-security-headers.mjs",
     "probe:lighthouse": "node scripts/probe-lighthouse-production.mjs",
     "docs:openapi": "node scripts/generate-openapi.mjs",
     "typecheck": "tsc --noEmit --incremental false"

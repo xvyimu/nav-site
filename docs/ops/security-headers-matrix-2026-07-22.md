@@ -22,6 +22,10 @@
 ```bash
 pnpm exec vitest run tests/csp.test.ts tests/api-csp-report.test.ts
 node scripts/audit-edge-scripts.mjs
+# Read-only header dump (default BASE=http://127.0.0.1:3264; production host blocked unless --allow-production)
+pnpm run probe:headers -- --compare-repo
+# Explicit production observation only:
+# pnpm run probe:headers -- --base-url https://yuanjia1314.ccwu.cc --allow-production --compare-repo
 ```
 
 ## DEFER (unchanged)

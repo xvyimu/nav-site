@@ -1,6 +1,6 @@
 # 发布检查清单
 
-> 最后更新：2026-07-18
+> 最后更新：2026-07-22
 > 发布分支：`master`
 > 生产入口：`https://yuanjia1314.ccwu.cc`（Vercel 主轨）
 > 当前生产运行时 HEAD：`ee5a047b`（见 [release-manifest-2026-07-18](./release-manifest-2026-07-18.md)）
@@ -24,14 +24,24 @@
    rtk pnpm run typecheck
    ```
 
-3. 在已获批准的合入/推送后，等待 Vercel Git 集成完成生产部署。不要把 CLI `vercel deploy --prod` 当作标准路径；手动部署属于带外生产操作，须单独获批。
+3. （可选）确认 PWA 图标可再生成，且安全头矩阵仍为当前 SSOT（不改 `next.config` / `proxy`）：
+
+   ```powershell
+   pnpm run icons:pwa
+   # 矩阵：docs/ops/security-headers-matrix-2026-07-22.md
+   # AS-IS/TARGET：docs/ops/security-headers-as-is-target-2026-07-22.md
+   # 只读头探测（默认 localhost；生产域需 --allow-production）：
+   pnpm run probe:headers -- --base-url http://127.0.0.1:3264 --compare-repo
+   ```
+
+4. 在已获批准的合入/推送后，等待 Vercel Git 集成完成生产部署。不要把 CLI `vercel deploy --prod` 当作标准路径；手动部署属于带外生产操作，须单独获批。
 
    ```powershell
    # Vercel Dashboard：确认与 master HEAD 对应的 Production deployment 已 Ready
    # 记录 deployment 对应 commit，随后执行下一步主域验收。
    ```
 
-4. 记录本次 HEAD，并以主域名复验：
+5. 记录本次 HEAD，并以主域名复验：
 
    ```powershell
    pnpm run verify:production -- --base-url https://yuanjia1314.ccwu.cc --expect-commit <HEAD>
@@ -44,6 +54,7 @@
 - `/build-info.json` 的 `commit` 等于待发布 HEAD。
 - `/api/search?q=ai&limit=5` 返回 JSON，`/tool/figma`、`/sitemap.xml` 和 `/robots.txt` 可访问。
 - `pnpm run verify:production -- --base-url https://yuanjia1314.ccwu.cc --expect-commit <HEAD>` 全部通过。
+- （可选）只读安全头：`pnpm run probe:headers -- --base-url https://yuanjia1314.ccwu.cc --allow-production --compare-repo`（默认禁生产域作 canary；见 `docs/ops/security-headers-matrix-2026-07-22.md`）。
 
 ## 语义检索常开（ARCH-1）
 

@@ -19,9 +19,19 @@ pnpm exec vitest run tests/csp.test.ts tests/api-csp-report.test.ts
 node scripts/audit-edge-scripts.mjs
 pnpm audit --audit-level=high
 pnpm run icons:pwa   # regenerate public/icon-192|512.png (no deploy)
+# Headers matrix + read-only probe (default BASE=localhost; prod host blocked unless --allow-production)
+pnpm run probe:headers -- --base-url http://127.0.0.1:3264 --compare-repo
+# Preview canary example (not production domain):
+# pnpm run probe:headers -- --base-url https://<preview>.vercel.app --compare-repo
 ```
 
-Headers inventory: `docs/ops/security-headers-as-is-target-2026-07-22.md` · compact matrix: `docs/ops/security-headers-matrix-2026-07-22.md`.
+| Asset | Path |
+| --- | --- |
+| PWA icons regen | `pnpm run icons:pwa` → `public/icon-192.png` / `icon-512.png` |
+| Headers matrix | `docs/ops/security-headers-matrix-2026-07-22.md` |
+| Headers AS-IS/TARGET | `docs/ops/security-headers-as-is-target-2026-07-22.md` |
+| Headers probe (read-only) | `pnpm run probe:headers` · `scripts/probe-security-headers.mjs` |
+| LAUNCH chain | `docs/LAUNCH-CHECKLIST.md` §上线前 step 3 |
 
 ## P1
 
