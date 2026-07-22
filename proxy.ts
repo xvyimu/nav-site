@@ -127,7 +127,9 @@ export const config = {
     "/admin/:path*",
     "/api/admin/:path*",
     "/login",
-    // HTML documents for optional dynamic CSP. With CSP_DYNAMIC=0 this is a no-op.
+    // HTML documents for optional dynamic CSP.
+    // When CSP_DYNAMIC=0, withDynamicCsp returns the response unchanged (cheap no-op),
+    // but the middleware still runs — keep DYNAMIC off in production.
     {
       source: "/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)",
       missing: [

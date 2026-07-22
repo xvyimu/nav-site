@@ -7,6 +7,7 @@ import { getApprovedLinkBySlug, getRelatedLinks, getCategories } from "@/lib/rep
 import { slugify } from "@/lib/slugify";
 import { relativeTime } from "@/lib/types";
 import { escapeJsonForHtml, isSafeUrl, withTimeout } from "@/lib/utils";
+import { getCspNonce } from "@/lib/csp-server";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ReviewSection } from "@/components/ReviewSection";
 import { logger } from "@/lib/logger";
@@ -118,6 +119,8 @@ export default async function ToolDetailPage({ params }: PageProps) {
 
   const jsonLd = generateJsonLd(data);
   const categoryName = data.category_name || "未分类";
+  // Only hits headers() when CSP_DYNAMIC=1 (see getCspNonce).
+  const nonce = await getCspNonce();
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -125,6 +128,7 @@ export default async function ToolDetailPage({ params }: PageProps) {
       {jsonLd && (
         <script
           type="application/ld+json"
+          nonce={nonce}
           dangerouslySetInnerHTML={{ __html: escapeJsonForHtml(JSON.stringify(jsonLd)) }}
         />
       )}

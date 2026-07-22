@@ -2,14 +2,14 @@
 
 > **Enforcing 默认结论不变：暂不**去掉 `script-src 'unsafe-inline'`。  
 > T9′ 已交付：**可回滚开关 · GA 外置 · CSP builder · 边缘审计脚本**。  
-> **T9″（T-CP-001）已接线**：`CSP_DYNAMIC=1` 时 proxy 发带 nonce 的 CSP + `x-nonce`，layout/`Analytics` 可读并挂 nonce。  
+> **T9″（T-CP-001）已接线**：`CSP_DYNAMIC=1` 时 proxy 发带 nonce 的 CSP + `x-nonce`；`lib/csp-server.getCspNonce` 供 layout / 首页 / tool 页 JSON-LD 与 `Analytics` 挂 nonce。  
 > **生产默认保持关闭**——仅 preview 手动开 `CSP_DYNAMIC`；`CSP_SCRIPT_UNSAFE_INLINE` 默认仍 true。
 
 ## 0. T9′ 交付清单（1–5）
 
 | # | 前置 | 状态 | 实现 |
 |---|------|------|------|
-| 1 | Nonce / strict-dynamic 管道 | **Builder + T9″ 接线就绪；默认仍关** | `lib/csp.ts`：`createCspNonce` / `createDynamicCspAttachment`；`CSP_DYNAMIC=1` 时 next.config **跳过**静态 CSP，`proxy.ts` 发 CSP + `x-nonce`；`app/layout.tsx` / `Analytics` 读 `x-nonce` 挂 nonce。**仅 preview 手动开** |
+| 1 | Nonce / strict-dynamic 管道 | **Builder + T9″ 接线就绪；默认仍关** | `lib/csp.ts` builders；`lib/csp-server.ts` 读 `x-nonce`；`proxy.ts` 动态头；`app/layout.tsx` + `app/page.tsx` + `app/tool/[slug]/page.tsx` + `Analytics` 挂 nonce。**仅 preview 手动开** |
 | 2 | GA 外置 | **已做** | `components/Analytics.tsx` → gtag.js + **`/api/ga?id=`**（`app/api/ga/route.ts`），**无** inline bootstrap |
 | 3 | 边缘 script 改写排查 | **已清除** | 2026-07-22：`rocket_loader` **off** · mangled **0** · 见 `docs/cloudflare-edge-csp-hardening-2026-07-22.md` |
 | 4 | 样本窗口 | **通道在线** | RO + `/api/csp-report` → 采样 Sentry `source:csp-report`；本机无 `SENTRY_AUTH_TOKEN` 时用 UI。结构阻断已足够否决立刻去 inline |

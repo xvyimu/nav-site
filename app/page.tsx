@@ -5,6 +5,7 @@ import { NavSkeleton } from "@/components/NavSkeleton";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getCategories, getApprovedLinks } from "@/lib/repositories";
 import { escapeJsonForHtml } from "@/lib/utils";
+import { getCspNonce } from "@/lib/csp-server";
 import { logger } from "@/lib/logger";
 import { SECTION_LABELS } from "@/lib/nav-config";
 import {
@@ -83,12 +84,15 @@ export default async function Home({
   };
 
   const collectionJsonLd = cat ? buildCollectionPageJsonLd(cat, categories) : null;
+  // Only hits headers() when CSP_DYNAMIC=1 (see getCspNonce).
+  const nonce = await getCspNonce();
 
   return (
     <div className="w-full bg-background">
       {collectionJsonLd && (
         <script
           type="application/ld+json"
+          nonce={nonce}
           dangerouslySetInnerHTML={{ __html: escapeJsonForHtml(JSON.stringify(collectionJsonLd)) }}
         />
       )}

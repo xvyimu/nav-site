@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { Providers } from "@/components/Providers";
 import { AppChrome } from "@/components/AppChrome";
 import { escapeJsonForHtml } from "@/lib/utils";
-import { CSP_NONCE_HEADER, readCspFlags } from "@/lib/csp";
+import { getCspNonce } from "@/lib/csp-server";
 import { WebVitals } from "./_components/web-vitals";
 
 const ShortcutPanel = dynamic(() => import("@/components/ShortcutPanel").then((m) => m.ShortcutPanel));
@@ -43,17 +43,6 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: dark)", color: "#111827" },
   ],
 };
-
-/**
- * Read per-request CSP nonce only when CSP_DYNAMIC=1.
- * Avoids calling headers() (dynamic rendering) on the default static path.
- */
-async function getCspNonce(): Promise<string | undefined> {
-  if (!readCspFlags().dynamic) return undefined;
-  const { headers } = await import("next/headers");
-  const h = await headers();
-  return h.get(CSP_NONCE_HEADER) ?? undefined;
-}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = await getCspNonce();
