@@ -50,6 +50,8 @@ Agent 续作 SSOT：[`docs/AGENT-CONTINUE-2026-07-21.md`](./docs/AGENT-CONTINUE-
 | 测试 | Vitest · Playwright |
 | 部署 | Vercel（生产单轨；project 可能仍名 `nav-site`） |
 
+**形态与栈 SSOT：** [`docs/PROJECT.md`](./docs/PROJECT.md) · Agent 入口 [`AGENTS.md`](./AGENTS.md) / [`CLAUDE.md`](./CLAUDE.md)。
+
 ## 目录
 
 ```text
