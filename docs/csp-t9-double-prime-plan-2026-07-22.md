@@ -76,12 +76,12 @@
 
 ## 7. 验收标准
 
-- [ ] `CSP_DYNAMIC` 未设：行为与 T9′ 一致（单测 + 代码门闩）。  
-- [ ] `CSP_DYNAMIC=1`：响应含 `Content-Security-Policy` 且 `script-src` 含 `'nonce-…'` + `'strict-dynamic'`；请求侧 `x-nonce` 可达 layout。  
-- [ ] `CSP_DYNAMIC=1` + `CSP_SCRIPT_UNSAFE_INLINE=0`：Enforcing **无** script `'unsafe-inline'`（builder 单测）。  
-- [ ] Admin 鉴权单测/路径不回归。  
-- [ ] `pnpm test`（unset Upstash）+ `pnpm typecheck` 通过。  
-- [ ] **不**在本任务把生产 env 改为去 inline。
+- [x] `CSP_DYNAMIC` 未设：行为与 T9′ 一致（单测 + 代码门闩）。  
+- [x] `CSP_DYNAMIC=1`：响应含 `Content-Security-Policy` 且 `script-src` 含 `'nonce-…'` + `'strict-dynamic'`；请求侧 `x-nonce` 可达 layout。  
+- [x] `CSP_DYNAMIC=1` + `CSP_SCRIPT_UNSAFE_INLINE=0`：Enforcing **无** script `'unsafe-inline'`（builder 单测）。  
+- [x] Admin 鉴权路径单测不回归（`tests/csp-proxy.test.ts`）。  
+- [x] `pnpm test`（unset Upstash）+ `pnpm typecheck` — 见收尾验证。  
+- [x] **不**在本任务把生产 env 改为去 inline。
 
 ## 8. Preview 金丝雀（人工，非本 PR 自动）
 

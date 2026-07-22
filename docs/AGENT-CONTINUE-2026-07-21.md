@@ -15,7 +15,7 @@
 | 探针 | home/health/search/tool/sitemap/robots/build-info **全 PASS**（`--no-proxy`） |
 | 限流 | Upstash **ok** + `DISTRIBUTED_RATE_LIMIT_FAIL_CLOSED` |
 | embedding | Cloudflare Workers AI bge-m3 **1024-d** ok |
-| CSP | Enforcing 默认 script **仍有** `unsafe-inline`；RO + csp-report→Sentry；**CF Rocket Loader off** · mangled=0 |
+| CSP | Enforcing 默认 script **仍有** `unsafe-inline`；RO + csp-report→Sentry；**CF Rocket Loader off** · mangled=0；**T9″ 代码已接**（`CSP_DYNAMIC` 默认 off） |
 | 测试 | 正式 Vitest **55** + e2e 保留；**不删**正式用例；本地 `.next` 可清 |
 | typecheck | **干净** |
 | 工作树 | clean · 无 `_tmp*` / backup / coverage / playwright-report |
@@ -35,7 +35,7 @@
 |----|------|
 | Admin 写→前台秒更 | **本地 dev + prod 库写测 PASS**。生产脚本登录 CSRF cookie 限制；代码已在生产。 |
 | CF 边缘 | `rocket_loader` **off** · `audit-edge-scripts` **mangled=0** |
-| CSP T9 去 inline | **默认仍不去**。决策：`docs/csp-t9-decision-2026-07-22.md`。下一手 **T9″ nonce→layout**。 |
+| CSP T9 去 inline | **默认仍不去**。T9″ 代码已接（proxy/layout nonce）。下一手 **preview 金丝雀** `CSP_DYNAMIC=1` + `CSP_SCRIPT_UNSAFE_INLINE=0`。 |
 | Hygiene | 正式测试保留；无 ad-hoc 探针/备份入仓 |
 
 ## 1. 不可动的架构不变式（ADR）
@@ -70,7 +70,8 @@ C1 favorites 权限纵深 · C2 文档 SSOT · C3 死链→Admin · Upstash+FAIL
 |---|------|------|--------|------|
 | T9 | 去 Enforcing script `unsafe-inline` | 安全 | **默认暂缓** | 见 `docs/csp-t9-decision-2026-07-22.md`；env `CSP_SCRIPT_UNSAFE_INLINE` |
 | T9′ | GA 外置 + CSP builder/开关 | 前置 | **已上线** `46e71ec3` | `/api/ga` · flags · 正式测保留 |
-| T9″ | proxy/layout 接 nonce · preview 金丝雀 | 安全 | 就绪前置 | 边缘 mangled=0；可开干 |
+| T9″ | proxy/layout 接 nonce | 安全 | **代码完成** | 默认 `CSP_DYNAMIC=off`；方案 `docs/csp-t9-double-prime-plan-2026-07-22.md` |
+| T9″′ | Preview 金丝雀去 inline | 验证 | **下一手** | Preview：`CSP_DYNAMIC=1` + `CSP_SCRIPT_UNSAFE_INLINE=0` 冒烟 + Sentry 观察 |
 | A′ | 浏览器生产 Admin 秒更 | 验证 | 可选 | 本地已 PASS |
 | D | Admin 审核 AI 建议标签 | 产品 P2 | 需 spec | 只建议、人确认 |
 | E | 死链周报节奏 | 运营 | 需 spec | 不改 check-links 算法 |

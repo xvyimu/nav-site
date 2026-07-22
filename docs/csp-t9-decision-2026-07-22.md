@@ -1,17 +1,18 @@
-# CSP T9 评估 · 2026-07-22（含 T9′ 落地）
+# CSP T9 评估 · 2026-07-22（含 T9′ / T9″ 落地）
 
 > **Enforcing 默认结论不变：暂不**去掉 `script-src 'unsafe-inline'`。  
-> T9′ 已交付：**可回滚开关 · GA 外置 · CSP builder · 边缘审计脚本**；nonce 动态挂载仍属后续接线。  
-> 生产 tip 以 `/build-info.json` 为准（代码合入后 redeploy 才吃到 T9′）。
+> T9′：**可回滚开关 · GA 外置 · CSP builder · 边缘审计**。  
+> T9″：**proxy/layout 已接 nonce**；生产默认 `CSP_DYNAMIC=off`；preview 可金丝雀 `CSP_DYNAMIC=1` + `CSP_SCRIPT_UNSAFE_INLINE=0`。  
+> 生产 tip 以 `/build-info.json` 为准。
 
-## 0. T9′ 交付清单（1–5）
+## 0. 交付清单
 
 | # | 前置 | 状态 | 实现 |
 |---|------|------|------|
-| 1 | Nonce / strict-dynamic 管道 | **Builder 就绪；动态挂载未默认开** | `lib/csp.ts`：`createCspNonce` / `'nonce-…'` + `'strict-dynamic'`；`CSP_DYNAMIC=1` 时 next.config **跳过**静态 CSP（避免双头）。layout 读 `x-nonce` 挂 `<Script nonce>` **尚未接**（避免半吊子破坏生产） |
-| 2 | GA 外置 | **已做** | `components/Analytics.tsx` → gtag.js + **`/api/ga?id=`**（`app/api/ga/route.ts`），**无** inline bootstrap |
+| 1 | Nonce / strict-dynamic 管道 | **T9″ 已接线（flag 门闩）** | `lib/csp.ts` builders + `createDynamicCspContext`；`proxy.ts` 在 `CSP_DYNAMIC=1` 时发 `x-nonce` + CSP；`app/layout.tsx` 透传 Script/Theme/JSON-LD；`next.config` 在 dynamic 时跳过静态 CSP |
+| 2 | GA 外置 | **已做** | `components/Analytics.tsx` → gtag.js + **`/api/ga?id=`**，**无** inline bootstrap；支持 `nonce` prop |
 | 3 | 边缘 script 改写排查 | **已清除** | 2026-07-22：`rocket_loader` **off** · mangled **0** · 见 `docs/cloudflare-edge-csp-hardening-2026-07-22.md` |
-| 4 | 样本窗口 | **通道在线** | RO + `/api/csp-report` → 采样 Sentry `source:csp-report`；本机无 `SENTRY_AUTH_TOKEN` 时用 UI。结构阻断已足够否决立刻去 inline |
+| 4 | 样本窗口 | **通道在线** | RO + `/api/csp-report` → 采样 Sentry `source:csp-report` |
 | 5 | 回滚开关 | **已做** | 见 §Env |
 
 ### Env 开关
@@ -20,9 +21,10 @@
 |------|------|------|
 | `CSP_REPORT_ONLY` | on（`0` 关） | Report-Only 头 |
 | `CSP_SCRIPT_UNSAFE_INLINE` | **on**（`0` 去掉） | Enforcing 是否含 script `'unsafe-inline'` |
-| `CSP_DYNAMIC` | **off** | 为 1 时 next.config 不发 CSP（留给 middleware 动态+nonce；**完整接线前勿在生产开**） |
+| `CSP_DYNAMIC` | **off** | 为 1 时 next.config 不发 CSP；proxy 发动态 CSP + `x-nonce`；layout 消费 nonce |
 
-回滚去 inline 失败：设回 `CSP_SCRIPT_UNSAFE_INLINE=1`（或不设）并 redeploy。
+回滚去 inline 失败：设回 `CSP_SCRIPT_UNSAFE_INLINE=1`（或不设）并 redeploy。  
+回滚动态路径：去掉 `CSP_DYNAMIC` 或设 `0` 并 redeploy（回静态 next.config CSP）。
 
 ## 1. 样本通道状态
 
@@ -34,59 +36,77 @@
 | Vercel Logs | 可见 POST 204 | 无 body 摘要 |
 | Sentry Issues API | 需 `SENTRY_AUTH_TOKEN` | UI：`message:"csp-report:"` / tag `source:csp-report` |
 
-## 2. 生产 HTML 结构（决定性，去 inline 前）
+## 2. 生产 HTML 结构（决定性）
 
 对 `GET /` 在 T9′ **前**实测过：
 
 | 指标 | 值 |
 |------|-----|
 | 无 `src` 的 `<script>` | **~17** |
-| 含边缘改写 type | 常见 `*-text/javascript` |
-| GTM/GA | 有；**现已改为外置** `/api/ga`（deploy 后生效） |
-| JSON-LD | layout 内联 `application/ld+json`（data 类型，script-src 通常不拦执行，但仍是 `<script>` 节点） |
+| 含边缘改写 type | 常见 `*-text/javascript`（**现 mangled=0**） |
+| GTM/GA | 有；**现已改为外置** `/api/ga` |
+| JSON-LD | layout 内联 `application/ld+json`（现可挂 nonce） |
 
-### 若现在 `CSP_SCRIPT_UNSAFE_INLINE=0` 且无 nonce
+### 若 `CSP_SCRIPT_UNSAFE_INLINE=0` 且无 nonce
 
-1. Next / 运行时仍可能注入 inline（需 nonce 管道）。  
-2. 边缘改写 type 的脚本行为不确定。  
-3. JSON-LD 一般安全；真正风险是 **JS inline** 与第三方。
+仍会拦 Next 运行时 / theme 内联脚本。**必须** `CSP_DYNAMIC=1` 且 layout 已接线（T9″ 代码侧已满足）。
 
 ## 3. 决策
 
 | 问题 | 答案 |
 |------|------|
 | 默认能否去掉 Enforcing `'unsafe-inline'`？ | **否**（默认 flag 仍为 on） |
-| GA 是否还阻塞？ | **代码层已解**；等生产 deploy 后用 RO/Sentry 确认 |
-| 下一步 | §4 完成 nonce→layout 接线后，preview 上 `CSP_SCRIPT_UNSAFE_INLINE=0` 金丝雀 |
+| GA 是否还阻塞？ | **代码层已解** |
+| 代码侧 nonce 管道？ | **T9″ 已接**（需 env 打开 dynamic） |
+| 下一步 | Preview 金丝雀观察 → 再生产切换 |
 
-## 4. 真正 cutover 清单（仍须全部满足）
+## 4. Cutover 清单
 
-1. **Middleware/proxy 挂动态 CSP + nonce**，layout/Script 透传 nonce（`CSP_DYNAMIC=1`）。  
-2. 确认生产 HTML **不再**出现 inline gtag bootstrap；`audit-edge-scripts.mjs` 无 mangled type 或已关 Rocket Loader。  
-3. Sentry `csp-report` 聚类 1–2 天可解释。  
-4. Preview：`CSP_SCRIPT_UNSAFE_INLINE=0` 冒烟（首页 / 搜索 / Admin / GA network）。  
-5. 生产切换 + 一键回滚说明写在 runbook。
+1. ~~Middleware/proxy 挂动态 CSP + nonce，layout 透传~~ **代码完成（T9″）**  
+2. 确认生产 HTML 无 inline gtag；`audit-edge-scripts.mjs` mangled=0  
+3. Sentry `csp-report` 聚类 1–2 天可解释  
+4. **Preview：** `CSP_DYNAMIC=1` + `CSP_SCRIPT_UNSAFE_INLINE=0` 冒烟（首页 / 搜索 / Admin / GA）  
+5. 生产切换 + 一键回滚（env）写在 runbook  
 
-## 5. 明确不做
+## 5. Preview 金丝雀（人工）
 
-- 不在无 nonce 时默认 `CSP_SCRIPT_UNSAFE_INLINE=0`。  
-- 不为「Sentry 暂时 0 条」宣布 T9 完成。  
-- 不把 style-src `'unsafe-inline'` 与 script 混改。
+```text
+Vercel Preview env:
+  CSP_DYNAMIC=1
+  CSP_SCRIPT_UNSAFE_INLINE=0
+```
 
-## 6. 相关代码
+验收：
 
-- `lib/csp.ts` — builders + flags + nonce  
+- 响应头 `Content-Security-Policy` 含 `'nonce-…'` + `'strict-dynamic'`  
+- HTML 中 Script / theme 带相同 nonce  
+- 控制台无 CSP 阻断首页交互；GA network 有 gtag + `/api/ga`  
+- Sentry `source:csp-report` 可解释  
+
+回滚：删除两 env 或 `CSP_SCRIPT_UNSAFE_INLINE=1` + redeploy。
+
+## 6. 明确不做
+
+- 不在无观察窗口时默认生产 `CSP_SCRIPT_UNSAFE_INLINE=0`  
+- 不为「Sentry 暂时 0 条」宣布 T9 完成  
+- 不把 style-src `'unsafe-inline'` 与 script 混改  
+
+## 7. 相关代码
+
+- `lib/csp.ts` — builders + flags + nonce + `createDynamicCspContext`  
 - `next.config.ts` — 静态 CSP / `CSP_DYNAMIC` 跳过  
+- `proxy.ts` — Admin 鉴权 + 动态 CSP（`CSP_DYNAMIC=1`）  
+- `app/layout.tsx` / `components/Analytics.tsx` / `ThemeProvider.tsx` — 消费 `x-nonce`  
 - `app/api/csp-report/route.ts` — 采样 + Sentry  
-- `app/api/ga/route.ts` + `components/Analytics.tsx` — GA 外置  
+- `app/api/ga/route.ts` — GA 外置  
 - `scripts/audit-edge-scripts.mjs` — 边缘审计  
-- `proxy.ts` — 仅 Admin 鉴权（nonce 挂载后续）
+- 方案：`docs/csp-t9-double-prime-plan-2026-07-22.md`  
 
-## 7. 命令
+## 8. 命令
 
 ```powershell
 node scripts/probe-production.mjs --no-proxy --expect-commit <sha>
 node scripts/audit-edge-scripts.mjs
-pnpm exec vitest run tests/csp.test.ts tests/api-ga.test.ts tests/api-csp-report.test.ts
+pnpm exec vitest run tests/csp.test.ts tests/csp-proxy.test.ts tests/api-ga.test.ts tests/api-csp-report.test.ts
 # Sentry UI: message:"csp-report:" OR tag source:csp-report
 ```
