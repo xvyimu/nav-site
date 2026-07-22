@@ -124,9 +124,18 @@ No Rocket Loader–style type mangling on the sampled production homepage.
 2. Optional: curl Vercel deployment URL with `Host` / without CF proxy (if DNS split exists).  
 3. Only then open a change ticket with layer + rollback.
 
+### W2 follow-up (2026-07-23)
+
+- Production DRIFT **reconfirmed** (same XFO/Referrer mismatch; build-info still `46e71ec…`).  
+- **Platform remediation playbook** (still no prod CF/Vercel edits):  
+  `docs/ops/headers-drift-platform-remediation-2026-07.md`  
+- P1 Preview probe **blocked on this agent host**: `*.vercel.app` connect timeout while custom-domain prod remains reachable — same network class as CSP Stage A blocker.
+
 ## Cross-links
 
 - `docs/ops/security-headers-as-is-target-2026-07-22.md`
 - `docs/ops/security-headers-matrix-2026-07-22.md`
+- `docs/ops/headers-drift-platform-remediation-2026-07.md`
 - `docs/ops/wave8-chronoportal-claude.md` (probe introduction)
 - `docs/ops/w1-arch-upgrade-chronoportal-claude.md`
+- `docs/ops/w2-arch-upgrade-chronoportal-claude.md`
