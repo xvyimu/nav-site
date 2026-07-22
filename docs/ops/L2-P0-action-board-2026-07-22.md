@@ -18,7 +18,10 @@ Derived from `docs/ops/L2-hygiene-checklist.md`. **Maintain Next; no Vue/Go rewr
 pnpm exec vitest run tests/csp.test.ts tests/api-csp-report.test.ts
 node scripts/audit-edge-scripts.mjs
 pnpm audit --audit-level=high
+pnpm run icons:pwa   # regenerate public/icon-192|512.png (no deploy)
 ```
+
+Headers inventory: `docs/ops/security-headers-as-is-target-2026-07-22.md` · compact matrix: `docs/ops/security-headers-matrix-2026-07-22.md`.
 
 ## P1
 
