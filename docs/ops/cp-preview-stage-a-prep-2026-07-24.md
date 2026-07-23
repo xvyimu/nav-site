@@ -113,6 +113,47 @@ if ($BASE -notmatch '\.vercel\.app$') { throw "BASE must be *.vercel.app for Sta
 
 失败只做 **Preview** R1/R2（见 canary §4）；**不要**改 Production。
 
+### 4.1 解阻后顺序（网络通 → 可写 Preview env 前）
+
+网络从 BLOCKED 恢复后，**严格按序**；任一步红则停，不跳步写 env：
+
+| 序 | 门闩 | 动作 / 证据 | 停条件 |
+|----|------|-------------|--------|
+| 0 | 连通 | A0：`curl -sI --max-time 20 $BASE/` 有 HTTP 状态行 | timeout / exit 28 / `http_code=000` |
+| 1 | 非生产 | `$BASE` 守卫：`*.vercel.app` 且 ≠ 生产域 | 等于 `yuanjia1314.ccwu.cc` 或非 vercel.app |
+| 2 | tip 对齐 | Redeploy 目标 commit ≥ 含 csp-report 限流修的 tip（`68dd13dd`+；本 wt 后续 local commit 仅文档/脱敏） | Preview commit 落后且无法 redeploy |
+| 3 | **仅 Preview** env | Dashboard/CLI 写 `CSP_DYNAMIC=1`，**目标环境只勾 Preview** | 任何 Production 勾选 → **禁止继续** |
+| 4 | 头/nonce | A4–A5：enforcing CSP 含 `nonce-`；HTML 有匹配 `nonce=` | 无 nonce / 5xx |
+| 5 | 功能 | A6：首页 / 搜索 / admin 登录无 enforcing 红错 | 阻断页或 console CSP error 不可接受 |
+| 6 | report sink | S4：`POST /api/csp-report` → **204**；刷限时仍 **204** 且响应头 **`Retry-After: 60`**（勿当 429 解读为故障） | 非 2xx 持续 / 5xx |
+| 7 | Stage B（可选） | 仅 A 全绿后 Preview `CSP_SCRIPT_UNSAFE_INLINE=0` | A 未绿 |
+
+**限流与 Retry-After（操作人须知）：**
+
+- `csp-report`：每 IP `windowMs=60_000` / `max=60`；超限 **仍 204**（浏览器 CSP collector 对非 2xx 不友好），用 **`Retry-After: 60`** 广告退避。
+- 探针 S4 **勿刷爆**；验证限流时最多短促连发，看头里 `Retry-After`，不要改 max 或关限流。
+- 其它公开 API 的 429 与 csp-report 的 204+Retry-After **分列**，勿混为一谈。
+
+### 4.2 SecOps 关键门闩（本预备 / 解阻后仍 **不执行网络写生产**）
+
+下列为 **硬停**；本会话与后续 Stage A 执行机均不得越过：
+
+1. **Production CSP 禁止** — 不写任何 Production `CSP_*`；不把 Preview 值勾到 Production；不改 `lib/csp.ts` / `next.config` / proxy **默认 flag 更松或生产 enforcing 终态**。  
+2. **无用户原文授权不讨论生产 flip** — 须「生产 CSP flip 现在」+ 阶段；且 §7.1 前置全真。  
+3. **`CP_CSP_prod` 人 gate** — DEFER；本预备不勾选。  
+4. **不通网不写 env** — Preview 边缘 timeout 时保持 BLOCKED，禁止「先写再测」。  
+5. **密钥不进 git** — 不把真实 `CSP_*` / Redis / Sentry DSN 提交进仓库。  
+6. **不 push**（本 wt 任务约束；合主干 / 远端另授权）。
+
+### 4.3 分布式限流 fail-open（仅文档 · **不改代码默认**）
+
+| 项 | 行为 |
+|----|------|
+| 默认 | **fail-open**：无 Upstash 或 Upstash 抖动 → 回退进程内桶（`backend: memory`），请求仍按本地配额尽量放行 |
+| 生产严格 | 设 **`DISTRIBUTED_RATE_LIMIT_FAIL_CLOSED=1`**（且 production / `VERCEL=1`）→ 未配置或请求失败时 **拒绝**（`allowed:false`, `backend: unavailable`） |
+| 本预备 | **不改**默认；不强制 Preview/Production 打开 fail-closed；仅记 residual：多实例下未配 Redis 时有效配额 ≈ 阈值 × 实例数 |
+| 代码 | `lib/rate-limit-distributed.ts` → `shouldFailClosed`；env 名见 `.env.local.example` |
+
 ---
 
 ## 5. 探针命令块（复制用）
@@ -149,11 +190,12 @@ curl.exe -sS --max-time 15 "$PROD/build-info.json"
 
 ```powershell
 # S4 csp-report sink（公开 POST；勿刷爆）
-curl.exe -sS -o NUL -w "http_code=%{http_code}`n" --max-time 20 `
+curl.exe -sS -D - -o NUL -w "http_code=%{http_code}`n" --max-time 20 `
   -X POST "$BASE/api/csp-report" `
   -H "Content-Type: application/csp-report" `
   -d '{"csp-report":{"violated-directive":"script-src","blocked-uri":"https://example.invalid/x","document-uri":"https://example.invalid/"}}'
 # 期望：http_code=204
+# 限流命中时：仍 http_code=204，响应头含 Retry-After: 60 与 Cache-Control: no-store
 ```
 
 可选：
@@ -254,7 +296,22 @@ curl.exe -sS --max-time 15 "https://yuanjia1314.ccwu.cc/build-info.json"
 ### 7.3 明文
 
 > **本任务（cp-preview-prep · 2026-07-24）未 flip 生产 CSP。**  
-> 未写入任何 Production `CSP_*`；未将代码默认改为生产 enforcing 终态；`CP_CSP_prod` 仍 DEFER。
+> 未写入任何 Production `CSP_*`；未将代码默认改为生产 enforcing 终态；`CP_CSP_prod` 仍 DEFER。  
+> **再次钉死：Production CSP 禁止**（含 env、默认 flag 放松、宣称 cutover）。
+
+### 7.4 csp-report 日志脱敏（本 wt 增量）
+
+| 项 | 说明 |
+|----|------|
+| 行为 | 写 log / Sentry 前对 `documentUri` / `blockedUri` 做 **path-only**（strip query + hash） |
+| 代码 | `app/api/csp-report/route.ts` → `toPathOnlyUri`；采样 hash 仍可用原始 blocked 串（emit 再脱敏） |
+| 测 | `tests/api-csp-report.test.ts` 锁定 query/hash 不进 logger / Sentry extra / fingerprint |
+| residual | `original-policy` 全文仍可能进采样日志（策略串，通常无用户 query）；未做 body 全字段递归脱敏 |
+
+### 7.5 分布式限流 residual（对照 §4.3）
+
+- 默认 **fail-open** 到 memory；生产要严格须显式 `DISTRIBUTED_RATE_LIMIT_FAIL_CLOSED=1`（**本预备不改默认、不写该 env**）。
+- csp-report 限流拒绝形态固定为 **204 + Retry-After: 60**（非 429）。
 
 ---
 
@@ -262,9 +319,11 @@ curl.exe -sS --max-time 15 "https://yuanjia1314.ccwu.cc/build-info.json"
 
 | 定义 | 状态 |
 |------|------|
-| Stage A 预备可交给人执行（env 名 · 探针 · 阻断 · 边界） | **是**（本文） |
+| Stage A 预备可交给人执行（env 名 · 探针 · 阻断 · 边界 · 解阻顺序 · 门闩） | **是**（本文） |
 | tip 含 csp-report 限流修 + audit 门 | **是** |
-| 无 CSP 生产变更 | **是** |
+| csp-report URI path-only 脱敏 + 测 | **是**（本 wt 增量） |
+| 分布式限流 fail-open / fail-closed 文档 | **是**（§4.3 · 未改默认） |
+| 无 CSP 生产变更 / 无默认 flag 放松 | **是** |
 | 未 push | **是**（commit 若有则仅 local） |
 
 ---
