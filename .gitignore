@@ -118,3 +118,6 @@ scripts/_next.out.txt
 docs/perf/lighthouse-*-production.json
 !docs/perf/lighthouse-*-production.summary.json
 
+
+# local tool (codebase-memory) - do not commit
+.cbmignore
