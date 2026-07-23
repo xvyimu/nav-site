@@ -30,7 +30,11 @@ export async function POST(request: Request) {
     60
   );
   if (!allowed) {
-    return new NextResponse(null, { status: 204 });
+    // Still 204 (CSP collectors treat non-2xx poorly); advertise throttle via Retry-After.
+    return new NextResponse(null, {
+      status: 204,
+      headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+    });
   }
 
   const raw = await request.text();

@@ -60,6 +60,8 @@ describe("POST /api/csp-report", () => {
       })
     );
     expect(response.status).toBe(204);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(mocks.loggerWarn).not.toHaveBeenCalled();
     expect(mocks.captureMessage).not.toHaveBeenCalled();
   });
