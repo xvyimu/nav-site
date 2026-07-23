@@ -9,3 +9,9 @@ overrides:
   # GHSA-52cp-r559-cp3m (js-yaml), GHSA-3jxr-9vmj-r5cp (brace-expansion)
   js-yaml: 4.3.0
   brace-expansion: 5.0.7
+  # Dependabot / GHSA 2026-07-23
+  # GHSA-f88m-g3jw-g9cj (sharp), GHSA-4c8g-83qw-93j6 + GHSA-v2hh-gcrm-f6hx (fast-uri),
+  # GHSA-frvp-7c67-39w9 (@hono/node-server)
+  sharp: 0.35.3
+  fast-uri: 3.1.4
+  '@hono/node-server': 2.0.11
