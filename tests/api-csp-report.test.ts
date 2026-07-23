@@ -175,4 +175,56 @@ describe("POST /api/csp-report", () => {
     }
     expect(hit).toBe(true);
   });
+
+  it("strips query/hash from documentUri and blockedUri before log/Sentry", async () => {
+    const { POST, toPathOnlyUri } = await importRoute();
+
+    expect(toPathOnlyUri("https://example.com/page?token=secret#frag")).toBe(
+      "https://example.com/page"
+    );
+    expect(toPathOnlyUri("inline")).toBe("inline");
+    expect(toPathOnlyUri("https://evil.example/x?a=1#h")).toBe("https://evil.example/x");
+
+    let logged = false;
+    for (let i = 0; i < 40; i += 1) {
+      mocks.loggerWarn.mockClear();
+      mocks.captureMessage.mockClear();
+      const response = await POST(
+        new Request("http://localhost/api/csp-report", {
+          method: "POST",
+          headers: { "content-type": "application/csp-report" },
+          body: JSON.stringify({
+            "csp-report": {
+              "document-uri": "https://example.com/page?token=secret#frag",
+              "violated-directive": "script-src",
+              // vary blocked-uri so sampling eventually hits
+              "blocked-uri": `https://evil.example/x?a=1#h-${i}`,
+            },
+          }),
+        })
+      );
+      expect(response.status).toBe(204);
+      if (mocks.loggerWarn.mock.calls.length > 0) {
+        logged = true;
+        const context = mocks.loggerWarn.mock.calls[0]?.[1] as {
+          documentUri?: string;
+          blockedUri?: string;
+        };
+        expect(context.documentUri).toBe("https://example.com/page");
+        expect(context.blockedUri).toBe("https://evil.example/x");
+        expect(context.documentUri).not.toMatch(/[?#]/);
+        expect(context.blockedUri).not.toMatch(/[?#]/);
+
+        const sentryExtra = mocks.captureMessage.mock.calls[0]?.[1] as {
+          extra?: { documentUri?: string; blockedUri?: string };
+          fingerprint?: string[];
+        };
+        expect(sentryExtra.extra?.documentUri).toBe("https://example.com/page");
+        expect(sentryExtra.extra?.blockedUri).toBe("https://evil.example/x");
+        expect(sentryExtra.fingerprint?.[2]).toBe("https://evil.example/x");
+        break;
+      }
+    }
+    expect(logged).toBe(true);
+  });
 });
