@@ -177,7 +177,8 @@ describe("POST /api/csp-report", () => {
   });
 
   it("strips query/hash from documentUri and blockedUri before log/Sentry", async () => {
-    const { POST, toPathOnlyUri } = await importRoute();
+    const { toPathOnlyUri } = await import("@/lib/csp-report-uri");
+    const { POST } = await importRoute();
 
     expect(toPathOnlyUri("https://example.com/page?token=secret#frag")).toBe(
       "https://example.com/page"
