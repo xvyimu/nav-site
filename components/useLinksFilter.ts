@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import type { Category, NavLink } from "@/lib/types";
 import type { PrecomputedNavData } from "@/lib/nav-derived-data";
+import type { ParsedUrlFilters } from "@/lib/navigation/url-state";
 import { useDerivedLinks } from "./navigation/useDerivedLinks";
 import { useFilterState } from "./navigation/useFilterState";
 import { useKeyboardNav } from "./navigation/useKeyboardNav";
@@ -12,16 +13,19 @@ export function useLinksFilter({
   categories,
   links,
   precomputed,
+  initialFilters,
 }: {
   categories: Category[];
   links: NavLink[];
   precomputed?: PrecomputedNavData;
+  /** RSC-parsed searchParams; seeds filter state for SSR/hydration parity. */
+  initialFilters?: ParsedUrlFilters;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const announceRef = useRef<HTMLDivElement>(null);
 
-  const filters = useFilterState();
+  const filters = useFilterState(initialFilters);
   const serverSearch = useServerSearch({
     rawSearch: filters.rawSearch,
     semanticSearch: filters.semanticSearch,

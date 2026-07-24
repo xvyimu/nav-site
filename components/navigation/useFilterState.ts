@@ -6,6 +6,7 @@ import {
   buildNavigationUrl,
   parseFiltersFromUrl,
   readInitialFilters,
+  type ParsedUrlFilters,
 } from "@/lib/navigation/url-state";
 import type { SortMode } from "./types";
 
@@ -30,8 +31,15 @@ export interface FilterState {
   clearSearchExperienceFilters: () => void;
 }
 
-export function useFilterState(): FilterState {
-  const [initial] = useState(readInitialFilters);
+/**
+ * Prefer RSC-seeded initialFilters (from page searchParams) so SSR HTML matches
+ * shareable ?cat= / ?q= URLs. Fall back to window URL only when seed is absent
+ * (tests / isolated mounts).
+ */
+export function useFilterState(initialFilters?: ParsedUrlFilters): FilterState {
+  const [initial] = useState<ParsedUrlFilters>(
+    () => initialFilters ?? readInitialFilters(),
+  );
   const [activeCategory, setActiveCategory] = useState(initial.cat);
   const [rawSearch, setRawSearch] = useState(initial.q);
   const [search, setSearch] = useState(initial.q);

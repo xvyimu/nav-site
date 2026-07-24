@@ -107,6 +107,39 @@ describe("frontend performance and lifecycle regressions", () => {
     expect(mocks.getDescendantSlugs).not.toHaveBeenCalled();
   });
 
+  it("seeds filter state from RSC initialFilters instead of DEFAULT_NAVIGATION_FILTERS", async () => {
+    const { useFilterState } = await import("@/components/navigation/useFilterState");
+    const { result } = renderHook(() =>
+      useFilterState({
+        q: "",
+        cat: "ai",
+        tags: ["api"],
+        minRating: 4,
+        popularity: "featured",
+        semantic: false,
+      })
+    );
+
+    expect(result.current.activeCategory).toBe("ai");
+    expect(result.current.activeTags).toEqual(["api"]);
+    expect(result.current.minRatingFilter).toBe(4);
+    expect(result.current.popularityFilter).toBe("featured");
+    expect(result.current.semanticSearch).toBe(false);
+  });
+
+  it("home page seeds Navigation with parseFiltersFromSearchParams and omits non-streaming Suspense", async () => {
+    const fs = await import("node:fs/promises");
+    const source = await fs.readFile("app/page.tsx", "utf8");
+
+    expect(source).toContain("parseFiltersFromSearchParams");
+    expect(source).toContain("initialFilters={initialFilters}");
+    expect(source).toContain("precomputed={precomputed}");
+    expect(source).not.toMatch(/import\s*\{[^}]*Suspense[^}]*\}\s*from\s*["']react["']/);
+    expect(source).not.toMatch(/<\s*Suspense[\s>]/);
+    // Route-level skeleton stays in app/loading.tsx; page must not import NavSkeleton.
+    expect(source).not.toMatch(/from\s*["']@\/components\/NavSkeleton["']/);
+  });
+
   it("clears stale search results when a later request returns a non-2xx response", async () => {
     vi.useFakeTimers();
     const fetchMock = vi

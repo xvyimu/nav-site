@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { type Category, type NavLink } from "@/lib/types";
 import type { PrecomputedNavData } from "@/lib/nav-derived-data";
+import type { ParsedUrlFilters } from "@/lib/navigation/url-state";
 import { HomeHero } from "./HomeHero";
 import { Sidebar } from "./Sidebar";
 import { useLinksFilter } from "./useLinksFilter";
@@ -24,10 +25,13 @@ export function Navigation({
   categories,
   links,
   precomputed,
+  initialFilters,
 }: {
   categories: Category[];
   links: NavLink[];
   precomputed?: PrecomputedNavData;
+  /** From RSC searchParams — keeps SSR filter HTML aligned with shareable URLs. */
+  initialFilters?: ParsedUrlFilters;
 }) {
   const {
     activeCategory, setActiveCategory,
@@ -48,7 +52,7 @@ export function Navigation({
     showLinks,
     flatResults,
     handleSearchKeyDown, handleResultKeyDown,
-  } = useLinksFilter({ categories, links, precomputed });
+  } = useLinksFilter({ categories, links, precomputed, initialFilters });
   const [mounted, setMounted] = useState(false);
   const [previewLink, setPreviewLink] = useState<NavLink | null>(null);
   /** 打开预览时记录触发控件，关闭后把键盘焦点还回去（a11y / E2E）。 */

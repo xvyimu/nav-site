@@ -1,7 +1,5 @@
-import { Suspense } from "react";
 import { type NavLink, type Category } from "@/lib/types";
 import { Navigation } from "@/components/Navigation";
-import { NavSkeleton } from "@/components/NavSkeleton";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getCategories, getApprovedLinks } from "@/lib/repositories";
 import { escapeJsonForHtml } from "@/lib/utils";
@@ -16,6 +14,7 @@ import {
   buildAvailableTags,
   type PrecomputedNavData,
 } from "@/lib/nav-derived-data";
+import { parseFiltersFromSearchParams } from "@/lib/navigation/url-state";
 
 // ISR: 每 60 秒重新生成（不再 await connection()，避免强制动态渲染）
 export const revalidate = 60;
@@ -54,12 +53,13 @@ function buildCollectionPageJsonLd(catSlug: string, categories: Category[]) {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ cat?: string }>;
+  // App Router may pass multi-value keys as string[]; parseFiltersFromSearchParams accepts both.
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const categoriesSignal = AbortSignal.timeout(FETCH_TIMEOUT);
   const linksSignal = AbortSignal.timeout(FETCH_TIMEOUT);
 
-  const [categories, links] = await Promise.all([
+  const [categories, links, sp] = await Promise.all([
     getCategories({ signal: categoriesSignal }).catch(() => {
       logger.warn("getCategories timed out, using empty fallback");
       return [];
@@ -68,9 +68,18 @@ export default async function Home({
       logger.warn("getApprovedLinks timed out, using empty fallback");
       return [];
     }),
+    searchParams,
   ]);
 
-  const { cat } = await searchParams;
+  // RSC-seeded filters: same source of truth as client URL state (shareable ?cat= / ?q=).
+  // Avoids DEFAULT_NAVIGATION_FILTERS on SSR + replaceState wiping deep links after hydrate.
+  const initialFilters = parseFiltersFromSearchParams(sp);
+  const cat =
+    typeof sp.cat === "string"
+      ? sp.cat
+      : Array.isArray(sp.cat)
+        ? sp.cat[0]
+        : undefined;
 
   // 服务端预计算派生数据（useLinksFilter 中 5 个纯 useMemo 的服务端版本）
   const descendantSlugsMap = buildDescendantSlugsMap(categories);
@@ -96,14 +105,18 @@ export default async function Home({
           dangerouslySetInnerHTML={{ __html: escapeJsonForHtml(JSON.stringify(collectionJsonLd)) }}
         />
       )}
+      {/*
+        NavSkeleton lives in app/loading.tsx for route transitions.
+        No inner Suspense: Navigation is a client child of already-resolved RSC data —
+        wrapping it only nested ErrorBoundary without streaming benefit.
+      */}
       <ErrorBoundary>
-        <Suspense fallback={<NavSkeleton />}>
-          <Navigation
-            categories={categories}
-            links={links as NavLink[]}
-            precomputed={precomputed}
-          />
-        </Suspense>
+        <Navigation
+          categories={categories}
+          links={links as NavLink[]}
+          precomputed={precomputed}
+          initialFilters={initialFilters}
+        />
       </ErrorBoundary>
     </div>
   );

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildNavigationUrl,
+  DEFAULT_NAVIGATION_FILTERS,
+  parseFiltersFromSearchParams,
   parseFiltersFromUrl,
 } from "@/lib/navigation/url-state";
 
@@ -59,5 +61,39 @@ describe("navigation url state", () => {
     });
 
     expect(url).toBe("/?semantic=false");
+  });
+
+  it("parseFiltersFromSearchParams accepts App Router record shape (RSC seed)", () => {
+    const parsed = parseFiltersFromSearchParams({
+      q: "  rust  ",
+      cat: "ai",
+      tag: ["api", "free"],
+      minRating: "3",
+      popularity: "popular",
+      semantic: "false",
+    });
+
+    expect(parsed).toEqual({
+      q: "rust",
+      cat: "ai",
+      tags: ["api", "free"],
+      minRating: 3,
+      popularity: "popular",
+      semantic: false,
+    });
+  });
+
+  it("parseFiltersFromSearchParams returns defaults for empty/null input", () => {
+    expect(parseFiltersFromSearchParams(null)).toEqual(DEFAULT_NAVIGATION_FILTERS);
+    expect(parseFiltersFromSearchParams(undefined)).toEqual(DEFAULT_NAVIGATION_FILTERS);
+    expect(parseFiltersFromSearchParams({})).toEqual(DEFAULT_NAVIGATION_FILTERS);
+  });
+
+  it("parseFiltersFromSearchParams accepts URLSearchParams", () => {
+    const parsed = parseFiltersFromSearchParams(
+      new URLSearchParams("cat=cloud&tag=free")
+    );
+    expect(parsed.cat).toBe("cloud");
+    expect(parsed.tags).toEqual(["free"]);
   });
 });

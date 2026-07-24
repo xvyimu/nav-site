@@ -57,9 +57,40 @@ export function parseFiltersFromUrl(sp: URLSearchParams): ParsedUrlFilters {
   return { q, cat, tags, minRating, popularity, semantic };
 }
 
+/**
+ * RSC / page searchParams → ParsedUrlFilters.
+ * Accepts App Router searchParams records (string | string[]) or URLSearchParams.
+ * Prefer this on the server so shareable ?cat= / ?q= URLs SSR with the same filter state
+ * the client will hydrate — avoids DEFAULT_NAVIGATION_FILTERS on SSR + client URL wipe.
+ */
+export function parseFiltersFromSearchParams(
+  input:
+    | URLSearchParams
+    | Record<string, string | string[] | undefined>
+    | null
+    | undefined,
+): ParsedUrlFilters {
+  if (!input) return { ...DEFAULT_NAVIGATION_FILTERS };
+  if (input instanceof URLSearchParams) {
+    return parseFiltersFromUrl(input);
+  }
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item !== undefined && item !== "") sp.append(key, item);
+      }
+    } else if (value !== "") {
+      sp.set(key, value);
+    }
+  }
+  return parseFiltersFromUrl(sp);
+}
+
 export function readInitialFilters(): ParsedUrlFilters {
   if (typeof window === "undefined") {
-    return DEFAULT_NAVIGATION_FILTERS;
+    return { ...DEFAULT_NAVIGATION_FILTERS };
   }
   return parseFiltersFromUrl(new URLSearchParams(window.location.search));
 }
