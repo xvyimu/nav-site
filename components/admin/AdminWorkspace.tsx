@@ -21,7 +21,6 @@ import {
   useAdminCategories,
 } from "@/components/admin/admin-queries";
 import { FadeContent } from "@/components/admin/FadeContent";
-import { LinkList } from "@/components/admin/LinkList";
 import { useAdminLinks } from "@/components/admin/useAdminLinks";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +48,20 @@ const LinkForm = dynamic(
         <div className="h-10 animate-pulse rounded-md bg-[var(--admin-surface)]" />
         <div className="h-10 animate-pulse rounded-md bg-[var(--admin-surface)]" />
         <div className="h-24 animate-pulse rounded-md bg-[var(--admin-surface)]" />
+      </div>
+    ),
+  }
+);
+
+/** 延迟加载列表表体，与 LinkForm 同模式加深工作台分包。 */
+const LinkList = dynamic(
+  () => import("@/components/admin/LinkList").then((module) => module.LinkList),
+  {
+    loading: () => (
+      <div className="min-h-72 space-y-3 p-4 sm:p-5" aria-label="正在加载链接列表">
+        <div className="h-12 animate-pulse rounded-md bg-[var(--admin-surface)]" />
+        <div className="h-12 animate-pulse rounded-md bg-[var(--admin-surface)]" />
+        <div className="h-12 animate-pulse rounded-md bg-[var(--admin-surface)]" />
       </div>
     ),
   }
