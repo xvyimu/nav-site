@@ -3,6 +3,7 @@ import { createStaticClient } from "@/lib/supabase/server";
 import type { NavLink } from "@/lib/types";
 import { slugify } from "@/lib/slugify";
 import { logger } from "@/lib/logger";
+import { coalesceInFlight } from "@/lib/request-coalesce";
 import {
   mapLinkRow,
   PUBLIC_LINK_SELECT,
@@ -18,16 +19,21 @@ interface GetApprovedLinksOpts {
   signal?: AbortSignal;
 }
 
+/** Coalesce key: list shape only — signals are per-waiter and must not split the pool. */
+function approvedLinksCoalesceKey(options?: Pick<GetApprovedLinksOpts, "limit" | "offset">): string {
+  const limit = options?.limit ?? "";
+  const offset = options?.offset ?? 0;
+  return `getApprovedLinks:limit=${limit}:offset=${offset}`;
+}
+
 /**
- * 获取所有已批准链接。
+ * 实际 DB 拉取（含重试）。不含 AbortSignal：共享 in-flight 不绑定任一 waiter 的 signal。
  */
-async function getApprovedLinksImpl(options?: GetApprovedLinksOpts): Promise<NavLink[]> {
+async function fetchApprovedLinks(
+  options?: Pick<GetApprovedLinksOpts, "limit" | "offset">
+): Promise<NavLink[]> {
   let lastError: Error | null = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
-    if (options?.signal?.aborted) {
-      throw new Error("Failed to fetch links");
-    }
-
     try {
       const supabase = createStaticClient();
       const buildQuery = (select: string) => {
@@ -46,10 +52,6 @@ async function getApprovedLinksImpl(options?: GetApprovedLinksOpts): Promise<Nav
           );
         }
 
-        if (options?.signal) {
-          query = query.abortSignal(options.signal);
-        }
-
         return query;
       };
 
@@ -58,7 +60,6 @@ async function getApprovedLinksImpl(options?: GetApprovedLinksOpts): Promise<Nav
       if (error) {
         logger.error("Failed to fetch links", { source: "repositories", attempt }, error);
         lastError = new Error("Failed to fetch links");
-        if (options?.signal?.aborted) break;
         if (attempt < 3) {
           await new Promise((r) => setTimeout(r, 1000 * attempt));
         }
@@ -67,8 +68,7 @@ async function getApprovedLinksImpl(options?: GetApprovedLinksOpts): Promise<Nav
 
       const result = await attachTagsToLinks(
         supabase,
-        ((data ?? []) as unknown as RawLinkRow[]).map(mapLinkRow),
-        options?.signal
+        ((data ?? []) as unknown as RawLinkRow[]).map(mapLinkRow)
       );
 
       if (result.length === 0 && attempt < 2) {
@@ -80,13 +80,33 @@ async function getApprovedLinksImpl(options?: GetApprovedLinksOpts): Promise<Nav
       return result;
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
-      if (options?.signal?.aborted) break;
       if (attempt < 3) {
         await new Promise((r) => setTimeout(r, 1000 * attempt));
       }
     }
   }
   throw lastError ?? new Error("getApprovedLinks failed after 3 attempts");
+}
+
+/**
+ * 获取所有已批准链接。
+ *
+ * - React `cache()`：同一 RSC 请求树内、相同参数引用复用。
+ * - `coalesceInFlight`：跨调用方 / 不同 `signal` 对象时，相同 limit/offset 的并发请求共享一次 DB。
+ * - `signal` 仅取消本 waiter 的等待，不中止共享 in-flight（其它 waiter 仍可拿到结果）。
+ */
+async function getApprovedLinksImpl(options?: GetApprovedLinksOpts): Promise<NavLink[]> {
+  const { signal, limit, offset } = options ?? {};
+  const listOpts =
+    limit !== undefined || offset !== undefined
+      ? { limit, offset }
+      : undefined;
+
+  return coalesceInFlight(
+    approvedLinksCoalesceKey(listOpts),
+    () => fetchApprovedLinks(listOpts),
+    signal
+  );
 }
 
 export const getApprovedLinks = cache(getApprovedLinksImpl);
