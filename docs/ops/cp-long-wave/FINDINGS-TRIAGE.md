@@ -17,8 +17,9 @@
 | **CP-CR-002** | 无 Upstash → 进程内限流 | **DONE** docs | **`ddb6d664`** `cp-cr-rate-limit-ops` rm |
 | **CP-CR-003** | 登录限流 DB 路径 ops 确认 | **DONE** 并入 CR-002 | 同上 |
 | **CP-CR-004** | service_role 应用层纪律 | **DONE** 清单 | **`faab2a7b`** `cp-cr-service-role-checklist` rm |
-| **CP-CR-005** | 公开 submit CSRF/脚本面 | **开修** docs 威胁模型 | **`cp-cr-csrf-submit-docs`** live |
+| **CP-CR-005** | 公开 submit CSRF/脚本面 | **DONE** docs | **`c69517f4`** rm |
 | **CP-CR-006** | Netlify CSP 漂移 | **queued** P2 | `cp-cr-netlify-drift` |
+| **CP-CR-BUILD** | csp-report route 导出 `toPathOnlyUri` → **next build 红** | **开修** | **`cp-cr-csp-report-export`** · W11 证据 |
 
 ## P2
 

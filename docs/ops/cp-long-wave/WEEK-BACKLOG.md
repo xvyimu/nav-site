@@ -11,12 +11,12 @@
 
 | 项 | 值 |
 |----|-----|
-| 日序 | Day 0 续 · **W1–W10 + CR-002/004 harvest** · **W11 + CR-005 live** |
-| tip base | `df11a2f2` · features 见 backlog |
-| live | **2** · `cp-long-verify` · `cp-cr-csrf-submit-docs` |
-| 已 harvest | scout · **W1–W10** · CR-002 `ddb6d664` · CR-004 `faab2a7b` |
-| findings | `FINDINGS-TRIAGE.md` · CR-001 DEFER · CR-002/004 DONE · CR-005 live |
-| 下一开 | W11/CR-005 DONE → **W12 INTEGRATE** · 可选 CR-006 |
+| 日序 | Day 0 续 · **W11 BLOCKED** · **CR-005 DONE** · **fix live** |
+| tip base | `df11a2f2` · **build 红**（route export）|
+| live | **1** · `cp-cr-csp-report-export` |
+| 已 harvest | scout · W1–W10 · CR-002/004/005 · W11 记 BLOCKER 后 rm |
+| findings | CR-001 DEFER · CR-002/004/005 DONE · **新 P0-build：route export** |
+| 下一开 | fix DONE → 重开 W11 verify → W12 INTEGRATE |
 | INTEGRATE | W12 · 总控只写说明 · **不** merge master |
 
 ---
@@ -35,11 +35,10 @@
 | **W8** | M-CP-webpack-lock-docs | `cp-webpack-lock-docs` | webpack-scripts-lock 契约测 + docs | 改 bundler 默认 | vitest **2** exit **0** | **DONE** · **`11515f0e`** pushed · rm |
 | **W9** | M-CP-csp-sentry-vitals | `cp-csp-sentry-vitals` | csp-report 脱敏 · web-vitals 可测 · **NOT_RELAXED** | 生产 CSP flip | vitest **30** exit **0** | **DONE** · **`11520432`** pushed · rm |
 | **W10** | M-CP-admin-bundle-split | `cp-admin-bundle-split` | dynamic Category/LinkHealth/LinkList | 功能重写 | vitest admin-boundary **3** exit **0** | **DONE** · **`e9b4ba01`** pushed · rm |
-| **W11** | M-CP-long-verify | `cp-long-verify` | 全量 typecheck/test/build(webpack) | push master | 命令+exit 入 evidence | **IN_PROGRESS** |
+| **W11** | M-CP-long-verify | `cp-long-verify` | typecheck/test/build | push master | tsc2 · test**0** · **build1** | **BLOCKED** · 见 `W11-BLOCKER-2026-07-24.md` · wt rm |
 | **W12** | M-CP-integrate-doc | （总控） | INTEGRATE.md 停人 | merge master | 人审 | queued |
-| **CR-002** | M-CP-cr-rate-limit-ops | `cp-cr-rate-limit-ops` | Upstash ops 清单 docs | 生产 env flip | docs | **DONE** · **`ddb6d664`** rm |
-| **CR-004** | M-CP-cr-service-role-checklist | `cp-cr-service-role-checklist` | service_role 纪律清单 | 扩 service_role | docs | **DONE** · **`faab2a7b`** rm |
-| **CR-005** | M-CP-cr-csrf-submit-docs | `cp-cr-csrf-submit-docs` | submit 威胁模型 docs | 改 CSRF 代码 | docs | **IN_PROGRESS** |
+| **CR-005** | M-CP-cr-csrf-submit-docs | `cp-cr-csrf-submit-docs` | submit 威胁模型 docs | 改 CSRF 代码 | docs | **DONE** · **`c69517f4`** rm |
+| **CR-BUILD** | M-CP-cr-csp-report-export | `cp-cr-csp-report-export` | 移 toPathOnlyUri 出 route | 放宽 CSP | vitest + **build 0** | **IN_PROGRESS** |
 | **W6** | M-CP-revalidate-tags | `cp-revalidate-tags` | revalidate 标签合理化（Admin 写后路径） | **绕 RLS** · 乱扩公开 revalidate | 契约/边界测 · typecheck | queued |
 | **W7** | M-CP-search-payload | `cp-search-payload` | Fuse/vector 查询体积与超时降级（payload 瘦身/超时路径） | 上 Meili/ES · 无阈值全量拆池 | search 相关 vitest + typecheck | queued |
 | **W8** | M-CP-webpack-lock-docs | `cp-webpack-lock-docs` | scripts/文档 **锁 `--webpack`** · 防 Turbopack 默认漂移 | 默认改 bundler | package scripts 断言测或 docs 双锁 + typecheck | queued |
