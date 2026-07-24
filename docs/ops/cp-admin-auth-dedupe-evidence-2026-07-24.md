@@ -21,8 +21,14 @@
 
 | 命令 | Exit | 备注 |
 |------|-----:|------|
-| `pnpm run typecheck` | _pending_ | `tsc --noEmit` |
-| `pnpm exec vitest run tests/admin-boundary.test.ts tests/security.test.ts tests/admin-login.test.tsx` | _pending_ | admin 边界 + requireAdmin + 登录 |
+| `pnpm run typecheck` | **2** | 既有 `tests/probe-security-headers.test.ts` ProcessEnv 债（W5）；**非**本支新增 |
+| `pnpm exec vitest run tests/admin-boundary.test.ts tests/security.test.ts tests/admin-login.test.tsx` | **0** | **3 files · 121 tests passed** |
+
+typecheck 错误样例（基线债，未触本模块）：
+
+```text
+tests/probe-security-headers.test.ts(31,35): error TS2345: Argument of type '{}' is not assignable to parameter of type 'ProcessEnv'.
+```
 
 ## 风险（一句）
 
