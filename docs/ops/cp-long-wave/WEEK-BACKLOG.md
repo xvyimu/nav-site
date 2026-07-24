@@ -11,11 +11,11 @@
 
 | 项 | 值 |
 |----|-----|
-| 日序 | Day 0 续 · **W1–W5 harvest** · **W6+W7+W8 live=3** |
+| 日序 | Day 0 续 · **W1–W8 harvest** · **W9+W10 live** |
 | tip base | `df11a2f2` · features 见 backlog 行 |
-| live | **3** · `cp-revalidate-tags` · `cp-search-payload` · `cp-webpack-lock-docs` |
-| 已 harvest | scout · W1–W5（`6015f650` typecheck0） |
-| 下一开 | W6/W7/W8 腾位 → W9/W10 |
+| live | **2** · `cp-csp-sentry-vitals` · `cp-admin-bundle-split` |
+| 已 harvest | scout · **W1–W8**（含 W7 `ce4c0443`） |
+| 下一开 | W9/W10 DONE → **W11** long-verify · **W12** INTEGRATE |
 | INTEGRATE | W12 · 总控只写说明 · **不** merge master |
 
 ---
@@ -29,9 +29,11 @@
 | **W3** | M-CP-links-pool | `cp-links-pool` | `coalesceInFlight` + getApprovedLinks | Meili | vitest **6** exit **0** | **DONE** · **`a3bd6e74`** pushed · rm |
 | **W4** | M-CP-admin-auth-dedupe | `cp-admin-auth-dedupe` | `getAdminSession`=cache(auth) · layout/pages | 改登录逻辑 | vitest admin-boundary **4** exit **0** | **DONE** · **`d6860240`** pushed · rm |
 | **W5** | M-CP-typecheck-probe-headers | `cp-typecheck-probe-headers` | ProbeEnv JSDoc · typecheck0 | 生产头 flip | typecheck **0** · probe 测 6/0 | **DONE** · **`6015f650`** pushed · rm |
-| **W6** | M-CP-revalidate-tags | `cp-revalidate-tags` | revalidate 标签合理化 | 绕 RLS | 契约测 · typecheck | **IN_PROGRESS** · nudged |
-| **W7** | M-CP-search-payload | `cp-search-payload` | Fuse/vector payload/超时降级 | Meili | search vitest · typecheck | **IN_PROGRESS** |
-| **W8** | M-CP-webpack-lock-docs | `cp-webpack-lock-docs` | scripts 锁 --webpack + 文档 | 改 bundler 默认 | scripts 断言 · docs | **IN_PROGRESS** · nudged |
+| **W6** | M-CP-revalidate-tags | `cp-revalidate-tags` | reason→path 矩阵 · tag 不扫 sitemap | 绕 RLS | vitest **9** exit **0** | **DONE** · **`83ec908d`** pushed · rm |
+| **W7** | M-CP-search-payload | `cp-search-payload` | Fuse limit + semantic cap80 + 2.5s timeout 降级 | Meili | vitest **31** exit **0** | **DONE** · **`ce4c0443`** pushed · rm |
+| **W8** | M-CP-webpack-lock-docs | `cp-webpack-lock-docs` | webpack-scripts-lock 契约测 + docs | 改 bundler 默认 | vitest **2** exit **0** | **DONE** · **`11515f0e`** pushed · rm |
+| **W9** | M-CP-csp-sentry-vitals | `cp-csp-sentry-vitals` | 观测完善 · **不放宽 CSP** | 生产 flip | 相关 vitest · NOT_RELAXED | **IN_PROGRESS** |
+| **W10** | M-CP-admin-bundle-split | `cp-admin-bundle-split` | 重 Admin dynamic import | 功能重写 | typecheck · vitest | **IN_PROGRESS** |
 | **W6** | M-CP-revalidate-tags | `cp-revalidate-tags` | revalidate 标签合理化（Admin 写后路径） | **绕 RLS** · 乱扩公开 revalidate | 契约/边界测 · typecheck | queued |
 | **W7** | M-CP-search-payload | `cp-search-payload` | Fuse/vector 查询体积与超时降级（payload 瘦身/超时路径） | 上 Meili/ES · 无阈值全量拆池 | search 相关 vitest + typecheck | queued |
 | **W8** | M-CP-webpack-lock-docs | `cp-webpack-lock-docs` | scripts/文档 **锁 `--webpack`** · 防 Turbopack 默认漂移 | 默认改 bundler | package scripts 断言测或 docs 双锁 + typecheck | queued |
@@ -79,7 +81,7 @@ W12 总控收口
 | Day0 | W1 **`96becf7c`** harvest · push feature · rm |
 | Day0 | 开 W2 · 后 **`98170d9e`** harvest · push · rm |
 | Day0 | 开 **W3** `cp-links-pool` + **W4** `cp-admin-auth-dedupe` · live=2 · 关 MINGW |
-| Day0 | 7m：W3/W4 harvest · 开 W6+W8 · W5 DONE **`6015f650`** typecheck0 · 开 W7 · live=3 |
+| Day0 | 7m：W3–W5 harvest · 开 W6–W8 · 再巡 **W6 `83ec908d` / W8 `11515f0e` / W7 `ce4c0443`** harvest · 开 W9+W10 · live=2 |
 
 ---
 

@@ -43,10 +43,12 @@
 | cp-home-static-client | (removed) | DONE | 0 | **`98170d9e`** pushed |
 | cp-links-pool | (removed) | DONE | 0 | **`a3bd6e74`** pushed |
 | cp-admin-auth-dedupe | (removed) | DONE | 0 | **`d6860240`** pushed |
-| cp-typecheck-probe-headers | (removed) | DONE | 0 | **`6015f650`** typecheck0 pushed |
-| **cp-revalidate-tags** | xvyimu/cp-revalidate-tags | in-progress | 1 | **W6 live** |
-| **cp-search-payload** | xvyimu/cp-search-payload | in-progress | 1 | **W7 live** |
-| **cp-webpack-lock-docs** | xvyimu/cp-webpack-lock-docs | in-progress | 1 | **W8 live** |
+| cp-typecheck-probe-headers | (removed) | DONE | 0 | **`6015f650`** |
+| cp-revalidate-tags | (removed) | DONE | 0 | **`83ec908d`** |
+| cp-search-payload | (removed) | DONE | 0 | **`ce4c0443`** |
+| cp-webpack-lock-docs | (removed) | DONE | 0 | **`11515f0e`** |
+| **cp-csp-sentry-vitals** | xvyimu/cp-csp-sentry-vitals | in-progress | 1 | **W9 live** |
+| **cp-admin-bundle-split** | xvyimu/cp-admin-bundle-split | in-progress | 1 | **W10 live** |
 
 ---
 
@@ -99,7 +101,7 @@
 | Phase0 scout | **DONE** |
 | G0 | **DONE**（C′ · 一周续航） |
 | Phase1 ACCEPTANCE | 见 §7 · 随模块 evidence |
-| Phase2 模块 | **W1–W5 DONE** · **W6+W7+W8 live=3** · 见 `WEEK-BACKLOG.md` |
+| Phase2 模块 | **W1–W8 DONE** · **W9+W10 live** · 见 `WEEK-BACKLOG.md` |
 | Phase3 verify | W11 |
 | Phase4 INTEGRATE | W12 · 只写 `INTEGRATE.md` · 不 merge |
 
@@ -136,6 +138,7 @@
 | T6 | 7m 巡检 | W3/W4 无 commit → nudge · 开 W5 · live=3 满 |
 | T7 | harvest W3/W4 | a3bd6e74 / d6860240 · vitest 0 · push · rm · 开 W6+W8 · nudge W5 |
 | T8 | harvest W5 | **`6015f650`** typecheck0 · push · rm · 开 W7 · live W6+W7+W8 |
+| T9 | harvest W6/W8/W7 | `83ec908d` / `11515f0e` / `ce4c0443` · 开 W9+W10 · live=2 |
 
 ---
 
