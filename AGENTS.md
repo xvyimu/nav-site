@@ -22,6 +22,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## 硬约束（摘要）
 
-- `pnpm dev` **必须**带 `--webpack`（端口 3264）  
-- 数据写路径经 repository / domain（见 docs ADR）  
+- `pnpm dev` / `pnpm build` **必须**带 `--webpack`（端口 **3264**；**禁止**改默认 bundler 为 Turbopack）
+  - 契约测：`tests/webpack-scripts-lock.test.ts`
+  - 栈 SSOT：[`docs/PROJECT.md`](./docs/PROJECT.md)
+- 数据写路径经 repository / domain（见 docs ADR）
 - 小修不重选型；换栈先 ADR + 改 PROJECT.md  

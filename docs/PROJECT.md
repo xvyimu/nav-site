@@ -43,7 +43,7 @@
 
 | 层 | 技术 | 约束 |
 |----|------|------|
-| 框架 | **Next.js 16** App Router | 构建 **webpack**（scripts 已带 `--webpack`；勿擅自改默认 bundler 策略） |
+| 框架 | **Next.js 16** App Router | 构建 **webpack**（`dev`/`build` scripts 必须带 `--webpack`；契约测 `tests/webpack-scripts-lock.test.ts`；勿擅自改默认 bundler 为 Turbopack） |
 | UI | **React 19** · **Tailwind CSS v4** · **shadcn/ui** · Radix | |
 | 语言 | TypeScript · **pnpm@11** | |
 | 数据 | **Supabase** PostgreSQL + **RLS** | 写路径经 repository / domain 模块（见 ADR） |
