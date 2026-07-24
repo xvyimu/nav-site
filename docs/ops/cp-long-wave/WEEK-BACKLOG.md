@@ -11,12 +11,12 @@
 
 | 项 | 值 |
 |----|-----|
-| 日序 | Day 0 续 · **W11 BLOCKED** · **CR-005 DONE** · **fix live** |
-| tip base | `df11a2f2` · **build 红**（route export）|
-| live | **1** · `cp-cr-csp-report-export` |
-| 已 harvest | scout · W1–W10 · CR-002/004/005 · W11 记 BLOCKER 后 rm |
-| findings | CR-001 DEFER · CR-002/004/005 DONE · **新 P0-build：route export** |
-| 下一开 | fix DONE → 重开 W11 verify → W12 INTEGRATE |
+| 日序 | Day 0 续 · **CR-BUILD DONE** · **W11 re-verify live** |
+| tip base | `df11a2f2` + fix feature `a8eb537a` |
+| live | **1** · `cp-long-verify` |
+| 已 harvest | W1–W10 · CR-002/004/005 · **CR-BUILD `a8eb537a` build0** |
+| findings | CR-001 DEFER · CR-002/004/005/BUILD DONE · CR-006 queued |
+| 下一开 | W11 DONE → **W12 INTEGRATE** |
 | INTEGRATE | W12 · 总控只写说明 · **不** merge master |
 
 ---
@@ -35,10 +35,8 @@
 | **W8** | M-CP-webpack-lock-docs | `cp-webpack-lock-docs` | webpack-scripts-lock 契约测 + docs | 改 bundler 默认 | vitest **2** exit **0** | **DONE** · **`11515f0e`** pushed · rm |
 | **W9** | M-CP-csp-sentry-vitals | `cp-csp-sentry-vitals` | csp-report 脱敏 · web-vitals 可测 · **NOT_RELAXED** | 生产 CSP flip | vitest **30** exit **0** | **DONE** · **`11520432`** pushed · rm |
 | **W10** | M-CP-admin-bundle-split | `cp-admin-bundle-split` | dynamic Category/LinkHealth/LinkList | 功能重写 | vitest admin-boundary **3** exit **0** | **DONE** · **`e9b4ba01`** pushed · rm |
-| **W11** | M-CP-long-verify | `cp-long-verify` | typecheck/test/build | push master | tsc2 · test**0** · **build1** | **BLOCKED** · 见 `W11-BLOCKER-2026-07-24.md` · wt rm |
-| **W12** | M-CP-integrate-doc | （总控） | INTEGRATE.md 停人 | merge master | 人审 | queued |
-| **CR-005** | M-CP-cr-csrf-submit-docs | `cp-cr-csrf-submit-docs` | submit 威胁模型 docs | 改 CSRF 代码 | docs | **DONE** · **`c69517f4`** rm |
-| **CR-BUILD** | M-CP-cr-csp-report-export | `cp-cr-csp-report-export` | 移 toPathOnlyUri 出 route | 放宽 CSP | vitest + **build 0** | **IN_PROGRESS** |
+| **W11** | M-CP-long-verify | `cp-long-verify` | 全量 typecheck/test/build | push master | 须 build0 | **IN_PROGRESS** re-open |
+| **CR-BUILD** | M-CP-cr-csp-report-export | `cp-cr-csp-report-export` | toPathOnlyUri → lib | 放宽 CSP | vitest6 **build0** | **DONE** · **`a8eb537a`** rm |
 | **W6** | M-CP-revalidate-tags | `cp-revalidate-tags` | revalidate 标签合理化（Admin 写后路径） | **绕 RLS** · 乱扩公开 revalidate | 契约/边界测 · typecheck | queued |
 | **W7** | M-CP-search-payload | `cp-search-payload` | Fuse/vector 查询体积与超时降级（payload 瘦身/超时路径） | 上 Meili/ES · 无阈值全量拆池 | search 相关 vitest + typecheck | queued |
 | **W8** | M-CP-webpack-lock-docs | `cp-webpack-lock-docs` | scripts/文档 **锁 `--webpack`** · 防 Turbopack 默认漂移 | 默认改 bundler | package scripts 断言测或 docs 双锁 + typecheck | queued |

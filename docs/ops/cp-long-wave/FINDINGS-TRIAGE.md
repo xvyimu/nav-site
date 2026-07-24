@@ -19,7 +19,7 @@
 | **CP-CR-004** | service_role 应用层纪律 | **DONE** 清单 | **`faab2a7b`** `cp-cr-service-role-checklist` rm |
 | **CP-CR-005** | 公开 submit CSRF/脚本面 | **DONE** docs | **`c69517f4`** rm |
 | **CP-CR-006** | Netlify CSP 漂移 | **queued** P2 | `cp-cr-netlify-drift` |
-| **CP-CR-BUILD** | csp-report route 导出 `toPathOnlyUri` → **next build 红** | **开修** | **`cp-cr-csp-report-export`** · W11 证据 |
+| **CP-CR-BUILD** | csp-report route 导出 `toPathOnlyUri` → next build 红 | **DONE** | **`a8eb537a`** · vitest6 · **build0** · rm |
 
 ## P2
 

@@ -51,9 +51,8 @@
 | cp-admin-bundle-split | (removed) | DONE | 0 | **`e9b4ba01`** |
 | cp-cr-rate-limit-ops | (removed) | DONE | 0 | **`ddb6d664`** |
 | cp-cr-service-role-checklist | (removed) | DONE | 0 | **`faab2a7b`** |
-| cp-long-verify | (removed) | BLOCKED | 0 | build1 · `W11-BLOCKER-2026-07-24.md` |
-| cp-cr-csrf-submit-docs | (removed) | DONE | 0 | **`c69517f4`** |
-| **cp-cr-csp-report-export** | xvyimu/cp-cr-csp-report-export | in-progress | 1 | **CR-BUILD live** · 修 route export |
+| cp-cr-csp-report-export | (removed) | DONE | 0 | **`a8eb537a`** build0 |
+| **cp-long-verify** | xvyimu/cp-long-verify | in-progress | 1 | **W11 re-open** · cherry-pick fix |
 
 ---
 
@@ -106,7 +105,7 @@
 | Phase0 scout | **DONE** |
 | G0 | **DONE**（C′ · 一周续航） |
 | Phase1 ACCEPTANCE | 见 §7 · 随模块 evidence |
-| Phase2 模块 | **W1–W10 + CR-002/004/005 DONE** · **W11 BLOCKED** · **CR-BUILD live** · 见 `W11-BLOCKER` |
+| Phase2 模块 | **W1–W10 + CR* DONE** · **W11 re-verify live** · CR-BUILD `a8eb537a` build0 |
 | Phase3 verify | W11 |
 | Phase4 INTEGRATE | W12 · 只写 `INTEGRATE.md` · 不 merge |
 
@@ -146,7 +145,8 @@
 | T9 | harvest W6/W8/W7 | `83ec908d` / `11515f0e` / `ce4c0443` · 开 W9+W10 |
 | T10 | findings 审查驱动 | P0 无 · W9 harvest · 开 CR-002/004 |
 | T11 | harvest W10+CR-002/004 | e9b4ba01 / ddb6d664 / faab2a7b · 开 W11 + CR-005 |
-| T12 | W11 实跑 | tsc2 · test0 · **build1** · 根因 route export · CR-005 `c69517f4` · 开 **cp-cr-csp-report-export** |
+| T12 | W11 实跑 | tsc2 · test0 · build1 · CR-005 · 开 CR-BUILD |
+| T13 | CR-BUILD harvest | **`a8eb537a`** vitest6 **build0** · 重开 W11 |
 
 ---
 
