@@ -11,11 +11,11 @@
 
 | 项 | 值 |
 |----|-----|
-| 日序 | Day 0 续 · **W1 harvest 完成** |
-| tip base | `df11a2f2` · W1 feature `96becf7c`（未合 master） |
-| live | **1** · `cp-home-static-client` |
-| 已 harvest | scout · **W1** `cp-admin-lh-ssr` @ `96becf7c` pushed feature |
-| 下一开 | W2 DONE 后 → **W3** 或 **W4**（live≤3） |
+| 日序 | Day 0 续 · **W1+W2 harvest** · **W3+W4 live** |
+| tip base | `df11a2f2` · features：W1 `96becf7c` · W2 `98170d9e`（均未合 master） |
+| live | **2** · `cp-links-pool` + `cp-admin-auth-dedupe` |
+| 已 harvest | scout · W1 · **W2** `cp-home-static-client` @ `98170d9e` pushed |
+| 下一开 | W3/W4 DONE 后 → W5 或并行 W6/W8（live≤3） |
 | INTEGRATE | W12 · 总控只写说明 · **不** merge master |
 
 ---
@@ -25,9 +25,9 @@
 | W | Module ID | wt 名 | 边界（做） | 不做 | 验收 | 状态 |
 |---|-----------|-------|-----------|------|------|------|
 | **W1** | M-CP-admin-lh-ssr | `cp-admin-lh-ssr` | link-health SSR/`initialData` 预取 · Panel 可 refresh/resolve · ADR-009 | 全量 Admin 重写 · RLS | evidence + vitest **0** · typecheck **2**（既有 probe 债→W5） | **DONE** · branch `xvyimu/cp-admin-lh-ssr` @ **`96becf7c`** · **pushed feature** · wt **rm** |
-| **W2** | M-CP-home-static-client | `cp-home-static-client` | 首页静态/client 边界：RSC vs client 切分复核 · 减少不必要 client 水合 | 换 UI 栈 · 虚拟列表 | typecheck + 相关测 · 说明边界图 | **IN_PROGRESS** |
-| **W3** | M-CP-links-pool | `cp-links-pool` | 链接池/请求合并（`getApprovedLinks` 等并发去重/缓存边界） | 拆微服务 · Meili | 测或代码路径证明合并 · typecheck | queued |
-| **W4** | M-CP-admin-auth-dedupe | `cp-admin-auth-dedupe` | Admin layout+page **重复 `auth()`** 去重（`cache`/thin getAdminSession） | 改登录产品逻辑 | typecheck + admin 边界测 | queued |
+| **W2** | M-CP-home-static-client | `cp-home-static-client` | 首页 RSC seed `?cat=`/`?q=` · 去无用 Suspense · url-state 可测 | 换 UI 栈 · 虚拟列表 | vitest **24** exit **0** · typecheck **2**（probe 既有） | **DONE** · `98170d9e` **pushed** · wt **rm** |
+| **W3** | M-CP-links-pool | `cp-links-pool` | 链接池/请求合并（`getApprovedLinks` 等并发去重/缓存边界） | 拆微服务 · Meili | 测或代码路径证明合并 · typecheck | **IN_PROGRESS** |
+| **W4** | M-CP-admin-auth-dedupe | `cp-admin-auth-dedupe` | Admin layout+page **重复 `auth()`** 去重（`cache`/thin getAdminSession） | 改登录产品逻辑 | typecheck + admin 边界测 | **IN_PROGRESS** |
 | **W5** | M-CP-typecheck-probe-headers | `cp-typecheck-probe-headers` | typecheck 债清扫 · `probe:headers` 本地/文档对齐 | 生产头 flip · 盲改平台层 | typecheck 0 · probe 命令 exit 记入 evidence | queued |
 | **W6** | M-CP-revalidate-tags | `cp-revalidate-tags` | revalidate 标签合理化（Admin 写后路径） | **绕 RLS** · 乱扩公开 revalidate | 契约/边界测 · typecheck | queued |
 | **W7** | M-CP-search-payload | `cp-search-payload` | Fuse/vector 查询体积与超时降级（payload 瘦身/超时路径） | 上 Meili/ES · 无阈值全量拆池 | search 相关 vitest + typecheck | queued |
@@ -73,10 +73,9 @@ W12 总控收口
 | 时 | 动作 |
 |----|------|
 | Day0 | 人闸一周续航 · 写本 WEEK-BACKLOG |
-| Day0 | 巡检 W1：agent 长 idle · dirty 有码无 commit → unblock 催收 |
-| Day0 | 实跑 vitest link-health **exit 0** · typecheck **2**（probe 既有→W5） |
-| Day0 | W1 **`96becf7c`** + evidence · **push feature exit 0** · stop/rm |
-| Day0 | 开 **W2** `cp-home-static-client` · 关 MINGW · live=1 |
+| Day0 | W1 **`96becf7c`** harvest · push feature · rm |
+| Day0 | 开 W2 · 后 **`98170d9e`** harvest · push · rm |
+| Day0 | 开 **W3** `cp-links-pool` + **W4** `cp-admin-auth-dedupe` · live=2 · 关 MINGW |
 
 ---
 
